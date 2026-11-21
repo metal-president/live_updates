@@ -710,10 +710,13 @@ final class $LiveUpdatesBridge$RouteListener$Type$
 /// Content is exchanged as the same JSON used on iOS ({@code title, body,
 /// progress, iconName, route, image, actions}) plus Android options: {@code
 /// channelId, channelName, shortCriticalText, colorArgb, whenEpochMillis,
-/// showChronometer, requestPromotion}. On Android 16+ progress uses Notification.ProgressStyle and promotion to a Live Update is requested
-/// (shown on builds that support promoted notifications, Android 16 QPR1 and
-/// later); older versions get a regular ongoing notification with a progress
-/// bar.
+/// showChronometer, requestPromotion, metrics, criticalMetric,
+/// bodySemanticStyle, progressSemanticStyle}. On Android 16+ progress uses
+/// Notification.ProgressStyle and promotion to a Live Update is
+/// requested (shown on builds that support promoted notifications, Android 16
+/// QPR1 and later); Android 17 shows {@code metrics} with {@code MetricStyle}
+/// instead (see LiveUpdatesApi37). Older versions get a regular ongoing
+/// notification with a progress bar.
 extension type LiveUpdatesBridge._(jni$_.JObject _$this)
     implements jni$_.JObject {
   static final _class = jni$_.JClass.forName(

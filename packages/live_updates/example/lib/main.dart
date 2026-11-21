@@ -37,6 +37,7 @@ class _ExamplePageState extends State<ExamplePage> {
   final _subs = <StreamSubscription<Object?>>[];
   LiveUpdate? _current;
   double _progress = 0;
+  DateTime _eta = DateTime.now();
   bool _push = false;
 
   @override
@@ -92,7 +93,17 @@ class _ExamplePageState extends State<ExamplePage> {
         iosSystemImage: 'list.bullet',
       ),
     ],
-    android: const AndroidLiveUpdateOptions(shortCriticalText: 'ETA'),
+    android: AndroidLiveUpdateOptions(
+      shortCriticalText: 'ETA',
+      // Android 17+: shown instead of the progress bar.
+      metrics: [
+        AndroidMetric.timer('Arrives in', _eta),
+        AndroidMetric.decimal('Distance', (1 - _progress) * 4, unit: 'km'),
+      ],
+      bodySemanticStyle: _progress >= 1
+          ? LiveUpdateSemanticStyle.safe
+          : LiveUpdateSemanticStyle.info,
+    ),
   );
 
   Future<void> _run(String label, Future<void> Function() action) async {
@@ -106,6 +117,7 @@ class _ExamplePageState extends State<ExamplePage> {
 
   Future<void> _start() => _run('start', () async {
     _progress = 0;
+    _eta = DateTime.now().add(const Duration(minutes: 15));
     // The order number is the key: pressing Start again updates instead of
     // creating a duplicate.
     final u = await LiveUpdates.startOrUpdate(

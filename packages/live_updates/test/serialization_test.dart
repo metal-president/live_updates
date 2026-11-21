@@ -82,4 +82,55 @@ void main() {
       isFalse,
     );
   });
+
+  test('android metrics and semantic styles', () {
+    final end = DateTime.fromMillisecondsSinceEpoch(1700000000000);
+    final json = LiveUpdateContent(
+      title: 't',
+      android: AndroidLiveUpdateOptions(
+        metrics: [
+          const AndroidMetric.integer('Steps', 1979),
+          const AndroidMetric.decimal(
+            'Distance',
+            4.25,
+            unit: 'km',
+            fractionDigits: 2,
+            semanticStyle: LiveUpdateSemanticStyle.caution,
+          ),
+          const AndroidMetric.text('Gate', 'B12'),
+          AndroidMetric.timer('ETA', end),
+          const AndroidMetric.pausedStopwatch('Time', Duration(seconds: 90)),
+        ],
+        criticalMetric: 3,
+        bodySemanticStyle: LiveUpdateSemanticStyle.danger,
+        progressSemanticStyle: LiveUpdateSemanticStyle.safe,
+      ),
+    ).toJson();
+    expect(json['metrics'], [
+      {'label': 'Steps', 'type': 'integer', 'value': 1979},
+      {
+        'label': 'Distance',
+        'type': 'decimal',
+        'value': 4.25,
+        'unit': 'km',
+        'fractionDigits': 2,
+        'semanticStyle': 'caution',
+      },
+      {'label': 'Gate', 'type': 'text', 'value': 'B12'},
+      {'label': 'ETA', 'type': 'timer', 'value': 1700000000000},
+      {'label': 'Time', 'type': 'pausedStopwatch', 'value': 90000},
+    ]);
+    expect(json['criticalMetric'], 3);
+    expect(json['bodySemanticStyle'], 'danger');
+    expect(json['progressSemanticStyle'], 'safe');
+  });
+
+  test('no metric keys by default', () {
+    final json = const LiveUpdateContent(
+      title: 't',
+      android: AndroidLiveUpdateOptions(),
+    ).toJson();
+    expect(json.containsKey('metrics'), isFalse);
+    expect(json.containsKey('bodySemanticStyle'), isFalse);
+  });
 }

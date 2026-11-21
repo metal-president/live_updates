@@ -170,6 +170,18 @@ Notifications). It cannot be enabled from Xcode.
      promotion off per app in system settings. Android 16 builds without
      promoted notification support show `ProgressStyle` without the chip.
    - Android 15 or lower: a regular ongoing notification with a progress bar.
+   - Android 17: metrics and semantic colors replace the progress bar
+     (`type` is `integer`, `decimal`, `text`, `timer`, `stopwatch`,
+     `pausedTimer` or `pausedStopwatch`; timers take epoch milliseconds,
+     paused ones a duration in milliseconds):
+
+     ```bash
+     dart run tool/send_push.dart fcm --service-account sa.json --fid <installation ID> \
+       --event update --id order-1 --content '{"title":"Order #1","body":"Nearby",
+       "bodySemanticStyle":"safe","metrics":[{"label":"Distance","type":"decimal",
+       "value":0.6,"unit":"km"},{"label":"Arrives in","type":"timer",
+       "value":1893456000000}]}'
+     ```
 5. Tap the notification: the app logs `tap: /orders/1`.
 
 ## iOS through FCM

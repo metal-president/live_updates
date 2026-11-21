@@ -13,6 +13,12 @@
   Re-run `create_widget --force` to update `LiveUpdatesActionIntent.swift`.
 - `LiveUpdateAction.requiresUnlock`: ask for an unlock before a Lock Screen
   press is handled (iOS, Android 12+).
+- Android 17: `AndroidLiveUpdateOptions.metrics` (`MetricStyle`, with
+  `criticalMetric`) and semantic colors for the body, the progress bar and
+  metrics (`LiveUpdateSemanticStyle`).
+- iOS 27: the generated widget leaves the title out of the compact Dynamic
+  Island view when it is limited in width (landscape). Re-run
+  `create_widget --force` to update the widget.
 - Fix: an Android `channelId` option no longer affects iOS push settings.
 
 ## 0.0.2

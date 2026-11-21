@@ -41,6 +41,26 @@ extension LiveUpdateContentJson on LiveUpdateContent {
       'whenEpochMillis': ?a.when?.millisecondsSinceEpoch,
       'showChronometer': a.showChronometer,
       if (!a.requestPromotion) 'requestPromotion': false,
+      if (a.metrics.isNotEmpty)
+        'metrics': [for (final m in a.metrics) m.toJson()],
+      'criticalMetric': ?a.criticalMetric,
+      'bodySemanticStyle': ?a.bodySemanticStyle?.name,
+      'progressSemanticStyle': ?a.progressSemanticStyle?.name,
     },
+  };
+}
+
+extension on AndroidMetric {
+  Map<String, Object?> toJson() => {
+    'label': label,
+    'type': kind.name,
+    'value': switch (value) {
+      final DateTime d => d.millisecondsSinceEpoch,
+      final Duration d => d.inMilliseconds,
+      final v => v,
+    },
+    'unit': ?unit,
+    if (kind == AndroidMetricKind.decimal) 'fractionDigits': ?fractionDigits,
+    'semanticStyle': ?semanticStyle?.name,
   };
 }

@@ -17,6 +17,7 @@ iOS **Live Activities** and Android **Live Update** notifications with one Dart 
 | --- | --- | --- | --- | --- |
 | Start / update / end | Live Activity | Live Update (when promoted) | Ongoing notification | no-op |
 | Progress | ✓ | `ProgressStyle` | progress bar | |
+| Metrics, semantic colors | – | Android 17+ | – | |
 | Tap route | ✓ | ✓ | ✓ | |
 | Lifecycle events | ✓ | ✓ | ✓ | |
 | Push tokens | ✓ | – | – | |
@@ -105,7 +106,8 @@ Interface Guidelines for Live Activities and Android's
   a Live Update; it then stays a regular notification.
 - Do not bring back an update the user dismissed. On Android `update` fails
   for a dismissed update, and remote `update` payloads for it are ignored.
-- Keep `shortCriticalText` short (Android suggests at most 7 characters).
+- Keep `shortCriticalText` short (Android suggests at most 7 characters) and
+  metric labels to 10 characters or fewer.
 
 ## Usage
 
@@ -245,6 +247,35 @@ Future<void> main() async {
   `LiveUpdatesActionIntent.swift`.
 - Android shows up to three actions. On iOS keep labels short: the whole
   content must stay under ActivityKit's 4 KB limit.
+
+### Android 17 metrics and semantic colors
+
+On Android 17 a Live Update can show up to three values, such as a countdown
+and a distance, with `MetricStyle` instead of the progress bar. Timers and
+stopwatches are counted by the system, so they keep running between updates.
+Semantic styles let Android color the body text, the progress bar or a metric
+by meaning (info, safe, caution, danger); the system picks the colors and
+applies them to promoted Live Updates.
+
+```dart
+LiveUpdateContent(
+  title: 'Order #1234',
+  body: 'Driver is nearby',
+  progress: 0.8,
+  android: AndroidLiveUpdateOptions(
+    metrics: [
+      AndroidMetric.timer('Arrives in', eta),
+      AndroidMetric.decimal('Distance', 0.6, unit: 'km'),
+    ],
+    criticalMetric: 0, // may be shown in the status bar chip
+    bodySemanticStyle: LiveUpdateSemanticStyle.safe,
+  ),
+);
+```
+
+Below Android 17 metrics and semantic styles are ignored and the progress bar
+is shown as before. The same keys work in remote payloads (see
+[docs/testing-remote.md](https://github.com/metal-president/live_updates/blob/main/docs/testing-remote.md)).
 
 ### Images
 

@@ -34,11 +34,13 @@ import org.json.JSONObject;
  * <p>Content is exchanged as the same JSON used on iOS ({@code title, body,
  * progress, iconName, route, image, actions}) plus Android options: {@code
  * channelId, channelName, shortCriticalText, colorArgb, whenEpochMillis,
- * showChronometer, requestPromotion}. On Android 16+ progress uses {@link
- * Notification.ProgressStyle} and promotion to a Live Update is requested
- * (shown on builds that support promoted notifications, Android 16 QPR1 and
- * later); older versions get a regular ongoing notification with a progress
- * bar.
+ * showChronometer, requestPromotion, metrics, criticalMetric,
+ * bodySemanticStyle, progressSemanticStyle}. On Android 16+ progress uses
+ * {@link Notification.ProgressStyle} and promotion to a Live Update is
+ * requested (shown on builds that support promoted notifications, Android 16
+ * QPR1 and later); Android 17 shows {@code metrics} with {@code MetricStyle}
+ * instead (see {@link LiveUpdatesApi37}). Older versions get a regular ongoing
+ * notification with a progress bar.
  */
 @Keep
 public final class LiveUpdatesBridge {
@@ -593,7 +595,11 @@ public final class LiveUpdatesBridge {
         .setOnlyAlertOnce(true)
         .setSmallIcon(smallIcon(c, optString(content, "iconName")));
     String body = optString(content, "body");
-    if (body != null) b.setContentText(body);
+    if (body != null) {
+      b.setContentText(
+          LiveUpdatesApi37.styledText(
+              body, LiveUpdatesApi37.semanticStyle(optString(content, "bodySemanticStyle"))));
+    }
     String image = optString(content, "image");
     if (image != null && !image.contains("/")) {
       android.graphics.Bitmap bitmap =
@@ -616,8 +622,19 @@ public final class LiveUpdatesBridge {
       requestPromotedOngoing(b, content.optBoolean("requestPromotion", true));
       String chip = optString(content, "shortCriticalText");
       if (chip != null) b.setShortCriticalText(chip);
-      if (hasProgress) {
-        b.setStyle(new Notification.ProgressStyle().setProgress(progress));
+      boolean metrics =
+          LiveUpdatesApi37.setMetricStyle(
+              b, content.optJSONArray("metrics"), content.optInt("criticalMetric", 0));
+      if (!metrics && hasProgress) {
+        Notification.ProgressStyle style = new Notification.ProgressStyle().setProgress(progress);
+        int semantic =
+            LiveUpdatesApi37.semanticStyle(optString(content, "progressSemanticStyle"));
+        if (semantic != 0 && LiveUpdatesApi37.available()) {
+          Notification.ProgressStyle.Segment segment = new Notification.ProgressStyle.Segment(100);
+          LiveUpdatesApi37.styleSegment(segment, semantic);
+          style.addProgressSegment(segment);
+        }
+        b.setStyle(style);
       }
     } else if (hasProgress) {
       b.setProgress(100, progress, false);
@@ -706,7 +723,7 @@ public final class LiveUpdatesBridge {
   }
 
   @Nullable
-  private static String optString(JSONObject o, String key) {
+  static String optString(JSONObject o, String key) {
     return o.has(key) && !o.isNull(key) ? o.optString(key) : null;
   }
 

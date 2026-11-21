@@ -38,11 +38,7 @@ struct LiveUpdatesWidgetLiveActivity: Widget {
       } compactLeading: {
         Thumbnail(state: context.state)
       } compactTrailing: {
-        if let progress = context.state.progress {
-          ProgressView(value: progress).progressViewStyle(.circular)
-        } else {
-          Text(context.state.title).lineLimit(1).frame(maxWidth: 64)
-        }
+        CompactTrailing(state: context.state)
       } minimal: {
         if let progress = context.state.progress {
           ProgressView(value: progress).progressViewStyle(.circular)
@@ -81,6 +77,46 @@ private struct LockScreenView: View {
     }
   }
 }
+
+/// Progress, else the title. In iOS 27's landscape Dynamic Island the compact
+/// views cannot grow, so the title is left out there.
+private struct CompactTrailing: View {
+  let state: LiveUpdatesAttributes.ContentState
+
+  var body: some View {
+    if let progress = state.progress {
+      ProgressView(value: progress).progressViewStyle(.circular)
+    } else {
+      #if compiler(>=6.4)
+        if #available(iOS 27.0, *) {
+          WidthAwareTitle(title: state.title)
+        } else {
+          title
+        }
+      #else
+        title
+      #endif
+    }
+  }
+
+  private var title: some View {
+    Text(state.title).lineLimit(1).frame(maxWidth: 64)
+  }
+}
+
+#if compiler(>=6.4)
+  @available(iOS 27.0, *)
+  private struct WidthAwareTitle: View {
+    let title: String
+    @Environment(\.isDynamicIslandLimitedInWidth) private var limitedInWidth
+
+    var body: some View {
+      if !limitedInWidth {
+        Text(title).lineLimit(1).frame(maxWidth: 64)
+      }
+    }
+  }
+#endif
 
 /// `LiveUpdateContent.actions`. Background actions run
 /// `LiveUpdatesActionIntent`; `opensApp` actions open the app with a URL.

@@ -177,4 +177,61 @@ public class LiveUpdatesBridgeTest {
         "android.app.Notification$ProgressStyle",
         shown(id).extras.getString(Notification.EXTRA_TEMPLATE));
   }
+
+  @Test
+  public void countdownTimerUsesTheChronometer() throws Exception {
+    long end = System.currentTimeMillis() + 600_000;
+    String id = LiveUpdatesBridge.start("{\"title\":\"A\",\"timerEnd\":" + (end / 1000.0) + "}");
+    Notification n = shown(id);
+    assertEquals(end, n.when, 1);
+    assertTrue(n.extras.getBoolean(Notification.EXTRA_SHOW_CHRONOMETER));
+    assertTrue(n.extras.getBoolean(Notification.EXTRA_CHRONOMETER_COUNT_DOWN));
+  }
+
+  @Test
+  public void stopwatchCountsUp() throws Exception {
+    long start = System.currentTimeMillis() - 60_000;
+    String id = LiveUpdatesBridge.start("{\"title\":\"A\",\"timerStart\":" + (start / 1000.0) + "}");
+    Notification n = shown(id);
+    assertEquals(start, n.when, 1);
+    assertTrue(n.extras.getBoolean(Notification.EXTRA_SHOW_CHRONOMETER));
+    assertFalse(n.extras.getBoolean(Notification.EXTRA_CHRONOMETER_COUNT_DOWN));
+  }
+
+  @Test
+  public void invalidTimersAreIgnored() throws Exception {
+    String id = LiveUpdatesBridge.start("{\"title\":\"A\",\"timerEnd\":\"soon\"}");
+    assertFalse(shown(id).extras.getBoolean(Notification.EXTRA_SHOW_CHRONOMETER));
+  }
+
+  @Test
+  public void timeoutAndAlert() throws Exception {
+    String id =
+        LiveUpdatesBridge.start("{\"title\":\"A\",\"timeoutAfterMillis\":3600000}");
+    Notification n = shown(id);
+    assertEquals(3_600_000, n.getTimeoutAfter());
+    assertTrue((n.flags & Notification.FLAG_ONLY_ALERT_ONCE) != 0);
+    LiveUpdatesBridge.update(id, "{\"title\":\"B\",\"androidAlert\":true}");
+    assertEquals(0, shown(id).flags & Notification.FLAG_ONLY_ALERT_ONCE);
+  }
+
+  @Test
+  public void progressSegmentsAndPoints() throws Exception {
+    String id =
+        LiveUpdatesBridge.start(
+            "{\"title\":\"A\",\"progress\":0.5,"
+                + "\"progressSegments\":[{\"length\":1,\"colorArgb\":4294901760},{\"length\":3},\"bad\",{\"length\":-5}],"
+                + "\"progressPoints\":[{\"position\":0.25},{\"position\":7},{\"position\":\"x\"}]}");
+    Notification n = shown(id);
+    Notification.ProgressStyle style =
+        (Notification.ProgressStyle) Notification.Builder.recoverBuilder(app, n).getStyle();
+    // Lengths 1 + 3 + 1 (the negative one is clamped to 1); "bad" is skipped.
+    assertEquals(3, style.getProgressSegments().size());
+    assertEquals(0xFFFF0000, style.getProgressSegments().get(0).getColor());
+    assertEquals(5, style.getProgressMax());
+    assertEquals(3, style.getProgress()); // round(0.5 * 5)
+    assertEquals(2, style.getProgressPoints().size());
+    assertEquals(1, style.getProgressPoints().get(0).getPosition()); // round(0.25 * 5)
+    assertEquals(5, style.getProgressPoints().get(1).getPosition()); // clamped to the end
+  }
 }

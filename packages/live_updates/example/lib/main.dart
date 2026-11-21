@@ -77,6 +77,8 @@ class _ExamplePageState extends State<ExamplePage> {
     body: _progress >= 1 ? 'Delivered' : 'On the way',
     progress: _progress,
     route: '/orders/1234',
+    // Counted by the system: no update needed every second.
+    timer: LiveUpdateTimer.countdown(_eta),
     image: const LiveUpdateImage.asset('assets/parcel.png', maxDimension: 128),
     actions: const [
       LiveUpdateAction(
@@ -95,6 +97,19 @@ class _ExamplePageState extends State<ExamplePage> {
     ],
     android: AndroidLiveUpdateOptions(
       shortCriticalText: 'ETA',
+      // Android 16+: preparing, on the way, delivered.
+      progressSegments: const [
+        AndroidProgressSegment(1),
+        AndroidProgressSegment(2),
+        AndroidProgressSegment(1),
+      ],
+      progressPoints: const [
+        AndroidProgressPoint(.25),
+        AndroidProgressPoint(.75),
+      ],
+      // Gone after 2 hours even if the app never ends it.
+      timeoutAfter: const Duration(hours: 2),
+      alert: _progress >= 1,
       // Android 17+: shown instead of the progress bar.
       metrics: [
         AndroidMetric.timer('Arrives in', _eta),

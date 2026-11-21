@@ -65,6 +65,15 @@ with the steps below.
      --content '{"title":"Order #1","body":"Delivered","progress":1}'
    ```
 
+   A countdown that keeps running without further pushes (seconds since
+   1970):
+
+   ```bash
+   ETA=$(( $(date +%s) + 600 ))
+   dart run tool/send_push.dart apns --sandbox ... --token <push token> \
+     --event update --content '{"title":"Order #1","timerEnd":'"$ETA"'}'
+   ```
+
 6. Tap the activity: the app opens and logs `tap: /orders/1`.
 
 Tap handling alone can be checked on a simulator without APNs:

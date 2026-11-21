@@ -151,4 +151,55 @@ void main() {
     ]);
     expect(jsonEncode(json), isA<String>());
   });
+
+  test('timers are sent as seconds since 1970', () {
+    final at = DateTime.fromMillisecondsSinceEpoch(1700000000500);
+    expect(
+      LiveUpdateContent(
+        title: 't',
+        timer: LiveUpdateTimer.countdown(at),
+      ).toJson()['timerEnd'],
+      1700000000.5,
+    );
+    final json = LiveUpdateContent(
+      title: 't',
+      timer: LiveUpdateTimer.stopwatch(at),
+    ).toJson();
+    expect(json['timerStart'], 1700000000.5);
+    expect(json.containsKey('timerEnd'), isFalse);
+  });
+
+  test('android progress parts, timeout and alert', () {
+    final json = const LiveUpdateContent(
+      title: 't',
+      ios: IosLiveUpdateOptions(
+        alert: IosAlert(title: 'a', body: 'b'),
+      ),
+      android: AndroidLiveUpdateOptions(
+        progressSegments: [
+          AndroidProgressSegment(1, color: Color(0xFFFF0000)),
+          AndroidProgressSegment(
+            3,
+            semanticStyle: LiveUpdateSemanticStyle.caution,
+          ),
+        ],
+        progressPoints: [AndroidProgressPoint(.5)],
+        progressTrackerIcon: 'ic_car',
+        timeoutAfter: Duration(minutes: 90),
+        alert: true,
+      ),
+    ).toJson();
+    expect(json['progressSegments'], [
+      {'length': 1, 'colorArgb': 0xFFFF0000},
+      {'length': 3, 'semanticStyle': 'caution'},
+    ]);
+    expect(json['progressPoints'], [
+      {'position': .5},
+    ]);
+    expect(json['progressTrackerIcon'], 'ic_car');
+    expect(json['timeoutAfterMillis'], 5400000);
+    expect(json['androidAlert'], isTrue);
+    // The iOS alert keeps its own key.
+    expect(json['alert'], {'title': 'a', 'body': 'b'});
+  });
 }

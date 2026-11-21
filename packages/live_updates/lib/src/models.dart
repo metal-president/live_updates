@@ -19,6 +19,7 @@ final class LiveUpdateContent {
     this.route,
     this.image,
     this.actions = const [],
+    this.timer,
     this.ios,
     this.android,
   }) : assert(progress == null || (progress >= 0 && progress <= 1));
@@ -53,6 +54,14 @@ final class LiveUpdateContent {
   /// three as notification actions.
   final List<LiveUpdateAction> actions;
 
+  /// A countdown or stopwatch that the system keeps running between updates,
+  /// such as the time until a delivery arrives. Prefer it to updating a text
+  /// every second, which uses up the update budget on both platforms.
+  ///
+  /// iOS shows it in the widget template; Android shows it as the
+  /// notification's chronometer (replacing [AndroidLiveUpdateOptions.when]).
+  final LiveUpdateTimer? timer;
+
   /// iOS-only options.
   final IosLiveUpdateOptions? ios;
 
@@ -68,6 +77,7 @@ final class LiveUpdateContent {
     String? route,
     LiveUpdateImage? image,
     List<LiveUpdateAction>? actions,
+    LiveUpdateTimer? timer,
     IosLiveUpdateOptions? ios,
     AndroidLiveUpdateOptions? android,
   }) => LiveUpdateContent(
@@ -78,6 +88,7 @@ final class LiveUpdateContent {
     route: route ?? this.route,
     image: image ?? this.image,
     actions: actions ?? this.actions,
+    timer: timer ?? this.timer,
     ios: ios ?? this.ios,
     android: android ?? this.android,
   );
@@ -92,6 +103,7 @@ final class LiveUpdateContent {
       other.route == route &&
       other.image == image &&
       listEquals(other.actions, actions) &&
+      other.timer == timer &&
       other.ios == ios &&
       other.android == android;
 
@@ -104,6 +116,7 @@ final class LiveUpdateContent {
     route,
     image,
     Object.hashAll(actions),
+    timer,
     ios,
     android,
   );
@@ -111,6 +124,32 @@ final class LiveUpdateContent {
   @override
   String toString() =>
       'LiveUpdateContent(title: $title, body: $body, progress: $progress)';
+}
+
+/// A timer counted by the system (see [LiveUpdateContent.timer]).
+@immutable
+final class LiveUpdateTimer {
+  /// Counts down to [end] and stops at zero.
+  const LiveUpdateTimer.countdown(DateTime this.end) : start = null;
+
+  /// Counts up from [start].
+  const LiveUpdateTimer.stopwatch(DateTime this.start) : end = null;
+
+  /// Start of a stopwatch, `null` for a countdown.
+  final DateTime? start;
+
+  /// End of a countdown, `null` for a stopwatch.
+  final DateTime? end;
+
+  /// Whether this is a countdown.
+  bool get countsDown => end != null;
+
+  @override
+  bool operator ==(Object other) =>
+      other is LiveUpdateTimer && other.start == start && other.end == end;
+
+  @override
+  int get hashCode => Object.hash(start, end);
 }
 
 /// A button on a live update.
@@ -338,6 +377,11 @@ final class AndroidLiveUpdateOptions {
     this.criticalMetric,
     this.bodySemanticStyle,
     this.progressSemanticStyle,
+    this.progressSegments = const [],
+    this.progressPoints = const [],
+    this.progressTrackerIcon,
+    this.timeoutAfter,
+    this.alert = false,
   }) : assert(criticalMetric == null || criticalMetric >= 0);
 
   /// Notification channel id. The channel is created on first use.
@@ -393,7 +437,29 @@ final class AndroidLiveUpdateOptions {
   final LiveUpdateSemanticStyle? bodySemanticStyle;
 
   /// Semantic color of the progress bar (Android 17+, promoted Live Updates).
+  /// Used when there are no [progressSegments].
   final LiveUpdateSemanticStyle? progressSemanticStyle;
+
+  /// Parts of the progress bar, such as the stages of a delivery (Android
+  /// 16+ `ProgressStyle`). Lengths are relative; [LiveUpdateContent.progress]
+  /// still runs from 0 to 1 over the whole bar.
+  final List<AndroidProgressSegment> progressSegments;
+
+  /// Marks on the progress bar, such as stops (Android 16+).
+  final List<AndroidProgressPoint> progressPoints;
+
+  /// Drawable shown at the current position of the progress bar, such as a
+  /// car or a parcel (Android 16+).
+  final String? progressTrackerIcon;
+
+  /// Removes the notification after this time even if the app is not
+  /// running, so a forgotten update does not stay on screen. Android 8+; on
+  /// iOS use [IosLiveUpdateOptions.staleDate] and end the activity.
+  final Duration? timeoutAfter;
+
+  /// Play the channel's sound and vibration for this post. By default only
+  /// the first post of an update alerts the user (iOS: [IosLiveUpdateOptions.alert]).
+  final bool alert;
 
   @override
   bool operator ==(Object other) =>
@@ -408,7 +474,12 @@ final class AndroidLiveUpdateOptions {
       listEquals(other.metrics, metrics) &&
       other.criticalMetric == criticalMetric &&
       other.bodySemanticStyle == bodySemanticStyle &&
-      other.progressSemanticStyle == progressSemanticStyle;
+      other.progressSemanticStyle == progressSemanticStyle &&
+      listEquals(other.progressSegments, progressSegments) &&
+      listEquals(other.progressPoints, progressPoints) &&
+      other.progressTrackerIcon == progressTrackerIcon &&
+      other.timeoutAfter == timeoutAfter &&
+      other.alert == alert;
 
   @override
   int get hashCode => Object.hash(
@@ -423,7 +494,68 @@ final class AndroidLiveUpdateOptions {
     criticalMetric,
     bodySemanticStyle,
     progressSemanticStyle,
+    Object.hashAll(progressSegments),
+    Object.hashAll(progressPoints),
+    progressTrackerIcon,
+    timeoutAfter,
+    alert,
   );
+}
+
+/// A part of the Android progress bar
+/// ([AndroidLiveUpdateOptions.progressSegments]).
+@immutable
+final class AndroidProgressSegment {
+  /// Creates a segment with a relative [length] (greater than 0).
+  const AndroidProgressSegment(this.length, {this.color, this.semanticStyle})
+    : assert(length > 0);
+
+  /// Length relative to the other segments.
+  final int length;
+
+  /// Color of the segment.
+  final Color? color;
+
+  /// Semantic color (Android 17+, promoted Live Updates); wins over [color].
+  final LiveUpdateSemanticStyle? semanticStyle;
+
+  @override
+  bool operator ==(Object other) =>
+      other is AndroidProgressSegment &&
+      other.length == length &&
+      other.color == color &&
+      other.semanticStyle == semanticStyle;
+
+  @override
+  int get hashCode => Object.hash(length, color, semanticStyle);
+}
+
+/// A mark on the Android progress bar
+/// ([AndroidLiveUpdateOptions.progressPoints]).
+@immutable
+final class AndroidProgressPoint {
+  /// Creates a point at [position], between 0 and 1 of the bar.
+  const AndroidProgressPoint(this.position, {this.color, this.semanticStyle})
+    : assert(position >= 0 && position <= 1);
+
+  /// Position between 0 (start) and 1 (end).
+  final double position;
+
+  /// Color of the point.
+  final Color? color;
+
+  /// Semantic color (Android 17+, promoted Live Updates); wins over [color].
+  final LiveUpdateSemanticStyle? semanticStyle;
+
+  @override
+  bool operator ==(Object other) =>
+      other is AndroidProgressPoint &&
+      other.position == position &&
+      other.color == color &&
+      other.semanticStyle == semanticStyle;
+
+  @override
+  int get hashCode => Object.hash(position, color, semanticStyle);
 }
 
 /// Meaning of a color in an Android 17 Live Update. Android chooses the

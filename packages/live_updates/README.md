@@ -16,7 +16,8 @@ iOS **Live Activities** and Android **Live Update** notifications with one Dart 
 | | iOS | Android 16+ | Android 7–15 | Other |
 | --- | --- | --- | --- | --- |
 | Start / update / end | Live Activity | Live Update (when promoted) | Ongoing notification | no-op |
-| Progress | ✓ | `ProgressStyle` | progress bar | |
+| Progress | ✓ | `ProgressStyle` (segments, points) | progress bar | |
+| Timer (countdown, stopwatch) | ✓ | chronometer | chronometer | |
 | Metrics, semantic colors | – | Android 17+ | – | |
 | Tap route | ✓ | ✓ | ✓ | |
 | Lifecycle events | ✓ | ✓ | ✓ | |
@@ -248,6 +249,50 @@ Future<void> main() async {
 - Android shows up to three actions. On iOS keep labels short: the whole
   content must stay under ActivityKit's 4 KB limit.
 
+### Timers
+
+A countdown or a stopwatch keeps running between updates because the system
+counts it: iOS draws it in the widget template, Android shows the
+notification's chronometer. Use it instead of updating a text every second,
+which uses up the update budget.
+
+```dart
+LiveUpdateContent(
+  title: 'Order #1234',
+  timer: LiveUpdateTimer.countdown(eta), // or LiveUpdateTimer.stopwatch(startedAt)
+);
+```
+
+On iOS a countdown stops at zero; Android keeps counting below zero, so update
+or end the live update when the time is up.
+
+### Android progress stages, timeout and alerts
+
+```dart
+LiveUpdateContent(
+  title: 'Order #1234',
+  progress: 0.6,
+  android: const AndroidLiveUpdateOptions(
+    // Android 16+: preparing, on the way, delivered (relative lengths).
+    progressSegments: [
+      AndroidProgressSegment(1),
+      AndroidProgressSegment(2),
+      AndroidProgressSegment(1),
+    ],
+    progressPoints: [AndroidProgressPoint(.25), AndroidProgressPoint(.75)],
+    progressTrackerIcon: 'ic_courier', // a drawable in your app
+    // Removed after 2 hours even if the app never ends it.
+    timeoutAfter: Duration(hours: 2),
+    // Sound and vibrate for this post (normally only the first one alerts).
+    alert: true,
+  ),
+);
+```
+
+`progress` still runs from 0 to 1 over the whole bar. Below Android 16 the
+segments, points and tracker icon are ignored. The iOS equivalent of `alert`
+is `IosLiveUpdateOptions.alert`.
+
 ### Android 17 metrics and semantic colors
 
 On Android 17 a Live Update can show up to three values, such as a countdown
@@ -332,7 +377,8 @@ update.pushTokens.listen((token) => api.registerActivity(update.id, token.hex));
 
 Send pushes with `apns-push-type: liveactivity` and topic
 `<bundle id>.push-type.liveactivity`. The `content-state` uses the same keys as
-`LiveUpdateContent`: `title`, `body`, `progress`, `iconName`, `route`, `extra`.
+`LiveUpdateContent`: `title`, `body`, `progress`, `iconName`, `route`, `extra`,
+and `timerStart` / `timerEnd` (seconds since 1970) for a timer.
 For push-to-start, set `"attributes-type": "LiveUpdatesAttributes"` and
 `"attributes": {}`.
 

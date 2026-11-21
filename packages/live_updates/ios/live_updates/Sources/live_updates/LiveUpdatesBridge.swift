@@ -349,6 +349,8 @@ private struct Payload: Decodable {
   var image: String?
   var actions: [LiveUpdatesAction]?
   var extra: [String: String]?
+  var timerStart: Double?
+  var timerEnd: Double?
   var staleDate: Double?
   var relevanceScore: Double?
   var enablePushUpdates: Bool?
@@ -363,7 +365,8 @@ private struct Payload: Decodable {
     ActivityContent(
       state: .init(
         title: title, body: body, progress: progress, iconName: iconName,
-        route: route, image: image, actions: actions ?? [], extra: extra ?? [:]),
+        route: route, image: image, actions: actions ?? [], extra: extra ?? [:],
+        timerStart: timerStart, timerEnd: timerEnd),
       staleDate: staleDate.map { Date(timeIntervalSince1970: $0) },
       relevanceScore: relevanceScore ?? 0
     )

@@ -53,7 +53,8 @@ final class LiveUpdate {
   int get hashCode => id.hashCode;
 
   @override
-  String toString() => 'LiveUpdate($id${key == null ? '' : ', $key'})';
+  // The key may be your own id, such as an order number: keep it out of logs.
+  String toString() => 'LiveUpdate($id)';
 }
 
 LiveUpdateState? _stateFromName(String name) => switch (name) {

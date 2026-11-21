@@ -21,13 +21,25 @@ remotely. Activity tokens arrive with that `key`, so the server can address
 the update by the same id on both platforms. Keys appear in notification data
 and push payloads, so do not use secrets as keys.
 
+The app reports tokens and keys itself, so a modified app can report any key.
+On the server:
+
+- Accept tokens only over an authenticated connection, and store them per
+  user, device and key. A new token for the same key replaces the old one.
+- Look keys up only within the records of the user they belong to, after
+  checking that the user owns that order (or other object). Never map a key
+  to another user's token.
+- Use a key for one running update per device: two activities started with
+  the same key report two tokens.
+
 ## One content JSON
 
 Build the content once. Keys are those of `LiveUpdateContent` (see the
 package README): `title`, `body`, `progress`, `route`, `timerEnd` /
 `timerStart` (seconds since 1970), `actions`, `extra`, and Android options
 such as `channelId`, `shortCriticalText` or `progressSegments`. Each platform
-ignores the keys it does not use.
+ignores the keys it does not use. iOS requires `title`, and `extra` must map
+strings to strings, or the activity rejects the content.
 
 ```json
 {"title": "Order #1234", "body": "On the way", "progress": 0.6, "timerEnd": 1893456000}
@@ -53,7 +65,8 @@ JSON encoded once more.
 ```
 
 - `live_updates_event`: `start`, `update` or `end`. `live_updates_id` is the key.
-- `end` may carry final content and `live_updates_dismiss_after` (seconds).
+- `end` may carry final content and `live_updates_dismiss_after` (seconds,
+  as a string like every FCM data value).
 - An `update` for an update that is not shown (ended, or dismissed by the
   user) is ignored; send `start` to show it again.
 
@@ -85,8 +98,10 @@ activity token for that key (or the push-to-start token to start one).
   older than the last one it applied.
 - `start` (with the push-to-start token) also needs
   `"attributes-type": "LiveUpdatesAttributes"`, `"attributes": {"key": "order-1234"}`
-  and an `alert` with `title` and `body`.
-- `end` takes `dismissal-date` (seconds); `stale-date`, `relevance-score` and
+  and an `alert` with `title` and `body`. Use a key that no running activity
+  on the device has.
+- `end` takes `dismissal-date` (a UNIX time in seconds); `stale-date`
+  (also a UNIX time), `relevance-score` and
   `alert` go next to `content-state`, not inside it.
 - A push replaces the whole content state: send every field that should stay.
 

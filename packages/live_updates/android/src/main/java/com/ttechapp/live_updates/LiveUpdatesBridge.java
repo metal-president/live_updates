@@ -176,14 +176,25 @@ public final class LiveUpdatesBridge {
    */
   @Nullable
   public static String keyForId(@NonNull String id) {
+    // Posted in this process: known right away (the system lists a new
+    // notification only after a moment).
+    synchronized (keyedIds) {
+      if (keyedIds.contains(id)) return id;
+    }
+    Context c = context;
+    if (c == null) return null;
+    // After a process restart: the marker on the shown notification.
     for (android.service.notification.StatusBarNotification n :
-        manager(requireContext()).getActiveNotifications()) {
-      if ((TAG_PREFIX + id).equals(n.getTag())) {
+        manager(c).getActiveNotifications()) {
+      if (n.getId() == NOTIFICATION_ID && (TAG_PREFIX + id).equals(n.getTag())) {
         return n.getNotification().extras.getBoolean(EXTRA_KEYED, false) ? id : null;
       }
     }
     return null;
   }
+
+  /** Ids posted with a key in this process. */
+  private static final Set<String> keyedIds = new java.util.HashSet<>();
 
   /** Notification extra marking updates whose id is an app or server key. */
   private static final String EXTRA_KEYED = "com.ttechapp.live_updates.KEYED";
@@ -412,6 +423,9 @@ public final class LiveUpdatesBridge {
       recentlyEnded.put(id, SystemClock.uptimeMillis());
     }
     emit("ended", id);
+    synchronized (keyedIds) {
+      keyedIds.remove(id);
+    }
     clearDismissed(c, id);
     if (json != null && dismissAfterSeconds != 0) {
       JSONObject content = new JSONObject(json);
@@ -576,6 +590,12 @@ public final class LiveUpdatesBridge {
     boolean isNew;
     synchronized (known) {
       isNew = known.add(id) && !wasShown;
+    }
+    // Before "started", so a listener can read the key at once.
+    if (keyed) {
+      synchronized (keyedIds) {
+        keyedIds.add(id);
+      }
     }
     if (isNew) emit("started", id);
     Notification.Builder b = builder(c, content, remote);

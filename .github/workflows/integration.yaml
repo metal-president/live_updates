@@ -18,8 +18,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Xcode 26 (macos-latest) and the Xcode 27 preview image.
-        runner: [macos-latest, xcode-27]
+        # Xcode 26 (macos-latest) on every PR; the Xcode 27 preview image
+        # (slow to get and to run) only on main and when started by hand.
+        runner: ${{ github.event_name == 'pull_request' && fromJSON('["macos-latest"]') || fromJSON('["macos-latest", "xcode-27"]') }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
     steps:

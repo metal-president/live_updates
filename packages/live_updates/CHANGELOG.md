@@ -1,5 +1,9 @@
 ## Unreleased
 
+- `LiveUpdate.key`: the key from `startOrUpdate`, a push-to-start
+  `attributes.key` (iOS) or a remote `live_updates_id` (Android), also on
+  updates from `active()` and `onStarted`.
+- Docs: sending to both platforms through FCM (`docs/server-fcm.md`).
 - `IosLiveUpdateOptions.compactTrailing` and `minimal` (`IosIslandContent`):
   choose what the compact and minimal Dynamic Island show.
 - `create_widget`: the reusable views move to `LiveUpdatesViews.swift`, which

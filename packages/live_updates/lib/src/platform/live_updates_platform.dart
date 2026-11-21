@@ -41,6 +41,9 @@ abstract class LiveUpdatesPlatform {
   /// Id of the running live update with key [key].
   Future<String?> idForKey(String key);
 
+  /// Key of the live update [id], or `null` when it was started without one.
+  Future<String?> keyForId(String id) async => null;
+
   /// Button presses as `(update id, action id)`.
   Stream<(String, String)> get actions;
 

@@ -1,0 +1,21 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: pub
+    directories:
+      - /
+      - /packages/live_updates
+      - /packages/live_updates/example
+      - /packages/live_updates_fcm
+    schedule:
+      interval: weekly
+    groups:
+      pub:
+        patterns: ["*"]

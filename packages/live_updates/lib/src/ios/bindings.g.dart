@@ -253,6 +253,20 @@ extension type LiveUpdatesBridge._(objc.ObjCObject object$)
     return _objc_msgSend_91o635(_class_LiveUpdatesBridge, _sel_isSupported);
   }
 
+  /// Key of the activity with <code>id</code> (from <code>startOrUpdate</code> or the push-to-start
+  /// <code>attributes</code>), or <code>nil</code>.
+  static objc.NSString? keyForId(objc.NSString id) {
+    final _$$ref = id.ref;
+    final $ret = _objc_msgSend_1sotr3r(
+      _class_LiveUpdatesBridge,
+      _sel_keyForId_,
+      _$$ref.pointer,
+    );
+    return $ret.address == 0
+        ? null
+        : objc.NSString.fromPointer($ret, retain: true, release: true);
+  }
+
   /// new
   static LiveUpdatesBridge new$() {
     final $ret = _objc_msgSend_151sglz(_class_LiveUpdatesBridge, _sel_new);
@@ -1572,6 +1586,7 @@ late final _sel_imageDirectory = objc.registerName("imageDirectory");
 late final _sel_init = objc.registerName("init");
 late final _sel_isKindOfClass_ = objc.registerName("isKindOfClass:");
 late final _sel_isSupported = objc.registerName("isSupported");
+late final _sel_keyForId_ = objc.registerName("keyForId:");
 late final _sel_new = objc.registerName("new");
 late final _sel_observeActions_ = objc.registerName("observeActions:");
 late final _sel_observeActivities_ = objc.registerName("observeActivities:");

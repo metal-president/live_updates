@@ -43,7 +43,7 @@ stream:
 | `fcmInstallationId` | all | `message.fid` |
 | `fcmRegistrationToken` (opt-in, legacy) | all | `message.token` |
 | `pushToStart` | iOS 17.2+ | `message.apns.live_activity_token`, `"event": "start"` |
-| `activity` (with `updateId`) | iOS | `message.apns.live_activity_token`, `"event": "update"` / `"end"` |
+| `activity` (with `updateId` and `key`) | iOS | `message.apns.live_activity_token`, `"event": "update"` / `"end"` |
 
 ```dart
 LiveUpdatesFcm.tokens().listen(
@@ -51,6 +51,7 @@ LiveUpdatesFcm.tokens().listen(
     type: token.type.name,
     value: token.value,
     updateId: token.updateId,
+    key: token.key, // your id from startOrUpdate or push-to-start
   ),
   // Token sources can fail (for example before APNs is ready on iOS).
   onError: (Object error) => debugPrint('Token error: $error'),
@@ -60,17 +61,23 @@ await FirebaseMessaging.instance.register();
 ```
 
 Keep the latest token per type (and per `updateId`), and drop an activity
-token once that live update ends. Activity tokens are emitted for live
+token once that live update ends. Activity tokens carry the update's `key`
+(the key given to `startOrUpdate`, or `attributes.key` of a push-to-start), so
+your server can find the iOS token for the same id it sends to Android as
+`live_updates_id`. Activity tokens are emitted for live
 updates started with `pushUpdates: true`. A new subscription first receives
 the tokens that are already known.
 
 Tokens allow pushing to the device: send them over an authenticated
 connection, store them per authenticated user and device on your server (the
-client chooses `updateId`, so do not trust it across users), and do not log
+client chooses `updateId` and `key`, so do not trust them across users), and do not log
 them. `LiveUpdatesToken.toString()` and `LiveUpdatePushToken.toString()`
 leave the value out.
 
 ## Message format
+
+For a server that sends to both platforms through FCM, see
+[docs/server-fcm.md](https://github.com/metal-president/live_updates/blob/main/docs/server-fcm.md).
 
 Send a data message (no `notification` block) with high priority:
 

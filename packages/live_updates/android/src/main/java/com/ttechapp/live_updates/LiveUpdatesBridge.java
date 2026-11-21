@@ -154,7 +154,7 @@ public final class LiveUpdatesBridge {
   @NonNull
   public static String start(@NonNull String json) throws JSONException {
     String id = UUID.randomUUID().toString();
-    post(id, new JSONObject(json));
+    post(id, new JSONObject(json), false, false);
     return id;
   }
 
@@ -166,9 +166,38 @@ public final class LiveUpdatesBridge {
   public static String startOrUpdate(@NonNull String key, @NonNull String json)
       throws JSONException {
     // A key the user dismissed stays hidden until the app ends it.
-    if (!isDismissed(requireContext(), key)) post(key, new JSONObject(json));
+    if (!isDismissed(requireContext(), key)) post(key, new JSONObject(json), false, true);
     return key;
   }
+
+  /**
+   * Key of the shown live update {@code id}: its id when it was started with
+   * a key (startOrUpdate or a remote payload), else {@code null}.
+   */
+  @Nullable
+  public static String keyForId(@NonNull String id) {
+    // Posted in this process: known right away (the system lists a new
+    // notification only after a moment).
+    synchronized (keyedIds) {
+      if (keyedIds.contains(id)) return id;
+    }
+    Context c = context;
+    if (c == null) return null;
+    // After a process restart: the marker on the shown notification.
+    for (android.service.notification.StatusBarNotification n :
+        manager(c).getActiveNotifications()) {
+      if (n.getId() == NOTIFICATION_ID && (TAG_PREFIX + id).equals(n.getTag())) {
+        return n.getNotification().extras.getBoolean(EXTRA_KEYED, false) ? id : null;
+      }
+    }
+    return null;
+  }
+
+  /** Ids posted with a key in this process. */
+  private static final Set<String> keyedIds = new java.util.HashSet<>();
+
+  /** Notification extra marking updates whose id is an app or server key. */
+  private static final String EXTRA_KEYED = "com.ttechapp.live_updates.KEYED";
 
   /** {@code key} if a live update with that id is shown, else {@code null}. */
   @Nullable
@@ -394,6 +423,9 @@ public final class LiveUpdatesBridge {
       recentlyEnded.put(id, SystemClock.uptimeMillis());
     }
     emit("ended", id);
+    synchronized (keyedIds) {
+      keyedIds.remove(id);
+    }
     clearDismissed(c, id);
     if (json != null && dismissAfterSeconds != 0) {
       JSONObject content = new JSONObject(json);
@@ -539,10 +571,15 @@ public final class LiveUpdatesBridge {
   }
 
   private static void post(String id, JSONObject content) {
-    post(id, content, false);
+    post(id, content, false, false);
   }
 
   private static void post(String id, JSONObject content, boolean remote) {
+    post(id, content, remote, remote);
+  }
+
+  /** {@code keyed}: the id is a key (startOrUpdate, remote payloads). */
+  private static void post(String id, JSONObject content, boolean remote, boolean keyed) {
     Context c = requireContext();
     // Survives process restarts: a notification already shown is not new.
     boolean wasShown = isShown(id);
@@ -554,10 +591,22 @@ public final class LiveUpdatesBridge {
     synchronized (known) {
       isNew = known.add(id) && !wasShown;
     }
+    // Before "started", so a listener can read the key at once.
+    if (keyed) {
+      synchronized (keyedIds) {
+        keyedIds.add(id);
+      }
+    }
     if (isNew) emit("started", id);
     Notification.Builder b = builder(c, content, remote);
     if (content.optBoolean("androidAlert", false) && !mayAlert(id)) b.setOnlyAlertOnce(true);
     b.setDeleteIntent(LiveUpdatesDismissReceiver.intent(c, id));
+    // update() keeps the marker of the shown notification.
+    if (keyed || keyForId(id) != null) {
+      android.os.Bundle extras = new android.os.Bundle();
+      extras.putBoolean(EXTRA_KEYED, true);
+      b.addExtras(extras);
+    }
     addActions(c, b, id, content);
     manager(c).notify(TAG_PREFIX + id, NOTIFICATION_ID, b.build());
   }

@@ -247,4 +247,18 @@ public class LiveUpdatesBridgeTest {
     assertEquals(1, style.getProgressPoints().get(0).getPosition()); // round(0.25 * 5)
     assertEquals(5, style.getProgressPoints().get(1).getPosition()); // clamped to the end
   }
+
+  @Test
+  public void keysAreReportedForKeyedUpdatesOnly() throws Exception {
+    String plain = LiveUpdatesBridge.start("{\"title\":\"A\"}");
+    assertEquals(null, LiveUpdatesBridge.keyForId(plain));
+    LiveUpdatesBridge.startOrUpdate("order-7", "{\"title\":\"B\"}");
+    assertEquals("order-7", LiveUpdatesBridge.keyForId("order-7"));
+    // update() keeps the key.
+    LiveUpdatesBridge.update("order-7", "{\"title\":\"C\"}");
+    assertEquals("order-7", LiveUpdatesBridge.keyForId("order-7"));
+    remote("start", "remote-8", "{\"title\":\"D\"}");
+    assertEquals("remote-8", LiveUpdatesBridge.keyForId("remote-8"));
+    assertEquals(null, LiveUpdatesBridge.keyForId("missing"));
+  }
 }

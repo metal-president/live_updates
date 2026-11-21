@@ -124,4 +124,20 @@ void main() {
     );
     await update.end(dismissAfter: Duration.zero);
   });
+
+  testWidgets('keys are reported with live updates', (tester) async {
+    if (!await LiveUpdates.isSupported()) return;
+    final plain = await LiveUpdates.start(const LiveUpdateContent(title: 'P'));
+    final keyed = await LiveUpdates.startOrUpdate(
+      'order-key-1',
+      const LiveUpdateContent(title: 'K'),
+    );
+    expect(plain.key, isNull);
+    expect(keyed.key, 'order-key-1');
+    final byId = {for (final u in await LiveUpdates.active()) u.id: u.key};
+    expect(byId[plain.id], isNull);
+    expect(byId[keyed.id], 'order-key-1');
+    expect((await LiveUpdates.find('order-key-1'))?.key, 'order-key-1');
+    await LiveUpdates.endAll();
+  });
 }

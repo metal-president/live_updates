@@ -1,3 +1,10 @@
+## Unreleased
+
+- `LiveUpdate.key`: the key from `startOrUpdate`, a push-to-start
+  `attributes.key` (iOS) or a remote `live_updates_id` (Android), also on
+  updates from `active()` and `onStarted`.
+- Docs: sending to both platforms through FCM (`docs/server-fcm.md`).
+
 ## 0.0.4
 
 - `LiveUpdateContent.timer`: a countdown or stopwatch counted by the system

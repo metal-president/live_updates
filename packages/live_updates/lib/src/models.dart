@@ -338,10 +338,7 @@ final class AndroidLiveUpdateOptions {
     this.criticalMetric,
     this.bodySemanticStyle,
     this.progressSemanticStyle,
-  }) : assert(
-         criticalMetric == null ||
-             (criticalMetric >= 0 && criticalMetric < metrics.length),
-       );
+  }) : assert(criticalMetric == null || criticalMetric >= 0);
 
   /// Notification channel id. The channel is created on first use.
   final String channelId;
@@ -373,15 +370,16 @@ final class AndroidLiveUpdateOptions {
   final bool requestPromotion;
 
   /// Values such as a distance, a speed or a countdown, shown with Android
-  /// 17's `MetricStyle` instead of the progress bar (the expanded view shows
-  /// up to three). Ignored below Android 17, where [LiveUpdateContent.progress]
-  /// is shown as usual.
+  /// 17's `MetricStyle` instead of the progress bar. Up to three are used.
+  /// Ignored below Android 17, where [LiveUpdateContent.progress] is shown as
+  /// usual.
   ///
   /// Keep labels short: Android recommends 10 characters or fewer.
   final List<AndroidMetric> metrics;
 
   /// Index in [metrics] of the most important metric, which Android may show
-  /// in the status bar chip of a promoted Live Update. Defaults to the first.
+  /// in the status bar chip of a promoted Live Update. Defaults to the first;
+  /// ignored when out of range.
   final int? criticalMetric;
 
   /// Semantic color of [LiveUpdateContent.body] (Android 17+). The system
@@ -473,7 +471,8 @@ enum AndroidMetricKind {
 /// without updates from the app.
 @immutable
 final class AndroidMetric {
-  /// A whole number, such as `1979` steps.
+  /// A whole number, such as `1979` steps. Android stores it as a 32-bit
+  /// integer, so larger values are clamped.
   const AndroidMetric.integer(
     this.label,
     int this.value, {
@@ -483,7 +482,8 @@ final class AndroidMetric {
        fractionDigits = null;
 
   /// A decimal number, such as `4.2` km, shown with at most
-  /// [fractionDigits] digits after the decimal point.
+  /// [fractionDigits] digits after the decimal point. NaN and infinite values
+  /// are left out.
   const AndroidMetric.decimal(
     this.label,
     double this.value, {

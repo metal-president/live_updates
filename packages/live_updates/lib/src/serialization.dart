@@ -57,6 +57,8 @@ extension on AndroidMetric {
     'value': switch (value) {
       final DateTime d => d.millisecondsSinceEpoch,
       final Duration d => d.inMilliseconds,
+      // jsonEncode rejects NaN and infinity; the platform skips a null value.
+      final double d when !d.isFinite => null,
       final v => v,
     },
     'unit': ?unit,

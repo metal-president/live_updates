@@ -31,6 +31,8 @@ final class LiveUpdatesApi37 {
   private static final int SEMANTIC_CAUTION = 3;
   private static final int SEMANTIC_DANGER = 4;
   private static final int FORMAT_CHRONOMETER = 2;
+  private static final int MAX_METRICS = 3;
+  private static final int MAX_TEXT = 64;
 
   private LiveUpdatesApi37() {}
 
@@ -67,7 +69,7 @@ final class LiveUpdatesApi37 {
       styled.setSpan(span, 0, text.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
       return styled;
     } catch (ReflectiveOperationException | RuntimeException e) {
-      Log.w(TAG, "Semantic style unavailable", e);
+      warn("Semantic style unavailable", e);
       return text;
     }
   }
@@ -78,7 +80,7 @@ final class LiveUpdatesApi37 {
     try {
       segment.getClass().getMethod("setSemanticStyle", int.class).invoke(segment, style);
     } catch (ReflectiveOperationException | RuntimeException e) {
-      Log.w(TAG, "Semantic style unavailable", e);
+      warn("Semantic style unavailable", e);
     }
   }
 
@@ -98,51 +100,73 @@ final class LiveUpdatesApi37 {
       Object style = styleClass.getConstructor().newInstance();
       Method add = styleClass.getMethod("addMetric", metricClass);
       int count = 0;
-      for (int i = 0; i < metrics.length(); i++) {
+      int critical = -1;
+      // The system shows at most three; ignore the rest of a remote payload.
+      for (int i = 0; i < metrics.length() && count < MAX_METRICS; i++) {
         JSONObject m = metrics.optJSONObject(i);
-        Object value = m == null ? null : metricValue(m);
-        if (value == null) continue;
-        add.invoke(
-            style,
-            metricCtor.newInstance(
-                value, m.optString("label"), semanticStyle(LiveUpdatesBridge.optString(m, "semanticStyle"))));
+        if (m == null) continue;
+        // A bad entry (rejected by the platform) is skipped, not the whole style.
+        try {
+          Object value = metricValue(m);
+          if (value == null) continue;
+          add.invoke(
+              style,
+              metricCtor.newInstance(
+                  value,
+                  clip(m.optString("label")),
+                  semanticStyle(LiveUpdatesBridge.optString(m, "semanticStyle"))));
+        } catch (java.lang.reflect.InvocationTargetException e) {
+          warn("Metric rejected", e);
+          continue;
+        }
+        if (i == criticalIndex) critical = count;
         count++;
       }
       if (count == 0) return false;
-      if (criticalIndex >= 0 && criticalIndex < count) {
-        styleClass.getMethod("setCriticalMetric", int.class).invoke(style, criticalIndex);
+      if (critical >= 0) {
+        styleClass.getMethod("setCriticalMetric", int.class).invoke(style, critical);
       }
       b.setStyle((Notification.Style) style);
       return true;
     } catch (ReflectiveOperationException | RuntimeException e) {
-      Log.w(TAG, "MetricStyle unavailable", e);
+      warn("MetricStyle unavailable", e);
       return false;
     }
   }
 
   @Nullable
   private static Object metricValue(JSONObject m) throws ReflectiveOperationException {
-    String unit = LiveUpdatesBridge.optString(m, "unit");
+    String unit = clip(LiveUpdatesBridge.optString(m, "unit"));
     String type = m.optString("type");
+    // Remote payloads may carry anything: numbers must be JSON numbers.
+    Object raw = m.opt("value");
+    boolean number = raw instanceof Number;
     switch (type) {
       case "integer":
+        if (!number) return null;
+        long whole =
+            Math.max(Integer.MIN_VALUE, Math.min(Integer.MAX_VALUE, ((Number) raw).longValue()));
         return Class.forName("android.app.Notification$Metric$FixedInt")
             .getConstructor(int.class, CharSequence.class)
-            .newInstance(m.optInt("value"), unit);
+            .newInstance((int) whole, unit);
       case "decimal":
         {
           int digits = Math.max(0, Math.min(m.optInt("fractionDigits", 1), 6));
+          if (!number) return null;
+          float value = ((Number) raw).floatValue();
+          if (Float.isNaN(value) || Float.isInfinite(value)) return null;
           return Class.forName("android.app.Notification$Metric$FixedFloat")
               .getConstructor(float.class, CharSequence.class, int.class, int.class)
-              .newInstance((float) m.optDouble("value"), unit, 0, digits);
+              .newInstance(value, unit, 0, digits);
         }
       case "text":
         return Class.forName("android.app.Notification$Metric$FixedText")
             .getConstructor(CharSequence.class, CharSequence.class)
-            .newInstance(m.optString("value"), unit);
+            .newInstance(clip(m.optString("value")), unit);
       case "timer":
       case "stopwatch":
         {
+          if (!number) return null;
           Class<?> c = Class.forName("android.app.Notification$Metric$TimeDifference");
           String factory = type.equals("timer") ? "forTimer" : "forStopwatch";
           return c.getMethod(factory, Instant.class, int.class)
@@ -151,6 +175,7 @@ final class LiveUpdatesApi37 {
       case "pausedTimer":
       case "pausedStopwatch":
         {
+          if (!number) return null;
           Class<?> c = Class.forName("android.app.Notification$Metric$TimeDifference");
           String factory = type.equals("pausedTimer") ? "forPausedTimer" : "forPausedStopwatch";
           return c.getMethod(factory, Duration.class, int.class)
@@ -159,5 +184,21 @@ final class LiveUpdatesApi37 {
       default:
         return null;
     }
+  }
+
+  @Nullable
+  private static String clip(@Nullable String text) {
+    if (text == null || text.length() <= MAX_TEXT) return text;
+    int end = Character.isHighSurrogate(text.charAt(MAX_TEXT - 1)) ? MAX_TEXT - 1 : MAX_TEXT;
+    return text.substring(0, end);
+  }
+
+  private static boolean warned;
+
+  /** Logs the first failure only, so a missing API does not log on every post. */
+  private static void warn(String message, Throwable e) {
+    if (warned) return;
+    warned = true;
+    Log.w(TAG, message, e);
   }
 }

@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'dart:ui';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -132,5 +134,21 @@ void main() {
     ).toJson();
     expect(json.containsKey('metrics'), isFalse);
     expect(json.containsKey('bodySemanticStyle'), isFalse);
+  });
+
+  test('non-finite decimals are left out; const options compile', () {
+    const options = AndroidLiveUpdateOptions(
+      metrics: [
+        AndroidMetric.decimal('Bad', double.nan),
+        AndroidMetric.integer('Steps', 1),
+      ],
+      criticalMetric: 1,
+    );
+    final json = const LiveUpdateContent(title: 't', android: options).toJson();
+    expect(json['metrics'], [
+      {'label': 'Bad', 'type': 'decimal', 'value': null, 'fractionDigits': 1},
+      {'label': 'Steps', 'type': 'integer', 'value': 1},
+    ]);
+    expect(jsonEncode(json), isA<String>());
   });
 }

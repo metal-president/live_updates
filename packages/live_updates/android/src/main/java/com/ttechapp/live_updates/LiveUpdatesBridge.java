@@ -624,7 +624,7 @@ public final class LiveUpdatesBridge {
       if (chip != null) b.setShortCriticalText(chip);
       boolean metrics =
           LiveUpdatesApi37.setMetricStyle(
-              b, content.optJSONArray("metrics"), content.optInt("criticalMetric", 0));
+              b, content.optJSONArray("metrics"), content.optInt("criticalMetric", -1));
       if (!metrics && hasProgress) {
         Notification.ProgressStyle style = new Notification.ProgressStyle().setProgress(progress);
         int semantic =

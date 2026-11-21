@@ -7,6 +7,15 @@ homepage: https://github.com/metal-president/live_updates
 repository: https://github.com/metal-president/live_updates/tree/main/packages/live_updates
 issue_tracker: https://github.com/metal-president/live_updates/issues
 topics: [live-activities, notifications, ios, android, widget]
+screenshots:
+  - description: iOS Live Activity on the Lock Screen with buttons, a timer and progress.
+    path: doc/screenshots/ios_lock_screen.png
+  - description: iOS Live Activity in the Dynamic Island (compact).
+    path: doc/screenshots/ios_dynamic_island.png
+  - description: Android 16 Live Update with progress stages and buttons.
+    path: doc/screenshots/android_16.png
+  - description: Android 17 Live Update with a countdown and a distance metric.
+    path: doc/screenshots/android_17.png
 resolution: workspace
 
 environment:

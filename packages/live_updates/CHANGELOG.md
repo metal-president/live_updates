@@ -4,6 +4,7 @@
   `attributes.key` (iOS) or a remote `live_updates_id` (Android), also on
   updates from `active()` and `onStarted`.
 - Docs: sending to both platforms through FCM (`docs/server-fcm.md`).
+- Screenshots on pub.dev and in the README; the example app has its own icon.
 
 ## 0.0.4
 

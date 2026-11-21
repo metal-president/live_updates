@@ -27,10 +27,21 @@ struct LiveUpdatesActionIntent: LiveActivityIntent {
     // looked up by name so this file also compiles in the widget extension.
     let activityId = self.activityId
     let actionId = self.actionId
-    await MainActor.run {
-      guard let bridge = NSClassFromString("LiveUpdatesBridge") as AnyObject? else { return }
-      _ = bridge.perform(
-        NSSelectorFromString("enqueueAction:actionId:"), with: activityId, with: actionId)
+    let startedHandler = await MainActor.run { () -> Bool in
+      guard let bridge = NSClassFromString("LiveUpdatesBridge") as AnyObject?,
+        let result = bridge.perform(
+          NSSelectorFromString("enqueueAction:actionId:"), with: activityId, with: actionId)
+      else { return false }
+      return (result.takeUnretainedValue() as? NSNumber)?.boolValue ?? false
+    }
+    if startedHandler {
+      // Keep the app running until the Dart background handler finished
+      // (the plugin times out after 25 seconds).
+      for await _ in NotificationCenter.default.notifications(
+        named: Notification.Name("LiveUpdatesBackgroundDone"))
+      {
+        break
+      }
     }
     return .result()
   }

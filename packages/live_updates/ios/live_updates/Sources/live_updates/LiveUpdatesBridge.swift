@@ -29,7 +29,7 @@ public final class LiveUpdatesBridge: NSObject {
   private static func request(_ payload: Payload, key: String?) throws -> String {
     let wantsPush = payload.enablePushUpdates ?? false
     var pushType: PushType? = wantsPush ? .token : nil
-    if let channel = payload.channelId {
+    if let channel = payload.broadcastChannelId {
       guard #available(iOS 18.0, *) else {
         throw NSError(
           domain: "live_updates", code: 2,
@@ -242,18 +242,69 @@ public final class LiveUpdatesBridge: NSObject {
   /// Queues a button press and delivers it if Dart listens. Called on the
   /// main thread by `LiveUpdatesActionIntent` (looked up by name, so the
   /// widget extension does not link the plugin) and for open-app URLs.
+  ///
+  /// Returns `true` when the press started the background action handler;
+  /// the caller should then wait for `LiveUpdatesBackgroundDone`.
   @objc(enqueueAction:actionId:)
-  public static func enqueueAction(_ activityId: String, actionId: String) {
+  @discardableResult
+  public static func enqueueAction(_ activityId: String, actionId: String) -> NSNumber {
     // Only accept presses of buttons the activity actually shows.
     guard
       let state = find(activityId)?.content.state,
       state.actions.contains(where: { $0.id == actionId })
-    else { return }
+    else { return false }
     let defaults = UserDefaults.standard
     var pending = defaults.stringArray(forKey: pendingActionsKey) ?? []
     pending.append("\(activityId)\n\(actionId)")
     defaults.set(pending, forKey: pendingActionsKey)
-    drainActions()
+    if actionHandler != nil {
+      drainActions()
+      return false
+    }
+    return startBackgroundHandler()
+  }
+
+  // MARK: - Background action handler
+
+  static let dispatcherKey = "live_updates.backgroundDispatcher"
+  static let handlerKey = "live_updates.backgroundHandler"
+
+  /// Stores the Dart callback handles of the background action handler.
+  @objc public static func setBackgroundActionHandler(_ dispatcher: Int64, handler: Int64) {
+    UserDefaults.standard.set(dispatcher, forKey: dispatcherKey)
+    UserDefaults.standard.set(handler, forKey: handlerKey)
+  }
+
+  /// Raw callback handle of the background handler, or 0.
+  @objc public static func backgroundActionHandler() -> Int64 {
+    Int64(UserDefaults.standard.integer(forKey: handlerKey))
+  }
+
+  /// Removes and returns queued presses as `"<activity id>\n<action id>"`.
+  @objc public static func takeQueuedActions() -> [String] {
+    let defaults = UserDefaults.standard
+    let pending = defaults.stringArray(forKey: pendingActionsKey) ?? []
+    defaults.removeObject(forKey: pendingActionsKey)
+    return pending
+  }
+
+  /// Called by the background engine when the handler finished.
+  @objc public static func backgroundActionsDone() {
+    guard let runner = NSClassFromString("LiveUpdatesBackgroundRunner") as AnyObject? else {
+      return
+    }
+    _ = runner.perform(NSSelectorFromString("finish"))
+  }
+
+  private static func startBackgroundHandler() -> NSNumber {
+    let dispatcher = Int64(UserDefaults.standard.integer(forKey: dispatcherKey))
+    guard dispatcher != 0,
+      let runner = NSClassFromString("LiveUpdatesBackgroundRunner") as AnyObject?,
+      let started = runner.perform(
+        NSSelectorFromString("startWithDispatcher:"), with: NSNumber(value: dispatcher)
+      )?.takeUnretainedValue() as? NSNumber
+    else { return false }
+    return started
   }
 
   private static var tapHandler: ((String) -> Void)?
@@ -291,7 +342,7 @@ private struct Payload: Decodable {
   var staleDate: Double?
   var relevanceScore: Double?
   var enablePushUpdates: Bool?
-  var channelId: String?
+  var broadcastChannelId: String?
   var alert: Alert?
 
   static func decode(_ json: String) throws -> Payload {

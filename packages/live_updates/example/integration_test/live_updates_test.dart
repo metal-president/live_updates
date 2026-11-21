@@ -109,4 +109,19 @@ void main() {
     await Future<void>.delayed(const Duration(milliseconds: 500));
     expect(await LiveUpdates.find('order-it'), isNull);
   });
+
+  testWidgets('Android options do not affect iOS push settings', (
+    tester,
+  ) async {
+    if (!await LiveUpdates.isSupported()) return;
+    // A notification channel id must never be read as an iOS broadcast
+    // channel (regression test).
+    final update = await LiveUpdates.start(
+      const LiveUpdateContent(
+        title: 'Options',
+        android: AndroidLiveUpdateOptions(channelId: 'orders'),
+      ),
+    );
+    await update.end(dismissAfter: Duration.zero);
+  });
 }

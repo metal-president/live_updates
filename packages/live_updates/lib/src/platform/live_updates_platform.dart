@@ -44,6 +44,19 @@ abstract class LiveUpdatesPlatform {
   /// Button presses as `(update id, action id)`.
   Stream<(String, String)> get actions;
 
+  /// Stores the callback handles used to run [LiveUpdates.setBackgroundActionHandler]'s
+  /// handler in a headless engine.
+  Future<void> setBackgroundActionHandler(int dispatcher, int handler) async {}
+
+  /// Raw callback handle of the background action handler, if registered.
+  Future<int?> backgroundActionHandler() async => null;
+
+  /// Removes and returns the presses queued for the background handler.
+  Future<List<(String, String)>> takeQueuedActions() async => const [];
+
+  /// Signals that the background handler finished.
+  Future<void> backgroundActionsDone() async {}
+
   /// Updates the live update with [id].
   Future<void> update(String id, LiveUpdateContent content);
 

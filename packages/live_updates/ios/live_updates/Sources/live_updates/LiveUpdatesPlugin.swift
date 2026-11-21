@@ -11,6 +11,19 @@ import UIKit
 /// bindings to `LiveUpdatesBridge`, not through platform channels. The plugin
 /// only listens for tap URLs opened from a Live Activity.
 public class LiveUpdatesPlugin: NSObject, FlutterPlugin, FlutterSceneLifeCycleDelegate {
+  /// Registers plugins for the headless engine that runs the background
+  /// action handler, so the handler can use plugins with platform channels.
+  /// Call it from AppDelegate:
+  ///
+  ///     LiveUpdatesPlugin.setPluginRegistrantCallback { registry in
+  ///       GeneratedPluginRegistrant.register(with: registry)
+  ///     }
+  public static func setPluginRegistrantCallback(
+    _ callback: @escaping (FlutterPluginRegistry) -> Void
+  ) {
+    LiveUpdatesBackgroundRunner.registrant = callback
+  }
+
   /// Flutter keeps lifecycle delegates weakly, so the plugin keeps itself alive.
   private static var instances: [LiveUpdatesPlugin] = []
 

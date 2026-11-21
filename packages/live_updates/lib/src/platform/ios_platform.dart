@@ -60,7 +60,7 @@ class IosLiveUpdatesPlatform extends LiveUpdatesPlatform with ContentEncoder {
   }) async {
     final json = await encodeContent(content, {
       'enablePushUpdates': pushUpdates,
-      'channelId': ?iosChannelId,
+      'broadcastChannelId': ?iosChannelId,
     });
     try {
       final id = LiveUpdatesBridge.start(_ns(json));
@@ -94,7 +94,7 @@ class IosLiveUpdatesPlatform extends LiveUpdatesPlatform with ContentEncoder {
   }) async {
     final json = await encodeContent(content, {
       'enablePushUpdates': pushUpdates,
-      'channelId': ?iosChannelId,
+      'broadcastChannelId': ?iosChannelId,
     });
     final result = Completer<String>();
     LiveUpdatesBridge.startOrUpdate(
@@ -121,6 +121,31 @@ class IosLiveUpdatesPlatform extends LiveUpdatesPlatform with ContentEncoder {
 
   @override
   Stream<(String, String)> get actions => _actions.stream;
+
+  @override
+  Future<void> setBackgroundActionHandler(int dispatcher, int handler) async =>
+      LiveUpdatesBridge.setBackgroundActionHandler(
+        dispatcher,
+        handler: handler,
+      );
+
+  @override
+  Future<int?> backgroundActionHandler() async {
+    final raw = LiveUpdatesBridge.backgroundActionHandler();
+    return raw == 0 ? null : raw;
+  }
+
+  @override
+  Future<List<(String, String)>> takeQueuedActions() async => [
+    for (final o in LiveUpdatesBridge.takeQueuedActions().asDart())
+      if (objc.NSString.as(o).toDartString() case final s)
+        if (s.indexOf('\n') case final at when at > 0)
+          (s.substring(0, at), s.substring(at + 1)),
+  ];
+
+  @override
+  Future<void> backgroundActionsDone() async =>
+      LiveUpdatesBridge.backgroundActionsDone();
 
   @override
   Future<void> update(String id, LiveUpdateContent content) async {

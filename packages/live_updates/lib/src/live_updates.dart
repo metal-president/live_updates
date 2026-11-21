@@ -1,3 +1,4 @@
+import 'background.dart';
 import 'models.dart';
 import 'platform/live_updates_platform.dart';
 
@@ -161,6 +162,27 @@ abstract final class LiveUpdates {
   static Stream<LiveUpdateActionEvent> get onAction => _platform.actions.map(
     (e) => LiveUpdateActionEvent(updateId: e.$1, actionId: e.$2),
   );
+
+  /// Runs [handler] for button presses that arrive while the app is not
+  /// running (or no [onAction] listener is active): the plugin starts a
+  /// headless Flutter engine, calls [handler] for each press and shuts the
+  /// engine down. Call it early, for example in `main`, before `runApp`.
+  ///
+  /// [handler] must be a top-level or static function annotated with
+  /// `@pragma('vm:entry-point')`. It has a few seconds to finish (the system
+  /// limits background work). On iOS, plugins that use platform channels are
+  /// only available to it if the app registers them for background engines
+  /// (see the README).
+  ///
+  /// ```dart
+  /// @pragma('vm:entry-point')
+  /// Future<void> onBackgroundAction(LiveUpdateActionEvent event) async {
+  ///   if (event.actionId == 'cancel') await api.cancelOrder(event.updateId);
+  /// }
+  /// ```
+  static Future<void> setBackgroundActionHandler(
+    LiveUpdateActionHandler handler,
+  ) => registerBackgroundActionHandler(handler);
 
   /// Currently running live updates started by this app, including ones
   /// started remotely with a push-to-start token.

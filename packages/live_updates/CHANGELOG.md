@@ -8,6 +8,10 @@
 - `create_widget`: per-configuration widget bundle ids and App Groups for
   flavors (`LIVE_UPDATES_APP_GROUP` build setting); offers to install the
   xcodeproj gem when it is missing; manual setup steps in the README.
+- `LiveUpdates.setBackgroundActionHandler`: handle button presses while the
+  app is not running in a headless Flutter engine (Android and iOS).
+  Re-run `create_widget --force` to update `LiveUpdatesActionIntent.swift`.
+- Fix: an Android `channelId` option no longer affects iOS push settings.
 
 ## 0.0.2
 

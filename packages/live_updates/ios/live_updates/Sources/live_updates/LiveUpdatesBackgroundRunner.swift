@@ -1,0 +1,50 @@
+import Flutter
+import Foundation
+
+/// Runs the Dart background action handler in a headless engine when a Live
+/// Activity button is pressed while no Dart listener is attached (for
+/// example when the system launched the app in the background for the
+/// press). Looked up by name from `LiveUpdatesBridge`, which does not link
+/// Flutter.
+@objc(LiveUpdatesBackgroundRunner)
+public final class LiveUpdatesBackgroundRunner: NSObject {
+  /// Posted when the handler finished (or timed out).
+  static let doneNotification = Notification.Name("LiveUpdatesBackgroundDone")
+  /// LiveActivityIntent runs get limited background time; stay well below.
+  private static let timeout: TimeInterval = 25
+
+  private static var engine: FlutterEngine?
+  private static var timeoutWork: DispatchWorkItem?
+  static var registrant: ((FlutterPluginRegistry) -> Void)?
+
+  /// Starts the engine (once). Returns whether a handler run is in progress.
+  @objc(startWithDispatcher:)
+  public static func start(dispatcher: NSNumber) -> NSNumber {
+    dispatchPrecondition(condition: .onQueue(.main))
+    if engine != nil { return true }
+    guard
+      let info = FlutterCallbackCache.lookupCallbackInformation(dispatcher.int64Value)
+    else { return false }
+    let engine = FlutterEngine(
+      name: "live_updates_background", project: nil, allowHeadlessExecution: true)
+    guard engine.run(withEntrypoint: info.callbackName, libraryURI: info.callbackLibraryPath)
+    else { return false }
+    registrant?(engine)
+    self.engine = engine
+    let work = DispatchWorkItem { finish() }
+    timeoutWork = work
+    DispatchQueue.main.asyncAfter(deadline: .now() + timeout, execute: work)
+    return true
+  }
+
+  /// Shuts the engine down and notifies waiting intents.
+  @objc public static func finish() {
+    DispatchQueue.main.async {
+      timeoutWork?.cancel()
+      timeoutWork = nil
+      engine?.destroyContext()
+      engine = nil
+      NotificationCenter.default.post(name: doneNotification, object: nil)
+    }
+  }
+}

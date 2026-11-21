@@ -3,7 +3,27 @@ import 'dart:async';
 import 'package:live_updates/live_updates.dart';
 import 'package:material_ui/material_ui.dart';
 
-void main() => runApp(const MaterialApp(home: ExamplePage()));
+/// Runs in a headless engine when a button is pressed while the app is not
+/// running.
+@pragma('vm:entry-point')
+Future<void> onBackgroundAction(LiveUpdateActionEvent event) async {
+  debugPrint(
+    '[live_updates] background action: ${event.actionId} on ${event.updateId}',
+  );
+  if (event.actionId == 'cancel') {
+    final active = await LiveUpdates.active();
+    await active
+        .where((u) => u.id == event.updateId)
+        .firstOrNull
+        ?.end(dismissAfter: Duration.zero);
+  }
+}
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await LiveUpdates.setBackgroundActionHandler(onBackgroundAction);
+  runApp(const MaterialApp(home: ExamplePage()));
+}
 
 class ExamplePage extends StatefulWidget {
   const ExamplePage({super.key});

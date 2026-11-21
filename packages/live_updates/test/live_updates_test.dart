@@ -65,6 +65,7 @@ void main() {
   group('events', eventTests);
   group('keys and actions', keyedTests);
   group('broadcast', broadcastTests);
+  group('background handler', backgroundHandlerTests);
 
   test('noop platform is safe', () async {
     LiveUpdatesPlatform.instance = NoopLiveUpdatesPlatform();
@@ -206,6 +207,15 @@ void broadcastTests() {
         pushUpdates: true,
         iosChannelId: 'Q0g=',
       ),
+      throwsArgumentError,
+    );
+  });
+}
+
+void backgroundHandlerTests() {
+  test('background handler must be a top-level or static function', () {
+    expect(
+      () => LiveUpdates.setBackgroundActionHandler((event) async {}),
       throwsArgumentError,
     );
   });

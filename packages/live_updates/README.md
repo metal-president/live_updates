@@ -186,6 +186,54 @@ LiveUpdates.onAction.listen((event) {
   app was not running, it is queued and delivered once Dart listens; use
   `opensApp: true` when the press must be handled right away.
 - `opensApp: true` opens the app and delivers the press.
+
+#### Handling presses while the app is not running
+
+Register a background handler to act on a press immediately, even when the
+app is not running. The plugin starts a headless Flutter engine, runs the
+handler and shuts the engine down:
+
+```dart
+@pragma('vm:entry-point')
+Future<void> onBackgroundAction(LiveUpdateActionEvent event) async {
+  if (event.actionId == 'cancel') {
+    await api.cancelOrder(event.updateId);
+    final updates = await LiveUpdates.active();
+    await updates
+        .where((u) => u.id == event.updateId)
+        .firstOrNull
+        ?.end(dismissAfter: Duration.zero);
+  }
+}
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await LiveUpdates.setBackgroundActionHandler(onBackgroundAction);
+  runApp(const App());
+}
+```
+
+- The handler runs only when no `onAction` listener is active; otherwise the
+  press goes to `onAction` as usual. (On iOS the system may launch your app
+  in the background for the press; if your app subscribes to `onAction` at
+  startup, that listener receives it.)
+- It must be a top-level or static function with
+  `@pragma('vm:entry-point')`, and it has limited time (about 9 seconds on
+  Android, 25 seconds on iOS).
+- live_updates itself works in the handler. On iOS, other plugins that use
+  platform channels need to be registered for the background engine:
+
+  ```swift
+  // AppDelegate.swift
+  LiveUpdatesPlugin.setPluginRegistrantCallback { registry in
+    GeneratedPluginRegistrant.register(with: registry)
+  }
+  ```
+
+  On Android, plugins are registered automatically.
+- Apps that set up the widget with an older version should run
+  `dart run live_updates:create_widget --force` to update
+  `LiveUpdatesActionIntent.swift`.
 - Android shows up to three actions. On iOS keep labels short: the whole
   content must stay under ActivityKit's 4 KB limit.
 

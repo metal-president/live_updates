@@ -88,11 +88,14 @@ def ensure_shared_intent(project, targets, name)
   end
 end
 
-# Files added by newer plugin versions to an existing widget target.
+# Files added by newer plugin versions to an existing widget target (only
+# create_widget's own files, not anything else in the folder).
+WIDGET_FILES = %w[LiveUpdatesAttributes.swift LiveUpdatesViews.swift LiveUpdatesActionIntent.swift].freeze
+
 def ensure_widget_files(project, target, name, ext_dir)
   group = project.main_group.find_subpath(name, true)
-  Dir.children(ext_dir).sort.each do |file|
-    next unless file.end_with?('.swift')
+  (WIDGET_FILES + ["#{name}LiveActivity.swift", "#{name}Bundle.swift"]).each do |file|
+    next unless File.exist?(File.join(ext_dir, file))
     ref = group.files.find { |f| f.path == file } || group.new_reference(file)
     next if target.source_build_phase.files_references.include?(ref)
     target.source_build_phase.add_file_reference(ref)

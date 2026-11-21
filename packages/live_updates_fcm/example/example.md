@@ -32,6 +32,7 @@ Future<void> main() async {
       'type': token.type.name,
       'value': token.value,
       'updateId': token.updateId,
+      'key': token.key, // your id for the update (iOS activity tokens)
     }),
     onError: (Object error) => debugPrint('Token error: $error'),
   );

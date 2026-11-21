@@ -1,0 +1,16 @@
+.dart_tool/
+build/
+.fvm/flutter_sdk
+.fvm/versions
+.idea/
+*.iml
+.DS_Store
+pubspec_overrides.yaml
+**/Pods/
+**/.symlinks/
+**/xcuserdata/
+**/.gradle/
+**/local.properties
+**/GeneratedPluginRegistrant.*
+coverage/
+.fvm/

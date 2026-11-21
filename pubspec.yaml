@@ -1,0 +1,13 @@
+name: live_updates_workspace
+publish_to: none
+
+environment:
+  sdk: ^3.14.0
+
+workspace:
+  - packages/live_updates
+  - packages/live_updates/example
+  - packages/live_updates_fcm
+
+dev_dependencies:
+  lints: ^6.0.0

@@ -1,0 +1,24 @@
+name: live_updates_fcm
+description: >-
+  Optional Firebase Cloud Messaging integration for live_updates: forwards
+  remote Live Update payloads and push tokens.
+version: 0.0.1
+homepage: https://github.com/metal-president/live_updates
+repository: https://github.com/metal-president/live_updates/tree/main/packages/live_updates_fcm
+issue_tracker: https://github.com/metal-president/live_updates/issues
+resolution: workspace
+
+environment:
+  sdk: ^3.14.0
+  flutter: ">=3.50.0"
+
+dependencies:
+  firebase_messaging: ^17.1.0
+  flutter:
+    sdk: flutter
+  live_updates: ^0.0.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0

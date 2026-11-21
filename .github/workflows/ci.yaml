@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  analyze-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version-file: .fvmrc
+          cache: true
+      - run: flutter pub get
+      - run: dart format --output=none --set-exit-if-changed packages
+      - run: flutter analyze packages
+      - run: flutter test
+        working-directory: packages/live_updates
+      - run: flutter test
+        working-directory: packages/live_updates_fcm
+      - run: dart pub publish --dry-run
+        working-directory: packages/live_updates
+
+  build-android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version-file: .fvmrc
+          cache: true
+      - run: flutter build apk --debug
+        working-directory: packages/live_updates/example
+
+  build-ios:
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        dependency-manager: [swiftpm, cocoapods]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version-file: .fvmrc
+          cache: true
+      - name: Switch example to CocoaPods
+        if: matrix.dependency-manager == 'cocoapods'
+        run: sed -i '' '/enable-swift-package-manager/d; /^  config:$/d' pubspec.yaml
+        working-directory: packages/live_updates/example
+      - run: flutter build ios --simulator --debug
+        working-directory: packages/live_updates/example

@@ -1,0 +1,28 @@
+name: live_updates_example
+description: Demonstrates how to use the live_updates plugin.
+publish_to: none
+version: 1.0.0+1
+resolution: workspace
+
+environment:
+  sdk: ^3.14.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  live_updates: any
+  material_ui: ^1.11.1
+
+dev_dependencies:
+  integration_test:
+    sdk: flutter
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/parcel.png
+  config:
+    enable-swift-package-manager: true

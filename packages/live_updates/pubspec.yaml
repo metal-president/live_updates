@@ -1,0 +1,41 @@
+name: live_updates
+description: >-
+  iOS Live Activities and Android Live Update notifications with one Dart
+  API. Built on FFIgen and JNIgen, no platform channels.
+version: 0.0.1
+homepage: https://github.com/metal-president/live_updates
+repository: https://github.com/metal-president/live_updates/tree/main/packages/live_updates
+issue_tracker: https://github.com/metal-president/live_updates/issues
+topics: [live-activities, notifications, ios, android, widget]
+resolution: workspace
+
+environment:
+  sdk: ^3.14.0
+  flutter: ">=3.50.0"
+
+dependencies:
+  ffi: ^2.2.0
+  flutter:
+    sdk: flutter
+  jni: ^1.2.1
+  meta: ^1.16.0
+  objective_c: ^9.6.4
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  ffigen: ^23.0.0
+  jnigen: ^1.1.0
+
+executables:
+  create_widget:
+
+flutter:
+  plugin:
+    platforms:
+      android:
+        package: com.ttechapp.live_updates
+        pluginClass: LiveUpdatesPlugin
+      ios:
+        pluginClass: LiveUpdatesPlugin

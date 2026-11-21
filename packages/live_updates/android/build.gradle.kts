@@ -2,7 +2,7 @@ group = "com.ttechapp.live_updates"
 version = "0.0.1"
 
 buildscript {
-    val kotlinVersion = "2.4.20"
+    val kotlinVersion = "2.4.21"
     repositories {
         google()
         mavenCentral()

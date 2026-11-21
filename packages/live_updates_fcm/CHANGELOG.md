@@ -1,3 +1,8 @@
+## Unreleased
+
+- `LiveUpdatesToken.key`: activity tokens carry the update's key, so a server
+  can find the iOS token for the id it uses on Android.
+
 ## 0.0.4
 
 - Requires live_updates 0.0.4 (timers, Android progress stages, timeout

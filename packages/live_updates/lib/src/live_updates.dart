@@ -4,10 +4,19 @@ import 'platform/live_updates_platform.dart';
 
 /// A running live update.
 final class LiveUpdate {
-  LiveUpdate._(this.id);
+  LiveUpdate._(this.id, [this.key]);
 
   /// Platform identifier (ActivityKit activity id or notification id).
   final String id;
+
+  /// The key given to [LiveUpdates.startOrUpdate], or set by the server when
+  /// it started the update (push-to-start `attributes.key` on iOS,
+  /// `live_updates_id` on Android). `null` for [LiveUpdates.start].
+  ///
+  /// Send it to your server with the update's push tokens so the server can
+  /// address the update by your own id on both platforms. Keys appear in
+  /// notification data and push payloads: do not put secrets in them.
+  final String? key;
 
   LiveUpdatesPlatform get _platform => LiveUpdatesPlatform.instance;
 
@@ -44,7 +53,7 @@ final class LiveUpdate {
   int get hashCode => id.hashCode;
 
   @override
-  String toString() => 'LiveUpdate($id)';
+  String toString() => 'LiveUpdate($id${key == null ? '' : ', $key'})';
 }
 
 LiveUpdateState? _stateFromName(String name) => switch (name) {
@@ -150,13 +159,14 @@ abstract final class LiveUpdates {
         pushUpdates: pushUpdates,
         iosChannelId: iosChannelId,
       ),
+      key,
     );
   }
 
   /// The running live update identified by [key], if any.
   static Future<LiveUpdate?> find(String key) async =>
       switch (await _platform.idForKey(key)) {
-        final id? => LiveUpdate._(id),
+        final id? => LiveUpdate._(id, key),
         null => null,
       };
 
@@ -196,14 +206,17 @@ abstract final class LiveUpdates {
   /// Currently running live updates started by this app, including ones
   /// started remotely with a push-to-start token.
   static Future<List<LiveUpdate>> active() async => [
-    for (final id in await _platform.activeIds()) LiveUpdate._(id),
+    for (final id in await _platform.activeIds())
+      LiveUpdate._(id, await _platform.keyForId(id)),
   ];
 
   /// Live updates that appear while the app runs, including ones started by
   /// a push-to-start notification (iOS) or a remote payload (Android).
   static Stream<LiveUpdate> get onStarted => _platform.events
       .where((e) => e.$2 == 'started')
-      .map((e) => LiveUpdate._(e.$1));
+      .asyncMap(
+        (e) async => LiveUpdate._(e.$1, await _platform.keyForId(e.$1)),
+      );
 
   /// Ends every live update started by this app.
   static Future<void> endAll() => _platform.endAll();

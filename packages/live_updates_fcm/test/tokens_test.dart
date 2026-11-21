@@ -25,6 +25,9 @@ class _TokenPlatform extends NoopLiveUpdatesPlatform {
 
   @override
   Stream<LiveUpdatePushToken> pushTokens(String id) => tokensOf(id).stream;
+
+  @override
+  Future<String?> keyForId(String id) async => id == 'a2' ? 'order-2' : null;
 }
 
 void main() {
@@ -64,6 +67,7 @@ void main() {
         type: LiveUpdatesTokenType.activity,
         value: 'cc',
         updateId: 'a2',
+        key: 'order-2',
       ),
     ]);
     await sub.cancel();

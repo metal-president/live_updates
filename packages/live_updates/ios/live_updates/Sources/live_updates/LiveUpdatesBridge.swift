@@ -89,6 +89,12 @@ public final class LiveUpdatesBridge: NSObject {
     findByKey(key)?.id
   }
 
+  /// Key of the activity with `id` (from `startOrUpdate` or the push-to-start
+  /// `attributes`), or `nil`.
+  @objc public static func keyForId(_ id: String) -> String? {
+    Activity<LiveUpdatesAttributes>.activities.first { $0.id == id }?.attributes.key
+  }
+
   private static func findByKey(_ key: String) -> Activity<LiveUpdatesAttributes>? {
     Activity<LiveUpdatesAttributes>.activities.first {
       $0.attributes.key == key && ($0.activityState == .active || $0.activityState == .stale)

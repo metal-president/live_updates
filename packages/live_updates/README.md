@@ -364,6 +364,11 @@ system symbol (iOS widget template) is used.
 
 ## Remote updates
 
+The content JSON is the same on both platforms; only the push envelope
+differs. To reach both through FCM from one server, see
+[docs/server-fcm.md](https://github.com/metal-president/live_updates/blob/main/docs/server-fcm.md). `LiveUpdate.key` is the id your server uses for an
+update on both platforms.
+
 ### iOS (APNs)
 
 ```dart

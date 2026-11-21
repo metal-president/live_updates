@@ -111,6 +111,10 @@ class AndroidLiveUpdatesPlatform extends LiveUpdatesPlatform
       LiveUpdatesBridge.idForKey(_j(key))?.toDartString(releaseOriginal: true);
 
   @override
+  Future<String?> keyForId(String id) async =>
+      LiveUpdatesBridge.keyForId(_j(id))?.toDartString(releaseOriginal: true);
+
+  @override
   Stream<(String, String)> get actions => _actions.stream;
 
   @override

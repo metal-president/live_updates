@@ -98,11 +98,15 @@ class _ExamplePageState extends State<ExamplePage> {
       // Android 17+: shown instead of the progress bar.
       metrics: [
         AndroidMetric.timer('Arrives in', _eta),
-        AndroidMetric.decimal('Distance', (1 - _progress) * 4, unit: 'km'),
+        AndroidMetric.decimal(
+          'Distance',
+          (1 - _progress) * 4,
+          unit: 'km',
+          semanticStyle: _progress >= 1
+              ? LiveUpdateSemanticStyle.safe
+              : LiveUpdateSemanticStyle.info,
+        ),
       ],
-      bodySemanticStyle: _progress >= 1
-          ? LiveUpdateSemanticStyle.safe
-          : LiveUpdateSemanticStyle.info,
     ),
   );
 

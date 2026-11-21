@@ -265,16 +265,22 @@ LiveUpdateContent(
   android: AndroidLiveUpdateOptions(
     metrics: [
       AndroidMetric.timer('Arrives in', eta),
-      AndroidMetric.decimal('Distance', 0.6, unit: 'km'),
+      AndroidMetric.decimal(
+        'Distance',
+        0.6,
+        unit: 'km',
+        semanticStyle: LiveUpdateSemanticStyle.safe,
+      ),
     ],
     criticalMetric: 0, // may be shown in the status bar chip
-    bodySemanticStyle: LiveUpdateSemanticStyle.safe,
   ),
 );
 ```
 
-Below Android 17 metrics and semantic styles are ignored and the progress bar
-is shown as before. The same keys work in remote payloads (see
+While metrics are set, Android 17 does not show the body text (its metric
+template has no room for it), so put anything users must read in the title or
+in an `AndroidMetric.text`. Below Android 17 metrics and semantic styles are
+ignored and the progress bar is shown as before. The same keys work in remote payloads (see
 [docs/testing-remote.md](https://github.com/metal-president/live_updates/blob/main/docs/testing-remote.md)).
 
 ### Images

@@ -32,6 +32,10 @@ end
 runner = project.targets.find { |t| t.name == 'Runner' } or abort('Runner target not found')
 app_id = runner.build_configurations.first.build_settings['PRODUCT_BUNDLE_IDENTIFIER']
 app_group = "group.#{app_id}" if app_group == 'auto'
+if app_group && !app_group.empty? && app_group !~ /\Agroup\.[A-Za-z0-9.-]+\z/
+  abort("App Group \"#{app_group}\" is not valid (bundle id with build variables?). " \
+        'Pass --app-group group.<your bundle id>.')
+end
 
 # Both targets find the App Group through this Info.plist key.
 if app_group && !app_group.empty?

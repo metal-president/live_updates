@@ -12,7 +12,8 @@ Options:
   --app-group <id>  App Group shared with the widget for images
                     (default: group.<app bundle id>)
   --no-app-group    Do not set up an App Group
-  --no-xcode        Only write the Swift sources; skip Xcode and App Group setup
+  --no-xcode        Only write the widget sources; do not change
+                    Runner.xcodeproj, Info.plist or entitlements
   --force           Overwrite existing generated files
   -h, --help        Show this help
 ''';
@@ -50,6 +51,12 @@ Future<int> createWidget(List<String> args) async {
     stderr.writeln('--name must be a Swift identifier, got "$name".');
     return 64;
   }
+  if (appGroup != null &&
+      appGroup != 'auto' &&
+      !RegExp(r'^group\.[A-Za-z0-9.-]+$').hasMatch(appGroup)) {
+    stderr.writeln('--app-group must look like group.com.example.app.');
+    return 64;
+  }
   final ios = Directory(iosDir);
   final xcodeproj = Directory('$iosDir/Runner.xcodeproj');
   if (!xcodeproj.existsSync()) {
@@ -82,19 +89,24 @@ Future<int> createWidget(List<String> args) async {
     stdout.writeln('write  ${f.path}');
   }
 
-  _enableLiveActivities('${ios.path}/Runner/Info.plist');
-
   if (editXcode) {
-    final script = File(
-      '${Directory.systemTemp.path}/live_updates_add_target.rb',
-    )..writeAsStringSync(render('add_target.rb.tmpl'));
-    final result = Process.runSync('ruby', [
-      script.path,
-      xcodeproj.path,
-      name,
-      out.path,
-      appGroup ?? '',
-    ]);
+    if (!_enableLiveActivities('${ios.path}/Runner/Info.plist')) return 1;
+    // Private temp directory (mkdtemp, 0700), removed afterwards.
+    final tmp = Directory.systemTemp.createTempSync('live_updates_');
+    final ProcessResult result;
+    try {
+      final script = File('${tmp.path}/add_target.rb')
+        ..writeAsStringSync(render('add_target.rb.tmpl'));
+      result = Process.runSync('ruby', [
+        script.path,
+        xcodeproj.path,
+        name,
+        out.path,
+        appGroup ?? '',
+      ]);
+    } finally {
+      tmp.deleteSync(recursive: true);
+    }
     stdout.write(result.stdout);
     if (result.exitCode != 0) {
       stderr
@@ -138,34 +150,44 @@ String _attributesSource(Directory templates) => File.fromUri(
   ),
 ).readAsStringSync();
 
-void _enableLiveActivities(String plist) {
-  if (!File(plist).existsSync()) return;
-  _registerTapScheme(plist);
-  for (final key in ['NSSupportsLiveActivities']) {
-    final read = Process.runSync('/usr/libexec/PlistBuddy', [
-      '-c',
-      'Print :$key',
-      plist,
-    ]);
-    if (read.exitCode == 0) continue;
+/// Runs one PlistBuddy command; returns whether it succeeded.
+bool _plistBuddy(String command, String plist) =>
     Process.runSync('/usr/libexec/PlistBuddy', [
       '-c',
-      'Add :$key bool true',
+      command,
       plist,
-    ]);
-    stdout.writeln('update $plist ($key = true)');
+    ]).exitCode ==
+    0;
+
+/// Sets NSSupportsLiveActivities and the tap URL scheme. Returns `false`
+/// (after printing why) if Info.plist could not be updated.
+bool _enableLiveActivities(String plist) {
+  if (!File(plist).existsSync()) {
+    stderr.writeln('$plist not found.');
+    return false;
   }
+  if (!_registerTapScheme(plist)) return false;
+  const key = 'NSSupportsLiveActivities';
+  if (_plistBuddy('Print :$key', plist)) return true;
+  if (!_plistBuddy('Add :$key bool true', plist)) {
+    stderr.writeln('Could not set $key in $plist.');
+    return false;
+  }
+  stdout.writeln('update $plist ($key = true)');
+  return true;
 }
 
 /// Registers `liveupdates-<bundle id>` so widget taps reach the app.
-void _registerTapScheme(String plist) {
+bool _registerTapScheme(String plist) {
   const scheme = r'liveupdates-$(PRODUCT_BUNDLE_IDENTIFIER)';
   final dump = Process.runSync('/usr/libexec/PlistBuddy', [
     '-c',
     'Print :CFBundleURLTypes',
     plist,
   ]);
-  if (dump.exitCode == 0 && (dump.stdout as String).contains(scheme)) return;
+  if (dump.exitCode == 0 && (dump.stdout as String).contains(scheme)) {
+    return true;
+  }
   final commands = [
     if (dump.exitCode != 0) 'Add :CFBundleURLTypes array',
     'Add :CFBundleURLTypes:0 dict',
@@ -174,7 +196,11 @@ void _registerTapScheme(String plist) {
     'Add :CFBundleURLTypes:0:CFBundleURLSchemes:0 string $scheme',
   ];
   for (final c in commands) {
-    Process.runSync('/usr/libexec/PlistBuddy', ['-c', c, plist]);
+    if (!_plistBuddy(c, plist)) {
+      stderr.writeln('Could not register the URL scheme in $plist ("$c").');
+      return false;
+    }
   }
   stdout.writeln('update $plist (URL scheme $scheme)');
+  return true;
 }

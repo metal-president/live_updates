@@ -169,7 +169,12 @@ it with `"attributes": {"key": "order-1234"}`.
 const LiveUpdateContent(
   title: 'Order #1234',
   actions: [
-    LiveUpdateAction(id: 'cancel', title: 'Cancel', iosSystemImage: 'xmark'),
+    LiveUpdateAction(
+      id: 'cancel',
+      title: 'Cancel',
+      iosSystemImage: 'xmark',
+      requiresUnlock: true,
+    ),
     LiveUpdateAction(id: 'track', title: 'Track', opensApp: true),
   ],
 );
@@ -186,6 +191,10 @@ LiveUpdates.onAction.listen((event) {
   app was not running, it is queued and delivered once Dart listens; use
   `opensApp: true` when the press must be handled right away.
 - `opensApp: true` opens the app and delivers the press.
+- Background presses work on the Lock Screen without unlocking the device.
+  Set `requiresUnlock: true` on buttons with consequences, such as cancelling
+  an order: iOS asks for Face ID or the passcode first, and Android 12+ asks
+  the user to unlock.
 
 #### Handling presses while the app is not running
 

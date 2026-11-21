@@ -94,6 +94,12 @@ private struct ActionButtons: View {
         ForEach(actions) { action in
           if action.opensApp, let url = action.url(activityID: activityID) {
             Link(destination: url) { ActionLabel(action: action) }
+          } else if action.requiresUnlock {
+            Button(
+              intent: LiveUpdatesSecureActionIntent(activityId: activityID, actionId: action.id)
+            ) {
+              ActionLabel(action: action)
+            }
           } else {
             Button(intent: LiveUpdatesActionIntent(activityId: activityID, actionId: action.id)) {
               ActionLabel(action: action)

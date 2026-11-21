@@ -110,10 +110,6 @@ Notifications). It cannot be enabled from Xcode.
 4. List or delete channels with `apns-channel --action list` and
    `--action delete --channel <id>` (up to 10,000 channels per environment).
 
-Apple's documentation lists the broadcast endpoint on
-`api.sandbox.push.apple.com` / `api.push.apple.com`; pass `--host` if your
-account uses a different broadcast host.
-
 ## Android with FCM
 
 ### Prerequisites

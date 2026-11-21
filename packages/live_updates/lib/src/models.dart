@@ -121,6 +121,7 @@ final class LiveUpdateAction {
     required this.id,
     required this.title,
     this.opensApp = false,
+    this.requiresUnlock = false,
     this.iosSystemImage,
     this.androidIcon,
   });
@@ -136,6 +137,12 @@ final class LiveUpdateAction {
   /// Android, delivered to Dart while the app runs (or when it next listens).
   final bool opensApp;
 
+  /// Requires the device to be unlocked before a background press is
+  /// handled (Lock Screen presses ask for Face ID / passcode). Use it for
+  /// destructive actions such as cancelling an order. Android 12+ and iOS;
+  /// ignored for [opensApp] buttons, which always open the app.
+  final bool requiresUnlock;
+
   /// SF Symbol shown on iOS, such as `xmark`.
   final String? iosSystemImage;
 
@@ -148,12 +155,19 @@ final class LiveUpdateAction {
       other.id == id &&
       other.title == title &&
       other.opensApp == opensApp &&
+      other.requiresUnlock == requiresUnlock &&
       other.iosSystemImage == iosSystemImage &&
       other.androidIcon == androidIcon;
 
   @override
-  int get hashCode =>
-      Object.hash(id, title, opensApp, iosSystemImage, androidIcon);
+  int get hashCode => Object.hash(
+    id,
+    title,
+    opensApp,
+    requiresUnlock,
+    iosSystemImage,
+    androidIcon,
+  );
 }
 
 /// A press of a [LiveUpdateAction].

@@ -11,6 +11,8 @@
 - `LiveUpdates.setBackgroundActionHandler`: handle button presses while the
   app is not running in a headless Flutter engine (Android and iOS).
   Re-run `create_widget --force` to update `LiveUpdatesActionIntent.swift`.
+- `LiveUpdateAction.requiresUnlock`: ask for an unlock before a Lock Screen
+  press is handled (iOS, Android 12+).
 - Fix: an Android `channelId` option no longer affects iOS push settings.
 
 ## 0.0.2

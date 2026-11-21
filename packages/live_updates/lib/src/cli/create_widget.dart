@@ -179,6 +179,8 @@ bool _ensureXcodeprojGem() {
         '--user-install',
         '--no-document',
         'xcodeproj',
+        '--version',
+        '~> 1.27',
       ]);
       stdout.write(install.stdout);
       stderr.write(install.stderr);

@@ -248,6 +248,14 @@ public final class LiveUpdatesBridge: NSObject {
   @objc(enqueueAction:actionId:)
   @discardableResult
   public static func enqueueAction(_ activityId: String, actionId: String) -> NSNumber {
+    queueAction(activityId, actionId: actionId, startBackground: true)
+  }
+
+  /// Queues a press. Open-app presses pass `startBackground: false`: the app
+  /// is coming to the foreground and its `onAction` listener handles them.
+  static func queueAction(_ activityId: String, actionId: String, startBackground: Bool)
+    -> NSNumber
+  {
     // Only accept presses of buttons the activity actually shows.
     guard
       let state = find(activityId)?.content.state,
@@ -257,7 +265,7 @@ public final class LiveUpdatesBridge: NSObject {
     var pending = defaults.stringArray(forKey: pendingActionsKey) ?? []
     pending.append("\(activityId)\n\(actionId)")
     defaults.set(pending, forKey: pendingActionsKey)
-    if actionHandler != nil {
+    if actionHandler != nil || !startBackground {
       drainActions()
       return false
     }
@@ -282,6 +290,8 @@ public final class LiveUpdatesBridge: NSObject {
 
   /// Removes and returns queued presses as `"<activity id>\n<action id>"`.
   @objc public static func takeQueuedActions() -> [String] {
+    // The queue is also written on the main thread (enqueueAction).
+    guard Thread.isMainThread else { return DispatchQueue.main.sync { takeQueuedActions() } }
     let defaults = UserDefaults.standard
     let pending = defaults.stringArray(forKey: pendingActionsKey) ?? []
     defaults.removeObject(forKey: pendingActionsKey)
@@ -394,7 +404,7 @@ extension LiveUpdatesBridge {
         let state = find(activity)?.content.state,
         state.actions.contains(where: { $0.id == action && $0.opensApp })
       else { return true }
-      enqueueAction(activity, actionId: action)
+      queueAction(activity, actionId: action, startBackground: false)
       return true
     }
     guard url.host == "tap", let route = item("route") else { return false }

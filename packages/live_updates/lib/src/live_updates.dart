@@ -108,6 +108,9 @@ abstract final class LiveUpdates {
   }
 
   static void _checkPushOptions(bool pushUpdates, String? channel) {
+    if (channel != null && channel.isEmpty) {
+      throw ArgumentError.value(channel, 'iosChannelId', 'Must not be empty');
+    }
     if (pushUpdates && channel != null) {
       throw ArgumentError(
         'pushUpdates and iosChannelId cannot be combined: an activity receives '
@@ -170,7 +173,13 @@ abstract final class LiveUpdates {
   ///
   /// [handler] must be a top-level or static function annotated with
   /// `@pragma('vm:entry-point')`. It has a few seconds to finish (the system
-  /// limits background work). On iOS, plugins that use platform channels are
+  /// limits background work). It also runs while the app is open if nothing
+  /// listens to [onAction].
+  ///
+  /// Buttons can be pressed on the Lock Screen, so the handler may run
+  /// without the device being unlocked. Make destructive actions require an
+  /// unlock with [LiveUpdateAction.requiresUnlock], and keep server-side
+  /// actions idempotent and authorized. On iOS, plugins that use platform channels are
   /// only available to it if the app registers them for background engines
   /// (see the README).
   ///

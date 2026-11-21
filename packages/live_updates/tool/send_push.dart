@@ -117,11 +117,9 @@ Future<void> main(List<String> args) async {
     case 'apns-broadcast':
       // iOS 18 broadcast to every activity on a channel (update or end only).
       if (event == 'start') _fail('Broadcasts cannot start Live Activities');
-      final host =
-          o['host'] ??
-          (o.containsKey('sandbox')
-              ? 'api.sandbox.push.apple.com'
-              : 'api.push.apple.com');
+      final host = o.containsKey('sandbox')
+          ? 'api.sandbox.push.apple.com'
+          : 'api.push.apple.com';
       await _curl(
         url: 'https://$host/4/broadcasts/apps/${_req(o, 'bundle-id')}',
         headers: {
@@ -352,9 +350,14 @@ Future<ProcessResult> _curlWithConfig(List<String> lines) async {
   return ProcessResult(process.pid, code, await out, await err);
 }
 
-/// Quotes a value for a curl config file.
-String _q(String value) =>
-    '"${value.replaceAll(r'\', r'\\').replaceAll('"', r'\"')}"';
+/// Quotes a value for a curl config file. Line breaks are rejected so a
+/// value can never start another config line.
+String _q(String value) {
+  if (value.contains('\n') || value.contains('\r')) {
+    _fail('Values must not contain line breaks');
+  }
+  return '"${value.replaceAll(r'\', r'\\').replaceAll('"', r'\"')}"';
+}
 
 String _b64(List<int> bytes) => base64Url.encode(bytes).replaceAll('=', '');
 

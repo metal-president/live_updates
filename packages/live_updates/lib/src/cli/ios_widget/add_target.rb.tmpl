@@ -30,7 +30,10 @@ def configure_app_group(project, target, ios_dir, default_rel, groups)
     rel = config.build_settings['CODE_SIGN_ENTITLEMENTS'] || default_rel
     add_app_group(File.join(ios_dir, rel), groups.values)
     config.build_settings['CODE_SIGN_ENTITLEMENTS'] = rel
-    config.build_settings[GROUP_SETTING] = groups.fetch(config.name)
+    group = groups[config.name] or
+      abort("#{target.name} has a build configuration \"#{config.name}\" that Runner does not have. " \
+            'Add it to Runner or pass --app-group.')
+    config.build_settings[GROUP_SETTING] = group
   end
   dir, file = File.split(default_rel)
   group_ref = project.main_group.find_subpath(dir, false)

@@ -78,7 +78,13 @@ class _ExamplePageState extends State<ExamplePage> {
     route: '/orders/1234',
     image: const LiveUpdateImage.asset('assets/parcel.png', maxDimension: 128),
     actions: const [
-      LiveUpdateAction(id: 'cancel', title: 'Cancel', iosSystemImage: 'xmark'),
+      LiveUpdateAction(
+        id: 'cancel',
+        title: 'Cancel',
+        iosSystemImage: 'xmark',
+        // Destructive: ask for an unlock on the Lock Screen first.
+        requiresUnlock: true,
+      ),
       LiveUpdateAction(
         id: 'details',
         title: 'Details',

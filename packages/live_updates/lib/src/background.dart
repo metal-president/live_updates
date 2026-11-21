@@ -51,13 +51,23 @@ Future<void> liveUpdatesBackgroundMain() async {
             CallbackHandle.fromRawHandle(raw),
           );
     if (handler is LiveUpdateActionHandler) {
-      for (final (updateId, actionId) in await platform.takeQueuedActions()) {
-        try {
-          await handler(
-            LiveUpdateActionEvent(updateId: updateId, actionId: actionId),
-          );
-        } on Object catch (error) {
-          debugPrint('live_updates: background action handler failed: $error');
+      // Presses that arrive while the handler runs are queued too: keep
+      // draining until the queue is empty.
+      for (
+        var queued = await platform.takeQueuedActions();
+        queued.isNotEmpty;
+        queued = await platform.takeQueuedActions()
+      ) {
+        for (final (updateId, actionId) in queued) {
+          try {
+            await handler(
+              LiveUpdateActionEvent(updateId: updateId, actionId: actionId),
+            );
+          } on Object catch (error) {
+            debugPrint(
+              'live_updates: background action handler failed: $error',
+            );
+          }
         }
       }
     }

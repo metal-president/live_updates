@@ -201,6 +201,15 @@ public final class LiveUpdatesBridge {
       String updateId,
       String actionId,
       @Nullable android.content.BroadcastReceiver.PendingResult result) {
+    emitAction(c, updateId, actionId, result, true);
+  }
+
+  private static void emitAction(
+      Context c,
+      String updateId,
+      String actionId,
+      @Nullable android.content.BroadcastReceiver.PendingResult result,
+      boolean allowBackground) {
     long dispatcher;
     synchronized (actionLock) {
       ActionListener listener = actionListener;
@@ -214,7 +223,7 @@ public final class LiveUpdatesBridge {
       pending.put(new org.json.JSONArray().put(updateId).put(actionId));
       // commit (not apply): the headless engine reads it right away.
       prefs.edit().putString(PREF_PENDING_ACTIONS, pending.toString()).commit();
-      dispatcher = prefs.getLong(PREF_BG_DISPATCHER, 0);
+      dispatcher = allowBackground ? prefs.getLong(PREF_BG_DISPATCHER, 0) : 0;
     }
     if (dispatcher != 0) {
       LiveUpdatesBackgroundRunner.run(c, dispatcher, result);
@@ -513,7 +522,9 @@ public final class LiveUpdatesBridge {
     intent.removeExtra(EXTRA_UPDATE_ID);
     intent.removeExtra(EXTRA_ROUTE);
     if (!intentToken(c).equals(token)) return; // Not from our notifications.
-    if (actionId != null && updateId != null) emitAction(c, updateId, actionId);
+    // Open-app presses: the app is coming to the foreground, so its onAction
+    // listener handles them (no background engine).
+    if (actionId != null && updateId != null) emitAction(c, updateId, actionId, null, false);
     if (route == null) return;
     RouteListener listener = routeListener;
     if (listener != null) {
@@ -640,9 +651,12 @@ public final class LiveUpdatesBridge {
         pi = LiveUpdatesActionReceiver.intent(c, id, actionId);
       }
       String iconName = optString(a, "androidIcon");
-      b.addAction(
-          new Notification.Action.Builder(smallIcon(c, iconName), a.optString("title"), pi)
-              .build());
+      Notification.Action.Builder action =
+          new Notification.Action.Builder(smallIcon(c, iconName), a.optString("title"), pi);
+      if (a.optBoolean("requiresUnlock", false) && Build.VERSION.SDK_INT >= 31) {
+        action.setAuthenticationRequired(true);
+      }
+      b.addAction(action.build());
     }
   }
 

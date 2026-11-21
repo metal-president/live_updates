@@ -30,6 +30,9 @@ public class LiveUpdatesPlugin: NSObject, FlutterPlugin, FlutterSceneLifeCycleDe
   public static func register(with registrar: FlutterPluginRegistrar) {
     // Keeps the FFIgen block trampolines linked into the app.
     live_updates_objc_link()
+    // Background engines register plugins again; the URL handling delegate
+    // is process-wide, so it is added only once.
+    guard instances.isEmpty else { return }
     let instance = LiveUpdatesPlugin()
     instances.append(instance)
     // Scene-based apps get URLs through the scene delegate only; registering

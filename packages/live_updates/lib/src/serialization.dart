@@ -20,6 +20,7 @@ extension LiveUpdateContentJson on LiveUpdateContent {
             'id': a.id,
             'title': a.title,
             if (a.opensApp) 'opensApp': true,
+            if (a.requiresUnlock) 'requiresUnlock': true,
             'systemImage': ?a.iosSystemImage,
             'androidIcon': ?a.androidIcon,
           },

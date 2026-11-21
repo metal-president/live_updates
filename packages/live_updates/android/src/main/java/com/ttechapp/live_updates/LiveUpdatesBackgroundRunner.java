@@ -37,6 +37,9 @@ final class LiveUpdatesBackgroundRunner {
         () -> {
           if (result != null) pending.add(result);
           if (engine != null) return; // Already running: it drains the queue.
+          // Start the deadline first: initialization can take a while.
+          main.removeCallbacks(timeout);
+          main.postDelayed(timeout, TIMEOUT_MS);
           try {
             // Loads the Flutter native library, needed for the callback lookup.
             FlutterLoader loader = FlutterInjector.instance().flutterLoader();
@@ -54,8 +57,7 @@ final class LiveUpdatesBackgroundRunner {
                 .getDartExecutor()
                 .executeDartCallback(
                     new DartExecutor.DartCallback(app.getAssets(), loader.findAppBundlePath(), info));
-            main.postDelayed(timeout, TIMEOUT_MS);
-          } catch (RuntimeException e) {
+          } catch (Throwable e) {
             Log.e(TAG, "Could not start the background action handler", e);
             finish();
           }

@@ -8,12 +8,9 @@ updates:
       actions:
         patterns: ["*"]
 
+  # A pub workspace is resolved from its root (pubspec.yaml + pubspec.lock).
   - package-ecosystem: pub
-    directories:
-      - /
-      - /packages/live_updates
-      - /packages/live_updates/example
-      - /packages/live_updates_fcm
+    directory: /
     schedule:
       interval: weekly
     groups:

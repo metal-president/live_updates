@@ -1,4 +1,4 @@
-## Unreleased
+## 0.0.3
 
 - iOS 18 broadcast: `start(..., iosChannelId:)` and `startOrUpdate(...,
   iosChannelId:)` subscribe a Live Activity to an APNs broadcast channel.

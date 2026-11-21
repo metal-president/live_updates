@@ -1,3 +1,8 @@
+## 0.0.3
+
+- Requires live_updates 0.0.3 (iOS 18 broadcast, background button
+  handler, Android 17 metrics).
+
 ## 0.0.2
 
 - `LiveUpdatesFcm.tokens()`: one stream with every token your server needs —

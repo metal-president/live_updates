@@ -1,3 +1,8 @@
+## Unreleased
+
+- Docs: Android 17 does not show the body text of a Live Update with
+  `metrics`.
+
 ## 0.0.3
 
 - iOS 18 broadcast: `start(..., iosChannelId:)` and `startOrUpdate(...,

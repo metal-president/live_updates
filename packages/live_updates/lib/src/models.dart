@@ -374,6 +374,11 @@ final class AndroidLiveUpdateOptions {
   /// Ignored below Android 17, where [LiveUpdateContent.progress] is shown as
   /// usual.
   ///
+  /// Android 17's metric template has no room for [LiveUpdateContent.body],
+  /// so the body (and [bodySemanticStyle]) is not shown while metrics are
+  /// set. Put what users must see in the title or in an
+  /// [AndroidMetric.text].
+  ///
   /// Keep labels short: Android recommends 10 characters or fewer.
   final List<AndroidMetric> metrics;
 
@@ -384,6 +389,7 @@ final class AndroidLiveUpdateOptions {
 
   /// Semantic color of [LiveUpdateContent.body] (Android 17+). The system
   /// picks the actual color, and only applies it to promoted Live Updates.
+  /// Not visible when [metrics] are set, because the body is not shown.
   final LiveUpdateSemanticStyle? bodySemanticStyle;
 
   /// Semantic color of the progress bar (Android 17+, promoted Live Updates).

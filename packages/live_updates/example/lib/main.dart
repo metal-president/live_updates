@@ -79,6 +79,8 @@ class _ExamplePageState extends State<ExamplePage> {
     route: '/orders/1234',
     // Counted by the system: no update needed every second.
     timer: LiveUpdateTimer.countdown(_eta),
+    // The compact Dynamic Island shows the countdown instead of the progress.
+    ios: const IosLiveUpdateOptions(compactTrailing: IosIslandContent.timer),
     image: const LiveUpdateImage.asset('assets/parcel.png', maxDimension: 128),
     actions: const [
       LiveUpdateAction(

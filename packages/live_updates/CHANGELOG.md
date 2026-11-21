@@ -1,3 +1,13 @@
+## Unreleased
+
+- `IosLiveUpdateOptions.compactTrailing` and `minimal` (`IosIslandContent`):
+  choose what the compact and minimal Dynamic Island show.
+- `create_widget`: the reusable views move to `LiveUpdatesViews.swift`, which
+  `create_widget` always updates together with `LiveUpdatesAttributes.swift`
+  and `LiveUpdatesActionIntent.swift`. Your layout file is kept unless you pass
+  `--force`. Existing layouts keep working; run `create_widget --force` once
+  to switch to the shorter layout that uses the shared views.
+
 ## 0.0.4
 
 - `LiveUpdateContent.timer`: a countdown or stopwatch counted by the system

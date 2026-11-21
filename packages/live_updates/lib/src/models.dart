@@ -303,6 +303,8 @@ final class IosLiveUpdateOptions {
     this.relevanceScore,
     this.alert,
     this.extra = const {},
+    this.compactTrailing,
+    this.minimal,
   });
 
   /// When the system marks the activity as stale.
@@ -318,13 +320,26 @@ final class IosLiveUpdateOptions {
   /// `context.state.extra`.
   final Map<String, String> extra;
 
+  /// What the generated widget shows on the trailing side of the compact
+  /// Dynamic Island. `null` (or content that is missing, such as
+  /// [IosIslandContent.progress] without a progress) falls back to the
+  /// progress, else the timer, else the title.
+  final IosIslandContent? compactTrailing;
+
+  /// What the generated widget shows in the minimal Dynamic Island (when
+  /// several activities share it). `null` falls back to the progress, else
+  /// the icon.
+  final IosIslandContent? minimal;
+
   @override
   bool operator ==(Object other) =>
       other is IosLiveUpdateOptions &&
       other.staleDate == staleDate &&
       other.relevanceScore == relevanceScore &&
       other.alert == alert &&
-      mapEquals(other.extra, extra);
+      mapEquals(other.extra, extra) &&
+      other.compactTrailing == compactTrailing &&
+      other.minimal == minimal;
 
   @override
   int get hashCode => Object.hash(
@@ -332,7 +347,52 @@ final class IosLiveUpdateOptions {
     relevanceScore,
     alert,
     Object.hashAllUnordered(extra.entries.map((e) => (e.key, e.value))),
+    compactTrailing,
+    minimal,
   );
+}
+
+/// Content for a small Dynamic Island area
+/// ([IosLiveUpdateOptions.compactTrailing], [IosLiveUpdateOptions.minimal]).
+///
+/// Text (title, body, extra) is left out when the island is limited in width
+/// (iOS 27 landscape). A customized widget can read the choice as
+/// `context.state.compactTrailing` / `context.state.minimal`.
+@immutable
+final class IosIslandContent {
+  const IosIslandContent._(this.value);
+
+  /// A circular progress ring ([LiveUpdateContent.progress]).
+  static const progress = IosIslandContent._('progress');
+
+  /// The timer ([LiveUpdateContent.timer]).
+  static const timer = IosIslandContent._('timer');
+
+  /// The title.
+  static const title = IosIslandContent._('title');
+
+  /// The body.
+  static const body = IosIslandContent._('body');
+
+  /// The icon ([LiveUpdateContent.iconName]).
+  static const icon = IosIslandContent._('icon');
+
+  /// The value of [IosLiveUpdateOptions.extra] for [key], such as a short
+  /// gate number.
+  const IosIslandContent.extra(String key) : value = 'extra:$key';
+
+  /// Wire value read by the widget.
+  final String value;
+
+  @override
+  bool operator ==(Object other) =>
+      other is IosIslandContent && other.value == value;
+
+  @override
+  int get hashCode => value.hashCode;
+
+  @override
+  String toString() => 'IosIslandContent($value)';
 }
 
 /// An alert presented with an iOS Live Activity update.

@@ -202,4 +202,21 @@ void main() {
     // The iOS alert keeps its own key.
     expect(json['alert'], {'title': 'a', 'body': 'b'});
   });
+
+  test('dynamic island choices', () {
+    final json = const LiveUpdateContent(
+      title: 't',
+      ios: IosLiveUpdateOptions(
+        extra: {'gate': 'B12'},
+        compactTrailing: IosIslandContent.extra('gate'),
+        minimal: IosIslandContent.timer,
+      ),
+    ).toJson();
+    expect(json['compactTrailing'], 'extra:gate');
+    expect(json['minimal'], 'timer');
+    expect(
+      const LiveUpdateContent(title: 't', ios: IosLiveUpdateOptions()).toJson(),
+      isNot(contains('compactTrailing')),
+    );
+  });
 }

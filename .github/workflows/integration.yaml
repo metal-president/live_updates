@@ -42,7 +42,9 @@ jobs:
           for runtime, items in devices.items():
               if ".iOS-" not in runtime:
                   continue
-              version = tuple(int(p) for p in runtime.split(".iOS-")[1].split("-"))
+              # e.g. ...SimRuntime.iOS-26-5; later images may append a suffix.
+              parts = runtime.split(".iOS-")[1].split("-")
+              version = tuple(int(p) for p in parts if p.isdigit())
               for d in items:
                   if d["name"].startswith("iPhone") and (best is None or version > best[0]):
                       best = (version, d["udid"], d["name"])

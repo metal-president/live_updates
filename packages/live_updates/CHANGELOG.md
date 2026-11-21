@@ -1,3 +1,11 @@
+## Unreleased
+
+- iOS 18 broadcast: `start(..., iosChannelId:)` and `startOrUpdate(...,
+  iosChannelId:)` subscribe a Live Activity to an APNs broadcast channel.
+- `tool/send_push.dart`: `apns-channel` (create, list, delete) and
+  `apns-broadcast` commands; `--input-push-channel` and `--activity-key` for
+  push-to-start.
+
 ## 0.0.2
 
 - Push tokens (`LiveUpdate.pushTokens`, `LiveUpdates.pushToStartTokens`)

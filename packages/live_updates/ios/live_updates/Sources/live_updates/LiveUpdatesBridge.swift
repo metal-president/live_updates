@@ -28,20 +28,30 @@ public final class LiveUpdatesBridge: NSObject {
 
   private static func request(_ payload: Payload, key: String?) throws -> String {
     let wantsPush = payload.enablePushUpdates ?? false
+    var pushType: PushType? = wantsPush ? .token : nil
+    if let channel = payload.channelId {
+      guard #available(iOS 18.0, *) else {
+        throw NSError(
+          domain: "live_updates", code: 2,
+          userInfo: [NSLocalizedDescriptionKey: "Broadcast channels require iOS 18 or later."])
+      }
+      pushType = .channel(channel)
+    }
     do {
       let activity = try Activity<LiveUpdatesAttributes>.request(
         attributes: LiveUpdatesAttributes(key: key),
         content: payload.content,
-        pushType: wantsPush ? .token : nil
+        pushType: pushType
       )
       return activity.id
-    } catch where wantsPush {
+    } catch where pushType != nil {
       throw NSError(
         domain: "live_updates", code: 1,
         userInfo: [
           NSLocalizedDescriptionKey:
-            "\(error.localizedDescription) enablePushUpdates requires the Push "
-            + "Notifications capability (aps-environment entitlement) on the Runner target."
+            "\(error.localizedDescription) Push updates and broadcast channels "
+            + "require the Push Notifications capability (aps-environment entitlement) on the "
+            + "Runner target; channels also need Broadcast Capability for the App ID."
         ])
     }
   }
@@ -281,6 +291,7 @@ private struct Payload: Decodable {
   var staleDate: Double?
   var relevanceScore: Double?
   var enablePushUpdates: Bool?
+  var channelId: String?
   var alert: Alert?
 
   static func decode(_ json: String) throws -> Payload {

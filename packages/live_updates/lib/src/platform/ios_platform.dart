@@ -56,9 +56,11 @@ class IosLiveUpdatesPlatform extends LiveUpdatesPlatform with ContentEncoder {
   Future<String> start(
     LiveUpdateContent content, {
     bool pushUpdates = false,
+    String? iosChannelId,
   }) async {
     final json = await encodeContent(content, {
       'enablePushUpdates': pushUpdates,
+      'channelId': ?iosChannelId,
     });
     try {
       final id = LiveUpdatesBridge.start(_ns(json));
@@ -88,9 +90,11 @@ class IosLiveUpdatesPlatform extends LiveUpdatesPlatform with ContentEncoder {
     String key,
     LiveUpdateContent content, {
     bool pushUpdates = false,
+    String? iosChannelId,
   }) async {
     final json = await encodeContent(content, {
       'enablePushUpdates': pushUpdates,
+      'channelId': ?iosChannelId,
     });
     final result = Completer<String>();
     LiveUpdatesBridge.startOrUpdate(

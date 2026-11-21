@@ -82,11 +82,38 @@ abstract final class LiveUpdates {
   /// [LiveUpdate.pushTokens]); it needs the Push Notifications capability.
   /// It has no effect on Android, where remote updates arrive as payloads
   /// (see [handleRemotePayload]).
+  ///
+  /// [iosChannelId] subscribes the Live Activity to an APNs broadcast channel
+  /// (iOS 18+), so one push updates every device on that channel, such as a
+  /// sports score. Create the channel with APNs' channel management API (see
+  /// `tool/send_push.dart`); it needs Broadcast Capability for the App ID.
+  /// Broadcasts can update and end activities but not start them. It cannot
+  /// be combined with [pushUpdates], throws [LiveUpdateException] before
+  /// iOS 18, and is ignored on Android (broadcast there with FCM topics and
+  /// [handleRemotePayload]).
   static Future<LiveUpdate> start(
     LiveUpdateContent content, {
     bool pushUpdates = false,
-  }) async =>
-      LiveUpdate._(await _platform.start(content, pushUpdates: pushUpdates));
+    String? iosChannelId,
+  }) async {
+    _checkPushOptions(pushUpdates, iosChannelId);
+    return LiveUpdate._(
+      await _platform.start(
+        content,
+        pushUpdates: pushUpdates,
+        iosChannelId: iosChannelId,
+      ),
+    );
+  }
+
+  static void _checkPushOptions(bool pushUpdates, String? channel) {
+    if (pushUpdates && channel != null) {
+      throw ArgumentError(
+        'pushUpdates and iosChannelId cannot be combined: an activity receives '
+        'either per-activity pushes or broadcasts.',
+      );
+    }
+  }
 
   /// Updates the running live update identified by [key], or starts a new
   /// one with that key. Use it when your own data has an id, such as an
@@ -102,15 +129,25 @@ abstract final class LiveUpdates {
   /// for that key, on iOS once the system no longer lists the ended activity.
   /// Use a new key for a new activity.
   ///
-  /// [pushUpdates] only applies when a new activity is started: an existing
-  /// activity keeps the push setting it was started with.
+  /// [pushUpdates] and [iosChannelId] only apply when a new activity is
+  /// started: an existing activity keeps the push setting it was started
+  /// with.
   static Future<LiveUpdate> startOrUpdate(
     String key,
     LiveUpdateContent content, {
     bool pushUpdates = false,
-  }) async => LiveUpdate._(
-    await _platform.startOrUpdate(key, content, pushUpdates: pushUpdates),
-  );
+    String? iosChannelId,
+  }) async {
+    _checkPushOptions(pushUpdates, iosChannelId);
+    return LiveUpdate._(
+      await _platform.startOrUpdate(
+        key,
+        content,
+        pushUpdates: pushUpdates,
+        iosChannelId: iosChannelId,
+      ),
+    );
+  }
 
   /// The running live update identified by [key], if any.
   static Future<LiveUpdate?> find(String key) async =>

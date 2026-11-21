@@ -81,6 +81,7 @@ class AndroidLiveUpdatesPlatform extends LiveUpdatesPlatform
   Future<String> start(
     LiveUpdateContent content, {
     bool pushUpdates = false,
+    String? iosChannelId,
   }) async {
     final json = await encodeContent(content);
     return _call(
@@ -94,6 +95,7 @@ class AndroidLiveUpdatesPlatform extends LiveUpdatesPlatform
     String key,
     LiveUpdateContent content, {
     bool pushUpdates = false,
+    String? iosChannelId,
   }) async {
     final json = await encodeContent(content);
     return _call(

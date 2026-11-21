@@ -216,6 +216,31 @@ Send pushes with `apns-push-type: liveactivity` and topic
 For push-to-start, set `"attributes-type": "LiveUpdatesAttributes"` and
 `"attributes": {}`.
 
+### iOS broadcast (iOS 18+)
+
+For updates that many users share, such as a match score, subscribe the
+activity to an APNs broadcast channel instead of collecting per-activity
+tokens. One push to the channel updates every subscribed device.
+
+```dart
+final update = await LiveUpdates.start(
+  const LiveUpdateContent(title: 'FC Tokyo 2 - 1 Kashima', body: '78 min'),
+  iosChannelId: channelIdFromYourServer,
+);
+```
+
+- Enable **Broadcast Capability** for the App ID in your Apple Developer
+  account (Identifiers > Push Notifications); Xcode cannot enable it.
+- Your server creates channels with APNs' channel management API and sends
+  `update` / `end` pushes to them; `tool/send_push.dart apns-channel` and
+  `apns-broadcast` show both requests.
+- Broadcasts cannot start activities. Start locally with `iosChannelId`, or
+  send a push-to-start with `input-push-channel` so the started activity
+  joins the channel.
+- `iosChannelId` cannot be combined with `pushUpdates`, and throws a
+  `LiveUpdateException` before iOS 18. On Android, use FCM topic messages
+  with the payload below.
+
 ### Android
 
 Deliver a data message and pass it to `LiveUpdates.handleRemotePayload`:

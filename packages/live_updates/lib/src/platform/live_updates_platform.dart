@@ -24,13 +24,18 @@ abstract class LiveUpdatesPlatform {
   Future<bool> canPostPromotedNotifications() async => false;
 
   /// Starts a live update and returns its id.
-  Future<String> start(LiveUpdateContent content, {bool pushUpdates = false});
+  Future<String> start(
+    LiveUpdateContent content, {
+    bool pushUpdates = false,
+    String? iosChannelId,
+  });
 
   /// Updates the live update with key [key] or starts one; returns its id.
   Future<String> startOrUpdate(
     String key,
     LiveUpdateContent content, {
     bool pushUpdates = false,
+    String? iosChannelId,
   });
 
   /// Id of the running live update with key [key].
@@ -83,6 +88,7 @@ class NoopLiveUpdatesPlatform extends LiveUpdatesPlatform {
   Future<String> start(
     LiveUpdateContent content, {
     bool pushUpdates = false,
+    String? iosChannelId,
   }) async => 'noop-${_next++}';
 
   @override
@@ -90,6 +96,7 @@ class NoopLiveUpdatesPlatform extends LiveUpdatesPlatform {
     String key,
     LiveUpdateContent content, {
     bool pushUpdates = false,
+    String? iosChannelId,
   }) async => key;
 
   @override

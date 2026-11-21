@@ -100,7 +100,12 @@ xcrun simctl openurl booted "liveupdates-com.ttechapp.liveUpdatesExample://tap?r
     await Firebase.initializeApp();
     FirebaseMessaging.onBackgroundMessage(_onBackgroundMessage);
     LiveUpdatesFcm.listen();
-    debugPrint('FCM token: ${await FirebaseMessaging.instance.getToken()}');
+    // Manual test only: printing tokens is fine on your own debug build, but
+    // never log tokens in a production app (they allow pushing to the device).
+    if (kDebugMode) {
+      LiveUpdatesFcm.tokens().listen((t) => debugPrint('${t.type.name}: ${t.value}'));
+    }
+    await FirebaseMessaging.instance.register();
     runApp(const MaterialApp(home: ExamplePage()));
   }
   ```
@@ -109,19 +114,19 @@ xcrun simctl openurl booted "liveupdates-com.ttechapp.liveUpdatesExample://tap?r
 
 ### Steps
 
-1. Run the app, allow notifications and copy the FCM token from the log.
+1. Run the app, allow notifications and copy the `fcmInstallationId` from the log.
 2. Start, update and end:
 
    ```bash
    cd packages/live_updates
-   dart run tool/send_push.dart fcm --service-account sa.json --token <FCM token> \
+   dart run tool/send_push.dart fcm --service-account sa.json --fid <installation ID> \
      --event start --id order-1 \
      --content '{"title":"Order #1","body":"Preparing","progress":0.1,"route":"/orders/1"}'
 
-   dart run tool/send_push.dart fcm --service-account sa.json --token <FCM token> \
+   dart run tool/send_push.dart fcm --service-account sa.json --fid <installation ID> \
      --event update --id order-1 --content '{"title":"Order #1","progress":0.6}'
 
-   dart run tool/send_push.dart fcm --service-account sa.json --token <FCM token> \
+   dart run tool/send_push.dart fcm --service-account sa.json --fid <installation ID> \
      --event end --id order-1
    ```
 
@@ -141,10 +146,11 @@ xcrun simctl openurl booted "liveupdates-com.ttechapp.liveUpdatesExample://tap?r
 
 FCM can deliver Live Activity pushes when the app also uses FCM on iOS (APNs
 key uploaded to Firebase). Send the Live Activity token (push or push-to-start)
-together with the device's FCM registration token:
+together with the iPhone's Firebase Installation ID (`fcmInstallationId` from
+`LiveUpdatesFcm.tokens()`):
 
 ```bash
 dart run tool/send_push.dart fcm-ios --service-account sa.json \
-  --token <FCM token of the iPhone> --live-activity-token <hex> \
+  --fid <installation ID of the iPhone> --live-activity-token <hex> \
   --event update --content '{"title":"Order #1","progress":0.8}'
 ```

@@ -31,7 +31,8 @@ final class LiveUpdate {
   Stream<String> get actions =>
       _platform.actions.where((e) => e.$1 == id).map((e) => e.$2);
 
-  /// Per-activity APNs push tokens (iOS only, empty elsewhere). Requires
+  /// Per-activity APNs push tokens (iOS only, empty elsewhere). A new
+  /// listener first receives the current token, if one is known. Requires
   /// starting with `pushUpdates: true`.
   Stream<LiveUpdatePushToken> get pushTokens => _platform.pushTokens(id);
 
@@ -139,7 +140,8 @@ abstract final class LiveUpdates {
   /// Ends every live update started by this app.
   static Future<void> endAll() => _platform.endAll();
 
-  /// iOS push-to-start tokens (iOS 17.2+, empty elsewhere).
+  /// iOS push-to-start tokens (iOS 17.2+, empty elsewhere). A new listener
+  /// first receives the current token, if one is known.
   static Stream<LiveUpdatePushToken> get pushToStartTokens =>
       _platform.pushToStartTokens;
 

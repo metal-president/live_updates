@@ -410,7 +410,8 @@ final class LiveUpdatePushToken {
   int get hashCode => hex.hashCode;
 
   @override
-  String toString() => 'LiveUpdatePushToken($hex)';
+  // The token is a credential for pushing to this device: keep it out of logs.
+  String toString() => 'LiveUpdatePushToken(<redacted>)';
 }
 
 /// Thrown when the platform rejects a live update operation.

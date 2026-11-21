@@ -89,7 +89,9 @@ public final class LiveUpdatesBridge {
 
   private static final String PREFS = "com.ttechapp.live_updates";
   private static final String PREF_PENDING_ACTIONS = "pendingActions";
-  private static final String PREF_DISMISSED = "dismissed";
+  private static final String PREF_DISMISSED = "dismissedIds";
+  private static final String PREF_INTENT_TOKEN = "intentToken";
+  static final String EXTRA_TOKEN = "com.ttechapp.live_updates.TOKEN";
 
   /**
    * NotificationManager updates its active list asynchronously, so recent
@@ -229,26 +231,55 @@ public final class LiveUpdatesBridge {
     }
   }
 
+  /** At most this many dismissed ids are remembered (oldest are dropped). */
+  private static final int MAX_DISMISSED = 200;
+
   /** Records that the user swiped the update away (see DismissReceiver). */
   static void markDismissed(Context c, String id) {
-    SharedPreferences prefs = prefs(c);
-    Set<String> ids = new java.util.HashSet<>(prefs.getStringSet(PREF_DISMISSED, new java.util.HashSet<>()));
-    ids.add(id);
-    prefs.edit().putStringSet(PREF_DISMISSED, ids).apply();
+    synchronized (actionLock) {
+      List<String> ids = readStrings(c, PREF_DISMISSED);
+      ids.remove(id);
+      ids.add(id);
+      while (ids.size() > MAX_DISMISSED) ids.remove(0);
+      writeStrings(c, PREF_DISMISSED, ids);
+    }
   }
 
   private static void clearDismissed(Context c, String id) {
-    SharedPreferences prefs = prefs(c);
-    Set<String> stored = prefs.getStringSet(PREF_DISMISSED, null);
-    if (stored == null || !stored.contains(id)) return;
-    Set<String> ids = new java.util.HashSet<>(stored);
-    ids.remove(id);
-    prefs.edit().putStringSet(PREF_DISMISSED, ids).apply();
+    synchronized (actionLock) {
+      List<String> ids = readStrings(c, PREF_DISMISSED);
+      if (ids.remove(id)) writeStrings(c, PREF_DISMISSED, ids);
+    }
   }
 
   private static boolean isDismissed(Context c, String id) {
-    Set<String> stored = prefs(c).getStringSet(PREF_DISMISSED, null);
-    return stored != null && stored.contains(id);
+    return readStrings(c, PREF_DISMISSED).contains(id);
+  }
+
+  private static List<String> readStrings(Context c, String key) {
+    org.json.JSONArray a = readArray(prefs(c), key);
+    List<String> out = new ArrayList<>();
+    for (int i = 0; i < a.length(); i++) out.add(a.optString(i));
+    return out;
+  }
+
+  private static void writeStrings(Context c, String key, List<String> values) {
+    prefs(c).edit().putString(key, new org.json.JSONArray(values).toString()).apply();
+  }
+
+  /**
+   * Random per-install secret put into the plugin's own launch intents. The
+   * launcher activity is exported, so extras without it may come from another
+   * app and are ignored.
+   */
+  private static String intentToken(Context c) {
+    SharedPreferences prefs = prefs(c);
+    String token = prefs.getString(PREF_INTENT_TOKEN, null);
+    if (token == null) {
+      token = UUID.randomUUID().toString();
+      prefs.edit().putString(PREF_INTENT_TOKEN, token).apply();
+    }
+    return token;
   }
 
   private static SharedPreferences prefs(Context c) {
@@ -358,13 +389,13 @@ public final class LiveUpdatesBridge {
       case "start":
         if (content == null) return false;
         clearDismissed(requireContext(), id);
-        post(id, new JSONObject(content));
+        post(id, new JSONObject(content), true);
         return true;
       case "update":
         if (content == null) return false;
         // Do not bring back an update that ended or that the user dismissed.
         if (!isDismissed(requireContext(), id) && isShown(id)) {
-          post(id, new JSONObject(content));
+          post(id, new JSONObject(content), true);
         }
         return true;
       case "end":
@@ -409,18 +440,25 @@ public final class LiveUpdatesBridge {
 
   /** Called by the plugin for launch and new intents. */
   static void handleIntent(@Nullable Intent intent) {
-    if (intent == null) return;
-    String actionId = intent.getStringExtra(EXTRA_ACTION_ID);
-    String updateId = intent.getStringExtra(EXTRA_UPDATE_ID);
-    if (actionId != null && updateId != null) {
-      intent.removeExtra(EXTRA_ACTION_ID);
-      intent.removeExtra(EXTRA_UPDATE_ID);
-      Context c = context;
-      if (c != null) emitAction(c, updateId, actionId);
+    Context c = context;
+    if (intent == null || c == null) return;
+    String token, actionId, updateId, route;
+    try {
+      token = intent.getStringExtra(EXTRA_TOKEN);
+      actionId = intent.getStringExtra(EXTRA_ACTION_ID);
+      updateId = intent.getStringExtra(EXTRA_UPDATE_ID);
+      route = intent.getStringExtra(EXTRA_ROUTE);
+    } catch (RuntimeException e) {
+      return; // Malformed extras from another app.
     }
-    String route = intent.getStringExtra(EXTRA_ROUTE);
-    if (route == null) return;
+    if (token == null && actionId == null && route == null) return;
+    intent.removeExtra(EXTRA_TOKEN);
+    intent.removeExtra(EXTRA_ACTION_ID);
+    intent.removeExtra(EXTRA_UPDATE_ID);
     intent.removeExtra(EXTRA_ROUTE);
+    if (!intentToken(c).equals(token)) return; // Not from our notifications.
+    if (actionId != null && updateId != null) emitAction(c, updateId, actionId);
+    if (route == null) return;
     RouteListener listener = routeListener;
     if (listener != null) {
       listener.onRoute(route);
@@ -430,6 +468,10 @@ public final class LiveUpdatesBridge {
   }
 
   private static void post(String id, JSONObject content) {
+    post(id, content, false);
+  }
+
+  private static void post(String id, JSONObject content, boolean remote) {
     Context c = requireContext();
     // Survives process restarts: a notification already shown is not new.
     boolean wasShown = isShown(id);
@@ -442,22 +484,37 @@ public final class LiveUpdatesBridge {
       isNew = known.add(id) && !wasShown;
     }
     if (isNew) emit("started", id);
-    Notification.Builder b = builder(c, content);
+    Notification.Builder b = builder(c, content, remote);
     b.setDeleteIntent(LiveUpdatesDismissReceiver.intent(c, id));
     addActions(c, b, id, content);
     manager(c).notify(TAG_PREFIX + id, NOTIFICATION_ID, b.build());
   }
 
+  private static final String DEFAULT_CHANNEL = "live_updates";
+
   private static Notification.Builder builder(Context c, JSONObject content) {
+    return builder(c, content, false);
+  }
+
+  /**
+   * Remote payloads may only use the default channel or channels that already
+   * exist, so a server cannot create arbitrary channels on the device.
+   */
+  private static Notification.Builder builder(Context c, JSONObject content, boolean remote) {
     Notification.Builder b;
     if (Build.VERSION.SDK_INT >= 26) {
-      String channelId = content.optString("channelId", "live_updates");
+      String channelId = content.optString("channelId", DEFAULT_CHANNEL);
       NotificationManager manager = manager(c);
+      if (remote
+          && !channelId.equals(DEFAULT_CHANNEL)
+          && manager.getNotificationChannel(channelId) == null) {
+        channelId = DEFAULT_CHANNEL;
+      }
       if (manager.getNotificationChannel(channelId) == null) {
         manager.createNotificationChannel(
             new NotificationChannel(
                 channelId,
-                content.optString("channelName", "Live updates"),
+                remote ? "Live updates" : content.optString("channelName", "Live updates"),
                 NotificationManager.IMPORTANCE_DEFAULT));
       }
       b = new Notification.Builder(c, channelId);
@@ -515,7 +572,10 @@ public final class LiveUpdatesBridge {
         Intent launch = c.getPackageManager().getLaunchIntentForPackage(c.getPackageName());
         if (launch == null) continue;
         launch.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-        launch.putExtra(EXTRA_UPDATE_ID, id).putExtra(EXTRA_ACTION_ID, actionId);
+        launch
+            .putExtra(EXTRA_UPDATE_ID, id)
+            .putExtra(EXTRA_ACTION_ID, actionId)
+            .putExtra(EXTRA_TOKEN, intentToken(c));
         launch.setData(intentUri("action", id, actionId));
         pi =
             PendingIntent.getActivity(
@@ -546,7 +606,7 @@ public final class LiveUpdatesBridge {
     if (launch == null) return null;
     launch.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
     if (route != null) {
-      launch.putExtra(EXTRA_ROUTE, route);
+      launch.putExtra(EXTRA_ROUTE, route).putExtra(EXTRA_TOKEN, intentToken(c));
       launch.setData(intentUri("tap", route, ""));
     }
     return PendingIntent.getActivity(

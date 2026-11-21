@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
+import 'package:crypto/crypto.dart' show sha256;
 import 'package:flutter/services.dart' show rootBundle;
 
 import 'models.dart';
@@ -20,6 +22,12 @@ class ImageStore {
 
   /// Prefix of every file written by the store.
   static const prefix = 'lu_';
+
+  /// Largest image download accepted by [LiveUpdateImage.network].
+  static const maxDownloadBytes = 10 * 1024 * 1024;
+
+  /// Time allowed for connecting and for each read of a download.
+  static const downloadTimeout = Duration(seconds: 15);
 
   /// Stores [image] and returns the file name relative to [directory].
   Future<String> store(LiveUpdateImage image) async {
@@ -44,19 +52,35 @@ class ImageStore {
       final data = await rootBundle.load(name);
       return data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
     }
-    final client = HttpClient();
+    final url = image.url!;
+    if (url.scheme != 'https') {
+      throw LiveUpdateException('Only https image URLs are allowed: $url');
+    }
+    final client = HttpClient()..connectionTimeout = downloadTimeout;
     try {
-      final response = await (await client.getUrl(image.url!)).close();
+      final request = await client.getUrl(url).timeout(downloadTimeout);
+      request.maxRedirects = 3;
+      final response = await request.close().timeout(downloadTimeout);
       if (response.statusCode != HttpStatus.ok) {
         throw LiveUpdateException(
-          'Image download failed (${response.statusCode}): ${image.url}',
+          'Image download failed (${response.statusCode}): $url',
         );
       }
+      if (response.contentLength > maxDownloadBytes) {
+        throw LiveUpdateException('Image is too large: $url');
+      }
       final builder = BytesBuilder(copy: false);
-      await response.forEach(builder.add);
+      await for (final chunk in response.timeout(downloadTimeout)) {
+        builder.add(chunk);
+        if (builder.length > maxDownloadBytes) {
+          throw LiveUpdateException('Image is too large: $url');
+        }
+      }
       return builder.takeBytes();
+    } on TimeoutException {
+      throw LiveUpdateException('Image download timed out: $url');
     } finally {
-      client.close();
+      client.close(force: true);
     }
   }
 
@@ -82,14 +106,10 @@ class ImageStore {
     return png.buffer.asUint8List();
   }
 
-  /// 64-bit FNV-1a over the bytes and the target size.
+  /// SHA-256 over the target size and the bytes (first 128 bits, hex).
   static String _hash(Uint8List bytes, int max) {
-    var h = 0xcbf29ce484222325;
-    for (final b in bytes) {
-      h = (h ^ b) * 0x100000001b3;
-    }
-    h = (h ^ max) * 0x100000001b3;
-    return h.toUnsigned(64).toRadixString(16).padLeft(16, '0');
+    final digest = sha256.convert([...'$max:'.codeUnits, ...bytes]);
+    return digest.toString().substring(0, 32);
   }
 
   void _cleanUp({required String keep}) {

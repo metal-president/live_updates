@@ -8,6 +8,16 @@ updates:
       actions:
         patterns: ["*"]
 
+  - package-ecosystem: gradle
+    directories:
+      - /packages/live_updates/android
+      - /packages/live_updates/example/android
+    schedule:
+      interval: weekly
+    groups:
+      gradle:
+        patterns: ["*"]
+
   # A pub workspace is resolved from its root (pubspec.yaml + pubspec.lock).
   - package-ecosystem: pub
     directory: /

@@ -53,4 +53,13 @@ void main() {
       expect(other.existsSync(), isTrue);
     });
   });
+
+  test('rejects non-https network images', () async {
+    await expectLater(
+      store.store(
+        LiveUpdateImage.network(Uri.parse('http://example.com/a.png')),
+      ),
+      throwsA(isA<LiveUpdateException>()),
+    );
+  });
 }

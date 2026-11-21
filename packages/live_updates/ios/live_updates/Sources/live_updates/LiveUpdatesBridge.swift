@@ -234,6 +234,11 @@ public final class LiveUpdatesBridge: NSObject {
   /// widget extension does not link the plugin) and for open-app URLs.
   @objc(enqueueAction:actionId:)
   public static func enqueueAction(_ activityId: String, actionId: String) {
+    // Only accept presses of buttons the activity actually shows.
+    guard
+      let state = find(activityId)?.content.state,
+      state.actions.contains(where: { $0.id == actionId })
+    else { return }
     let defaults = UserDefaults.standard
     var pending = defaults.stringArray(forKey: pendingActionsKey) ?? []
     pending.append("\(activityId)\n\(actionId)")
@@ -331,6 +336,10 @@ extension LiveUpdatesBridge {
       return true
     }
     guard url.host == "tap", let route = item("route") else { return false }
+    // URL schemes are not authenticated: only deliver a route that one of the
+    // app's activities actually carries, so other apps cannot inject routes.
+    guard Activity<LiveUpdatesAttributes>.activities.contains(where: { $0.content.state.route == route })
+    else { return true }
     if let handler = tapHandler { handler(route) } else { pendingRoutes.append(route) }
     return true
   }

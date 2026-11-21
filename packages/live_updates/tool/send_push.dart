@@ -140,11 +140,9 @@ Future<String> _googleAccessToken(Map<String, Object?> sa) async {
       '${_b64(utf8.encode(jsonEncode({'iss': sa['client_email'], 'scope': 'https://www.googleapis.com/auth/firebase.messaging', 'aud': 'https://oauth2.googleapis.com/token', 'iat': now, 'exp': now + 3600})))}';
   final signature = _opensslSign(unsigned, sa['private_key'] as String);
   final assertion = '$unsigned.${_b64(signature)}';
-  final result = Process.runSync('curl', [
-    '-sS',
-    '-d',
-    'grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=$assertion',
-    'https://oauth2.googleapis.com/token',
+  final result = await _curlWithConfig([
+    'url = ${_q('https://oauth2.googleapis.com/token')}',
+    'data-raw = ${_q('grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=$assertion')}',
   ]);
   final json = jsonDecode(result.stdout as String) as Map<String, Object?>;
   final token = json['access_token'];
@@ -174,9 +172,12 @@ Uint8List _opensslSign(String data, String key) {
       keyFile.path,
       dataFile.path,
     ], stdoutEncoding: null);
-    if (result.exitCode != 0) _fail('openssl failed: ${result.stderr}');
+    if (result.exitCode != 0) {
+      throw StateError('openssl failed: ${result.stderr}');
+    }
     return Uint8List.fromList(result.stdout as List<int>);
   } finally {
+    // Always remove the private key copy (exit() would skip this).
     dir.deleteSync(recursive: true);
   }
 }
@@ -209,27 +210,46 @@ Future<void> _curl({
   if (dryRun) {
     stdout
       ..writeln('POST $url')
-      ..writeln(headers.entries.map((e) => '${e.key}: ${e.value}').join('\n'))
+      ..writeln(
+        headers.entries
+            .map(
+              (e) =>
+                  '${e.key}: ${e.key == 'authorization' ? '<redacted>' : e.value}',
+            )
+            .join('\n'),
+      )
       ..writeln()
       ..writeln(json);
     return;
   }
-  final result = await Process.run('curl', [
-    '-sS',
-    '-w',
-    '\nHTTP %{http_code}\n',
-    if (http2) '--http2',
-    for (final h in headers.entries) ...['-H', '${h.key}: ${h.value}'],
-    '-H',
-    'content-type: application/json',
-    '-d',
-    jsonEncode(body),
-    url,
+  final result = await _curlWithConfig([
+    'url = ${_q(url)}',
+    'write-out = ${_q(r'\nHTTP %{http_code}\n')}',
+    if (http2) 'http2',
+    for (final h in headers.entries) 'header = ${_q('${h.key}: ${h.value}')}',
+    'header = ${_q('content-type: application/json')}',
+    'data-raw = ${_q(jsonEncode(body))}',
   ]);
   stdout.write(result.stdout);
   stderr.write(result.stderr);
   if (!(result.stdout as String).contains('HTTP 200')) exitCode = 1;
 }
+
+/// Runs curl with its options read from stdin (`--config -`), so tokens and
+/// keys never appear in the process list.
+Future<ProcessResult> _curlWithConfig(List<String> lines) async {
+  final process = await Process.start('curl', ['-sS', '--config', '-']);
+  process.stdin.writeln(lines.join('\n'));
+  await process.stdin.close();
+  final out = process.stdout.transform(utf8.decoder).join();
+  final err = process.stderr.transform(utf8.decoder).join();
+  final code = await process.exitCode;
+  return ProcessResult(process.pid, code, await out, await err);
+}
+
+/// Quotes a value for a curl config file.
+String _q(String value) =>
+    '"${value.replaceAll(r'\', r'\\').replaceAll('"', r'\"')}"';
 
 String _b64(List<int> bytes) => base64Url.encode(bytes).replaceAll('=', '');
 

@@ -104,7 +104,9 @@ if (await LiveUpdates.requestPermission()) {
   await update.end(dismissAfter: const Duration(minutes: 5));
 }
 
-// Taps on a live update deliver its route.
+// Taps on a live update deliver its route. Only routes that one of the
+// app's live updates carries are delivered, but treat them like any deep
+// link: validate before acting on them.
 LiveUpdates.onTap.listen((route) => router.go(route));
 
 // Live updates still running, e.g. after an app restart.

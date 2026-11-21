@@ -22,12 +22,18 @@ public struct LiveUpdatesAttributes: ActivityAttributes {
     public var timerStart: Double?
     /// Timer end (countdown) in seconds since 1970, counted by the system.
     public var timerEnd: Double?
+    /// What the compact Dynamic Island shows on the trailing side
+    /// (`IosLiveUpdateOptions.compactTrailing`), or `nil` for the default.
+    public var compactTrailing: String?
+    /// What the minimal Dynamic Island shows (`IosLiveUpdateOptions.minimal`).
+    public var minimal: String?
 
     public init(
       title: String, body: String? = nil, progress: Double? = nil,
       iconName: String? = nil, route: String? = nil, image: String? = nil,
       actions: [LiveUpdatesAction] = [], extra: [String: String] = [:],
-      timerStart: Double? = nil, timerEnd: Double? = nil
+      timerStart: Double? = nil, timerEnd: Double? = nil,
+      compactTrailing: String? = nil, minimal: String? = nil
     ) {
       self.title = title
       self.body = body
@@ -39,6 +45,8 @@ public struct LiveUpdatesAttributes: ActivityAttributes {
       self.extra = extra
       self.timerStart = timerStart
       self.timerEnd = timerEnd
+      self.compactTrailing = compactTrailing
+      self.minimal = minimal
     }
 
     // Lenient decoding so APNs `content-state` may omit optional keys.
@@ -54,6 +62,8 @@ public struct LiveUpdatesAttributes: ActivityAttributes {
       extra = try c.decodeIfPresent([String: String].self, forKey: .extra) ?? [:]
       timerStart = try c.decodeIfPresent(Double.self, forKey: .timerStart)
       timerEnd = try c.decodeIfPresent(Double.self, forKey: .timerEnd)
+      compactTrailing = try c.decodeIfPresent(String.self, forKey: .compactTrailing)
+      minimal = try c.decodeIfPresent(String.self, forKey: .minimal)
     }
   }
 

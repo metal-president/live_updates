@@ -14,7 +14,11 @@ Options:
   --no-app-group    Do not set up an App Group
   --no-xcode        Only write the widget sources; do not change
                     Runner.xcodeproj, Info.plist or entitlements
-  --force           Overwrite existing generated files
+  --force           Also overwrite the files meant for you to edit
+                    (<Name>LiveActivity.swift, <Name>Bundle.swift,
+                    Info.plist). LiveUpdatesAttributes.swift,
+                    LiveUpdatesViews.swift and LiveUpdatesActionIntent.swift
+                    are always updated.
   -h, --help        Show this help
 ''';
 
@@ -73,18 +77,28 @@ Future<int> createWidget(List<String> args) async {
           .replaceAll('{{name}}', name);
 
   final out = Directory('${ios.path}/$name');
-  final files = {
+  // Owned by the plugin: always replaced, so they match the plugin version.
+  final owned = {
     'LiveUpdatesAttributes.swift': _attributesSource(templates),
+    'LiveUpdatesViews.swift': render('Views.swift.tmpl'),
+    'LiveUpdatesActionIntent.swift': render('ActionIntent.swift.tmpl'),
+  };
+  // Yours to edit: written once, replaced only with --force.
+  final editable = {
     '${name}LiveActivity.swift': render('LiveActivityWidget.swift.tmpl'),
     '${name}Bundle.swift': render('WidgetBundle.swift.tmpl'),
-    'LiveUpdatesActionIntent.swift': render('ActionIntent.swift.tmpl'),
     'Info.plist': render('Info.plist.tmpl'),
   };
   out.createSync(recursive: true);
-  for (final MapEntry(key: file, value: content) in files.entries) {
+  for (final MapEntry(key: file, value: content) in owned.entries) {
+    final f = File('${out.path}/$file');
+    f.writeAsStringSync(content);
+    stdout.writeln('write  ${f.path}');
+  }
+  for (final MapEntry(key: file, value: content) in editable.entries) {
     final f = File('${out.path}/$file');
     if (f.existsSync() && !force) {
-      stdout.writeln('skip   ${f.path} (exists, use --force to overwrite)');
+      stdout.writeln('keep   ${f.path} (yours to edit; --force replaces it)');
       continue;
     }
     f.writeAsStringSync(content);
@@ -130,8 +144,9 @@ Future<int> createWidget(List<String> args) async {
     );
   }
   stdout.writeln(
-    '\nDone. Customize ${out.path}/${name}LiveActivity.swift to change the UI.\n'
-    'Keep LiveUpdatesAttributes.swift identical to the plugin\'s copy.',
+    '\nDone. Customize ${out.path}/${name}LiveActivity.swift to change the UI;\n'
+    'run create_widget again after updating live_updates to refresh the\n'
+    'LiveUpdates*.swift files (your layout is kept).',
   );
   return 0;
 }

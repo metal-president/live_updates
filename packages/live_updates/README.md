@@ -86,9 +86,38 @@ With `--no-xcode` only the widget sources are written. Then, in Xcode:
    targets and set `LiveUpdatesAppGroup` to that group in both Info.plist
    files.
 
-The UI lives in `ios/LiveUpdatesWidget/LiveUpdatesWidgetLiveActivity.swift`;
-edit it freely. Keep `LiveUpdatesAttributes.swift` identical to the plugin's
-copy, because ActivityKit matches the two by name and shape.
+#### Customizing the widget
+
+`create_widget` writes two kinds of files to `ios/LiveUpdatesWidget/`:
+
+- **Yours to edit**: `LiveUpdatesWidgetLiveActivity.swift` (the layout of the
+  Lock Screen and every Dynamic Island presentation), the widget bundle and
+  `Info.plist`. Running `create_widget` again keeps them; `--force` replaces
+  them.
+- **Owned by the plugin**: `LiveUpdatesAttributes.swift`,
+  `LiveUpdatesViews.swift` (the building blocks the layout uses, such as
+  `LiveUpdatesLockScreen` and `LiveUpdatesCompactTrailing`) and
+  `LiveUpdatesActionIntent.swift`. Running `create_widget` again replaces
+  them, so run it after updating live_updates. Do not edit them: copy a view
+  into your layout file to change it.
+
+In the layout, `context.state` has every field of `LiveUpdateContent`, and
+`context.state.extra["driver"]` reads `IosLiveUpdateOptions.extra`, for
+values the template does not show.
+
+Without touching Swift, choose what the small Dynamic Island areas show:
+
+```dart
+ios: const IosLiveUpdateOptions(
+  extra: {'gate': 'B12'},
+  compactTrailing: IosIslandContent.extra('gate'), // or progress, timer, title, body
+  minimal: IosIslandContent.timer,                  // or progress, icon, ...
+),
+```
+
+Content that is missing (such as `progress` without a progress) falls back to
+the default, and text is left out when the island is limited in width (iOS 27
+landscape).
 
 ### Android
 
@@ -252,7 +281,7 @@ Future<void> main() async {
 
   On Android, plugins are registered automatically.
 - Apps that set up the widget with an older version should run
-  `dart run live_updates:create_widget --force` to update
+  `dart run live_updates:create_widget` again to update
   `LiveUpdatesActionIntent.swift`.
 - Android shows up to three actions. On iOS keep labels short: the whole
   content must stay under ActivityKit's 4 KB limit.

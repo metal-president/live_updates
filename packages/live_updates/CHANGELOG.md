@@ -4,6 +4,13 @@
   `attributes.key` (iOS) or a remote `live_updates_id` (Android), also on
   updates from `active()` and `onStarted`.
 - Docs: sending to both platforms through FCM (`docs/server-fcm.md`).
+- `IosLiveUpdateOptions.compactTrailing` and `minimal` (`IosIslandContent`):
+  choose what the compact and minimal Dynamic Island show.
+- `create_widget`: the reusable views move to `LiveUpdatesViews.swift`, which
+  `create_widget` always updates together with `LiveUpdatesAttributes.swift`
+  and `LiveUpdatesActionIntent.swift`. Your layout file is kept unless you pass
+  `--force`. Existing layouts keep working; run `create_widget --force` once
+  to switch to the shorter layout that uses the shared views.
 - Screenshots on pub.dev and in the README; the example app has its own icon.
 
 ## 0.0.4

@@ -88,7 +88,19 @@ def ensure_shared_intent(project, targets, name)
   end
 end
 
+# Files added by newer plugin versions to an existing widget target.
+def ensure_widget_files(project, target, name, ext_dir)
+  group = project.main_group.find_subpath(name, true)
+  Dir.children(ext_dir).sort.each do |file|
+    next unless file.end_with?('.swift')
+    ref = group.files.find { |f| f.path == file } || group.new_reference(file)
+    next if target.source_build_phase.files_references.include?(ref)
+    target.source_build_phase.add_file_reference(ref)
+  end
+end
+
 if (existing = project.targets.find { |t| t.name == name })
+  ensure_widget_files(project, existing, name, ext_dir)
   ensure_shared_intent(project, [runner, existing], name)
   project.save
   if use_group

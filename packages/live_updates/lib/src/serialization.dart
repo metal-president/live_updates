@@ -36,6 +36,8 @@ extension LiveUpdateContentJson on LiveUpdateContent {
       'relevanceScore': ?ios.relevanceScore,
       if (ios.alert case final a?)
         'alert': {'title': a.title, 'body': a.body, 'sound': ?a.sound},
+      'compactTrailing': ?ios.compactTrailing?.value,
+      'minimal': ?ios.minimal?.value,
     },
     if (android case final a?) ...{
       'channelId': a.channelId,

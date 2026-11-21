@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		05A642524A7AF3C0D6EDA9E5 /* LiveUpdatesViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79BDE6073B0179BA6AF799EE /* LiveUpdatesViews.swift */; };
 		133E97E402AE25F1F45EEF9B /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AFEC6456E4CC78ADF4474C8D /* Foundation.framework */; };
 		1498D2341E8E89220040F4C2 /* GeneratedPluginRegistrant.m in Sources */ = {isa = PBXBuildFile; fileRef = 1498D2331E8E89220040F4C2 /* GeneratedPluginRegistrant.m */; };
 		28F569F6D19E097213F30683 /* LiveUpdatesWidgetBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1C057765D123E7B0A11F15C /* LiveUpdatesWidgetBundle.swift */; };
@@ -84,6 +85,7 @@
 		7884E8672EC3CC0400C636F2 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
 		78DABEA22ED26510000E7860 /* live_updates */ = {isa = PBXFileReference; lastKnownFileType = wrapper; name = live_updates; path = ../../ios/live_updates; sourceTree = "<group>"; };
 		78E0A7A72DC9AD7400C4905E /* FlutterGeneratedPluginSwiftPackage */ = {isa = PBXFileReference; lastKnownFileType = wrapper; name = FlutterGeneratedPluginSwiftPackage; path = Flutter/ephemeral/Packages/FlutterGeneratedPluginSwiftPackage; sourceTree = "<group>"; };
+		79BDE6073B0179BA6AF799EE /* LiveUpdatesViews.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LiveUpdatesViews.swift; sourceTree = "<group>"; };
 		7AFA3C8E1D35360C0083082E /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = Release.xcconfig; path = Flutter/Release.xcconfig; sourceTree = "<group>"; };
 		83B865589589D3FDD0DA606D /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 		846C232AD8E7192F415CF900 /* Runner.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = Runner.entitlements; sourceTree = "<group>"; };
@@ -147,6 +149,7 @@
 				8DF1D1706A81444FCC7F8270 /* LiveUpdatesWidgetLiveActivity.swift */,
 				B8567A12472CED2B5C540B81 /* LiveUpdatesWidget.entitlements */,
 				D995BE158A968C649AC7DE1C /* LiveUpdatesActionIntent.swift */,
+				79BDE6073B0179BA6AF799EE /* LiveUpdatesViews.swift */,
 			);
 			name = LiveUpdatesWidget;
 			path = LiveUpdatesWidget;
@@ -419,6 +422,7 @@
 				28F569F6D19E097213F30683 /* LiveUpdatesWidgetBundle.swift in Sources */,
 				94C29E2E8CBE1AAB33A8EBCE /* LiveUpdatesWidgetLiveActivity.swift in Sources */,
 				FA0AA39CE848A9A75FE3CA32 /* LiveUpdatesActionIntent.swift in Sources */,
+				05A642524A7AF3C0D6EDA9E5 /* LiveUpdatesViews.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

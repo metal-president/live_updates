@@ -42,11 +42,17 @@ jobs:
           for runtime, items in devices.items():
               if ".iOS-" not in runtime:
                   continue
-              # e.g. ...SimRuntime.iOS-26-5; later images may append a suffix.
+              # e.g. ...SimRuntime.iOS-26-5. Skip device-specific runtimes
+              # (a suffix such as -iPhone19) and foldable models.
               parts = runtime.split(".iOS-")[1].split("-")
-              version = tuple(int(p) for p in parts if p.isdigit())
+              if not all(p.isdigit() for p in parts):
+                  continue
+              version = tuple(int(p) for p in parts)
               for d in items:
-                  if d["name"].startswith("iPhone") and (best is None or version > best[0]):
+                  name = d["name"]
+                  if not name.startswith("iPhone") or "Duo" in name:
+                      continue
+                  if best is None or version > best[0]:
                       best = (version, d["udid"], d["name"])
           print(best[1]); print(best, file=sys.stderr)
           ')

@@ -11,6 +11,7 @@
   and `LiveUpdatesActionIntent.swift`. Your layout file is kept unless you pass
   `--force`. Existing layouts keep working; run `create_widget --force` once
   to switch to the shorter layout that uses the shared views.
+- Screenshots on pub.dev and in the README; the example app has its own icon.
 
 ## 0.0.4
 

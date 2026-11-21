@@ -21,7 +21,7 @@ jobs:
         # Xcode 26 (macos-latest) and the Xcode 27 preview image.
         runner: [macos-latest, xcode-27]
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 40
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -59,8 +59,21 @@ jobs:
           xcrun simctl boot "$udid"
           xcrun simctl bootstatus "$udid" -b
           echo "udid=$udid" >> "$GITHUB_OUTPUT"
-      - run: flutter test integration_test -d "${{ steps.sim.outputs.udid }}"
+      # The app sometimes never starts on a fresh simulator, and flutter test
+      # waits for it until the job times out: give each attempt 20 minutes
+      # and try once more on a rebooted simulator.
+      - name: flutter test integration_test
         working-directory: packages/live_updates/example
+        env:
+          UDID: ${{ steps.sim.outputs.udid }}
+        run: |
+          run() { perl -e 'alarm shift; exec @ARGV' 1200 flutter test integration_test -d "$UDID"; }
+          if run; then exit 0; fi
+          echo "::warning::First attempt failed or timed out; retrying on a rebooted simulator."
+          xcrun simctl shutdown "$UDID" || true
+          xcrun simctl boot "$UDID"
+          xcrun simctl bootstatus "$UDID" -b
+          run
 
   integration-android:
     runs-on: ubuntu-latest

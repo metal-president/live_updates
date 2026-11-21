@@ -6,6 +6,7 @@ version: 0.0.4
 homepage: https://github.com/metal-president/live_updates
 repository: https://github.com/metal-president/live_updates/tree/main/packages/live_updates_fcm
 issue_tracker: https://github.com/metal-president/live_updates/issues
+topics: [live-activities, notifications, firebase, push-notifications]
 resolution: workspace
 
 environment:

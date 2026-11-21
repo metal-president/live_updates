@@ -57,7 +57,7 @@ abstract final class LiveUpdatesFcm {
   /// authenticated connection and do not log them.
   ///
   /// ```dart
-  /// LiveUpdatesFcm.tokens().listen(api.registerToken);
+  /// LiveUpdatesFcm.tokens().listen(api.registerToken, onError: report);
   /// await FirebaseMessaging.instance.register();
   /// ```
   static Stream<LiveUpdatesToken> tokens({

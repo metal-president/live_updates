@@ -1,3 +1,9 @@
+## 0.0.2
+
+- Push tokens (`LiveUpdate.pushTokens`, `LiveUpdates.pushToStartTokens`)
+  replay the current token to new listeners.
+- `LiveUpdatePushToken.toString()` no longer includes the token.
+
 ## 0.0.1
 
 - Initial release.

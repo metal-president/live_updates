@@ -16,8 +16,8 @@ dependencies:
   firebase_messaging: ^17.1.0
   flutter:
     sdk: flutter
-  live_updates: ^0.0.1
-  meta: ^1.19.0
+  live_updates: ^0.0.2
+  meta: ^1.16.0
 
 dev_dependencies:
   flutter_test:

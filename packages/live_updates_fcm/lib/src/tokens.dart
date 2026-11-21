@@ -62,27 +62,39 @@ final class LiveUpdatesToken {
 
 /// Merges FCM and live update tokens into one stream.
 ///
-/// Listens to the FCM token and its refreshes, iOS push-to-start tokens, and
-/// the push tokens of every live update that is running or starts later.
-/// Each distinct token is emitted once per subscription.
+/// Every listener gets its own subscriptions to the FCM token, iOS
+/// push-to-start tokens and the push tokens of every live update that is
+/// running or starts later. Token sources replay their current value to new
+/// listeners, so subscribing late or again still yields the current tokens.
+/// Each distinct token is emitted once per listener.
 @internal
 Stream<LiveUpdatesToken> mergeTokens({
   required Stream<String> installationIds,
   Future<String?> Function()? initialRegistrationToken,
   Stream<String>? registrationTokenRefresh,
-}) {
-  late final StreamController<LiveUpdatesToken> controller;
+}) => Stream<LiveUpdatesToken>.multi((listener) {
+  var active = true;
   final subscriptions = <StreamSubscription<Object?>>[];
-  final watchedUpdates = <String>{};
+  final perUpdate = <String, List<StreamSubscription<Object?>>>{};
   final seen = <LiveUpdatesToken>{};
 
   void emit(LiveUpdatesToken token) {
-    if (seen.add(token) && !controller.isClosed) controller.add(token);
+    if (active && seen.add(token)) listener.add(token);
+  }
+
+  void error(Object e, StackTrace s) {
+    if (active) listener.addError(e, s);
+  }
+
+  void stopWatching(String id) {
+    for (final sub in perUpdate.remove(id) ?? const []) {
+      unawaited(sub.cancel());
+    }
   }
 
   void watch(LiveUpdate update) {
-    if (!watchedUpdates.add(update.id)) return;
-    subscriptions.add(
+    if (!active || perUpdate.containsKey(update.id)) return;
+    perUpdate[update.id] = [
       update.pushTokens.listen(
         (t) => emit(
           LiveUpdatesToken(
@@ -91,64 +103,69 @@ Stream<LiveUpdatesToken> mergeTokens({
             updateId: update.id,
           ),
         ),
-        onError: controller.addError,
+        onError: error,
+      ),
+      // Ended updates cannot be pushed to any more: stop watching them.
+      update.states.listen((state) {
+        if (state == LiveUpdateState.ended ||
+            state == LiveUpdateState.dismissed) {
+          stopWatching(update.id);
+        }
+      }, onError: error),
+    ];
+  }
+
+  void Function(String?) fcm(LiveUpdatesTokenType type) => (token) {
+    if (token != null && token.isNotEmpty) {
+      emit(LiveUpdatesToken(type: type, value: token));
+    }
+  };
+
+  subscriptions.add(
+    installationIds.listen(
+      fcm(LiveUpdatesTokenType.fcmInstallationId),
+      onError: error,
+    ),
+  );
+  if (registrationTokenRefresh != null) {
+    subscriptions.add(
+      registrationTokenRefresh.listen(
+        fcm(LiveUpdatesTokenType.fcmRegistrationToken),
+        onError: error,
       ),
     );
   }
-
-  controller = StreamController<LiveUpdatesToken>.broadcast(
-    onListen: () {
-      void Function(String?) fcm(LiveUpdatesTokenType type) => (token) {
-        if (token != null && token.isNotEmpty) {
-          emit(LiveUpdatesToken(type: type, value: token));
-        }
-      };
-
-      subscriptions.add(
-        installationIds.listen(
-          fcm(LiveUpdatesTokenType.fcmInstallationId),
-          onError: controller.addError,
-        ),
-      );
-      if (registrationTokenRefresh != null) {
-        subscriptions.add(
-          registrationTokenRefresh.listen(
-            fcm(LiveUpdatesTokenType.fcmRegistrationToken),
-            onError: controller.addError,
-          ),
-        );
-      }
-      initialRegistrationToken?.call().then(
-        fcm(LiveUpdatesTokenType.fcmRegistrationToken),
-        onError: controller.addError,
-      );
-      subscriptions
-        ..add(
-          LiveUpdates.pushToStartTokens.listen(
-            (t) => emit(
-              LiveUpdatesToken(
-                type: LiveUpdatesTokenType.pushToStart,
-                value: t.hex,
-              ),
-            ),
-            onError: controller.addError,
-          ),
-        )
-        ..add(
-          LiveUpdates.onStarted.listen(watch, onError: controller.addError),
-        );
-      LiveUpdates.active().then(
-        (updates) => updates.forEach(watch),
-        onError: controller.addError,
-      );
-    },
-    onCancel: () async {
-      final pending = List.of(subscriptions);
-      subscriptions.clear();
-      watchedUpdates.clear();
-      seen.clear();
-      await Future.wait(pending.map((s) => s.cancel()));
-    },
+  initialRegistrationToken?.call().then(
+    fcm(LiveUpdatesTokenType.fcmRegistrationToken),
+    onError: error,
   );
-  return controller.stream;
-}
+  subscriptions
+    ..add(
+      LiveUpdates.pushToStartTokens.listen(
+        (t) => emit(
+          LiveUpdatesToken(
+            type: LiveUpdatesTokenType.pushToStart,
+            value: t.hex,
+          ),
+        ),
+        onError: error,
+      ),
+    )
+    ..add(LiveUpdates.onStarted.listen(watch, onError: error));
+  LiveUpdates.active().then(
+    (updates) => updates.forEach(watch),
+    onError: error,
+  );
+
+  listener.onCancel = () async {
+    // Late async results (getToken, active) are ignored from here on.
+    active = false;
+    final pending = [
+      ...subscriptions,
+      for (final subs in perUpdate.values) ...subs,
+    ];
+    subscriptions.clear();
+    perUpdate.clear();
+    await Future.wait(pending.map((s) => s.cancel()));
+  };
+});

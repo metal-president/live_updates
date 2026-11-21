@@ -104,4 +104,42 @@ void main() {
     await sub.cancel();
     expect(p.pushToStart.hasListener, isFalse);
   });
+
+  test('each listener gets its own tokens', () async {
+    final fids = StreamController<String>.broadcast();
+    final stream = mergeTokens(installationIds: fids.stream);
+    final a = <LiveUpdatesToken>[];
+    final b = <LiveUpdatesToken>[];
+    final subA = stream.listen(a.add);
+    final subB = stream.listen(b.add);
+    await pump();
+    fids.add('fid-1');
+    await pump();
+    expect(a, hasLength(1));
+    expect(b, hasLength(1));
+    await subA.cancel();
+    await subB.cancel();
+  });
+
+  test('stops watching updates that ended', () async {
+    final sub = mergeTokens(installationIds: const Stream.empty())
+        .listen((_) {});
+    await pump();
+    expect(p.tokensOf('a1').hasListener, isTrue);
+    p.eventsController.add(('a1', 'ended'));
+    await pump();
+    expect(p.tokensOf('a1').hasListener, isFalse);
+    await sub.cancel();
+  });
+
+  test('late results after cancel do not subscribe', () async {
+    final slow = Completer<String?>();
+    final sub = mergeTokens(
+      installationIds: const Stream.empty(),
+      initialRegistrationToken: () => slow.future,
+    ).listen((_) => fail('no token expected after cancel'));
+    await sub.cancel();
+    slow.complete('late');
+    await pump();
+  });
 }

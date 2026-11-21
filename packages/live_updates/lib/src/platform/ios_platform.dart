@@ -7,6 +7,7 @@ import '../ios/bindings.g.dart';
 import '../models.dart';
 import 'buffered_broadcast.dart';
 import 'content_encoder.dart';
+import 'latest_value_stream.dart';
 import 'live_updates_platform.dart';
 
 /// iOS backend: FFIgen bindings to the Swift `LiveUpdatesBridge`.
@@ -26,7 +27,7 @@ class IosLiveUpdatesPlatform extends LiveUpdatesPlatform with ContentEncoder {
       ObjCBlock_ffiVoid_NSString.listener((r) => add(r.toDartString())),
     ),
   );
-  late final _pushToStart = BufferedBroadcast<LiveUpdatePushToken>(
+  late final _pushToStart = LatestValueStream<LiveUpdatePushToken>(
     (add) => LiveUpdatesBridge.observePushToStartTokens(
       ObjCBlock_ffiVoid_NSString.listener(
         (t) => add(LiveUpdatePushToken(t.toDartString())),
@@ -42,7 +43,7 @@ class IosLiveUpdatesPlatform extends LiveUpdatesPlatform with ContentEncoder {
       }),
     ),
   );
-  final _pushTokens = <String, StreamController<LiveUpdatePushToken>>{};
+  final _pushTokens = <String, LatestValueStream<LiveUpdatePushToken>>{};
   final _events = StreamController<(String, String)>.broadcast();
   bool _eventsObserved = false;
 
@@ -177,17 +178,19 @@ class IosLiveUpdatesPlatform extends LiveUpdatesPlatform with ContentEncoder {
   }
 
   @override
-  Stream<LiveUpdatePushToken> pushTokens(String id) =>
-      _pushTokens.putIfAbsent(id, () {
-        final controller = StreamController<LiveUpdatePushToken>.broadcast();
-        LiveUpdatesBridge.observePushTokens(
-          _ns(id),
-          handler: ObjCBlock_ffiVoid_NSString.listener(
-            (t) => controller.add(LiveUpdatePushToken(t.toDartString())),
+  Stream<LiveUpdatePushToken> pushTokens(String id) => _pushTokens
+      .putIfAbsent(
+        id,
+        () => LatestValueStream(
+          (add) => LiveUpdatesBridge.observePushTokens(
+            _ns(id),
+            handler: ObjCBlock_ffiVoid_NSString.listener(
+              (t) => add(LiveUpdatePushToken(t.toDartString())),
+            ),
           ),
-        );
-        return controller;
-      }).stream;
+        ),
+      )
+      .stream;
 
   @override
   Stream<LiveUpdatePushToken> get pushToStartTokens => _pushToStart.stream;

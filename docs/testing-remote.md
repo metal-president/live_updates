@@ -100,7 +100,11 @@ xcrun simctl openurl booted "liveupdates-com.ttechapp.liveUpdatesExample://tap?r
     await Firebase.initializeApp();
     FirebaseMessaging.onBackgroundMessage(_onBackgroundMessage);
     LiveUpdatesFcm.listen();
-    LiveUpdatesFcm.tokens().listen((t) => debugPrint('${t.type.name}: ${t.value}'));
+    // Manual test only: printing tokens is fine on your own debug build, but
+    // never log tokens in a production app (they allow pushing to the device).
+    if (kDebugMode) {
+      LiveUpdatesFcm.tokens().listen((t) => debugPrint('${t.type.name}: ${t.value}'));
+    }
     await FirebaseMessaging.instance.register();
     runApp(const MaterialApp(home: ExamplePage()));
   }
@@ -142,7 +146,8 @@ xcrun simctl openurl booted "liveupdates-com.ttechapp.liveUpdatesExample://tap?r
 
 FCM can deliver Live Activity pushes when the app also uses FCM on iOS (APNs
 key uploaded to Firebase). Send the Live Activity token (push or push-to-start)
-together with the device's FCM registration token:
+together with the iPhone's Firebase Installation ID (`fcmInstallationId` from
+`LiveUpdatesFcm.tokens()`):
 
 ```bash
 dart run tool/send_push.dart fcm-ios --service-account sa.json \

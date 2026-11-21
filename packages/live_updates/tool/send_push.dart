@@ -92,6 +92,7 @@ Future<void> main(List<String> args) async {
 /// FCM send target: `--fid` (Firebase Installation ID, recommended) or
 /// `--token` (legacy registration token).
 Map<String, String> _fcmTarget(Map<String, String> o) => switch (o) {
+  {'fid': _, 'token': _} => _fail('Pass either --fid or --token, not both'),
   {'fid': final fid} => {'fid': fid},
   {'token': final token} => {'token': token},
   _ => _fail('Missing --fid (or legacy --token)'),

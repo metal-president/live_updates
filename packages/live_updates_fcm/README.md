@@ -46,21 +46,29 @@ stream:
 | `activity` (with `updateId`) | iOS | `message.apns.live_activity_token`, `"event": "update"` / `"end"` |
 
 ```dart
-LiveUpdatesFcm.tokens().listen((token) {
-  api.registerToken(
+LiveUpdatesFcm.tokens().listen(
+  (token) => api.registerToken(
     type: token.type.name,
     value: token.value,
     updateId: token.updateId,
-  );
-});
+  ),
+  // Token sources can fail (for example before APNs is ready on iOS).
+  onError: (Object error) => debugPrint('Token error: $error'),
+);
 // The installation ID is reported once the app registers with FCM.
 await FirebaseMessaging.instance.register();
 ```
 
-Keep the latest token per type (and per `updateId`). Activity tokens are
-emitted for live updates started with `pushUpdates: true`. Tokens allow
-pushing to the device, so send them over an authenticated connection and do
-not log them; `LiveUpdatesToken.toString()` leaves the value out.
+Keep the latest token per type (and per `updateId`), and drop an activity
+token once that live update ends. Activity tokens are emitted for live
+updates started with `pushUpdates: true`. A new subscription first receives
+the tokens that are already known.
+
+Tokens allow pushing to the device: send them over an authenticated
+connection, store them per authenticated user and device on your server (the
+client chooses `updateId`, so do not trust it across users), and do not log
+them. `LiveUpdatesToken.toString()` and `LiveUpdatePushToken.toString()`
+leave the value out.
 
 ## Message format
 

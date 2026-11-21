@@ -213,6 +213,19 @@ public class LiveUpdatesBridgeTest {
     assertTrue((n.flags & Notification.FLAG_ONLY_ALERT_ONCE) != 0);
     LiveUpdatesBridge.update(id, "{\"title\":\"B\",\"androidAlert\":true}");
     assertEquals(0, shown(id).flags & Notification.FLAG_ONLY_ALERT_ONCE);
+    // A second alert within 10 seconds is muted.
+    LiveUpdatesBridge.update(id, "{\"title\":\"C\",\"androidAlert\":true}");
+    assertTrue((shown(id).flags & Notification.FLAG_ONLY_ALERT_ONCE) != 0);
+  }
+
+  @Test
+  public void shortTimeoutsAndQualifiedIconNamesAreRejected() throws Exception {
+    String id =
+        LiveUpdatesBridge.start(
+            "{\"title\":\"A\",\"timeoutAfterMillis\":1,\"iconName\":\"android:drawable/ic_dialog_alert\"}");
+    Notification n = shown(id);
+    assertEquals(60_000, n.getTimeoutAfter());
+    assertEquals(android.R.drawable.ic_dialog_info, n.getSmallIcon().getResId());
   }
 
   @Test

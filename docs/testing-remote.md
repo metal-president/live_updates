@@ -66,12 +66,13 @@ with the steps below.
    ```
 
    A countdown that keeps running without further pushes (seconds since
-   1970):
+   1970). A push replaces the whole content state, so include every field
+   that should stay:
 
    ```bash
    ETA=$(( $(date +%s) + 600 ))
    dart run tool/send_push.dart apns --sandbox ... --token <push token> \
-     --event update --content '{"title":"Order #1","timerEnd":'"$ETA"'}'
+     --event update --content '{"title":"Order #1","body":"On the way","timerEnd":'"$ETA"'}'
    ```
 
 6. Tap the activity: the app opens and logs `tap: /orders/1`.

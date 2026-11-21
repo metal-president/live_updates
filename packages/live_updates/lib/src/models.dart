@@ -443,6 +443,10 @@ final class AndroidLiveUpdateOptions {
   /// Parts of the progress bar, such as the stages of a delivery (Android
   /// 16+ `ProgressStyle`). Lengths are relative; [LiveUpdateContent.progress]
   /// still runs from 0 to 1 over the whole bar.
+  ///
+  /// Shown only with a [LiveUpdateContent.progress], and not on Android 17
+  /// when [metrics] are set (they replace the progress bar). The same applies
+  /// to [progressPoints] and [progressTrackerIcon].
   final List<AndroidProgressSegment> progressSegments;
 
   /// Marks on the progress bar, such as stops (Android 16+).
@@ -452,13 +456,15 @@ final class AndroidLiveUpdateOptions {
   /// car or a parcel (Android 16+).
   final String? progressTrackerIcon;
 
-  /// Removes the notification after this time even if the app is not
-  /// running, so a forgotten update does not stay on screen. Android 8+; on
-  /// iOS use [IosLiveUpdateOptions.staleDate] and end the activity.
+  /// Removes the notification after this time (at least one minute, counted
+  /// from the latest post) even if the app is not running, so a forgotten update does not stay on screen.
+  /// Android 8+; on iOS use [IosLiveUpdateOptions.staleDate] and end the
+  /// activity.
   final Duration? timeoutAfter;
 
   /// Play the channel's sound and vibration for this post. By default only
-  /// the first post of an update alerts the user (iOS: [IosLiveUpdateOptions.alert]).
+  /// the first post of an update alerts the user. At most one alert per
+  /// update every 10 seconds (iOS: [IosLiveUpdateOptions.alert]).
   final bool alert;
 
   @override

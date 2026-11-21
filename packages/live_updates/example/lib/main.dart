@@ -109,6 +109,7 @@ class _ExamplePageState extends State<ExamplePage> {
       ],
       // Gone after 2 hours even if the app never ends it.
       timeoutAfter: const Duration(hours: 2),
+      // Sound once more when the order is delivered.
       alert: _progress >= 1,
       // Android 17+: shown instead of the progress bar.
       metrics: [

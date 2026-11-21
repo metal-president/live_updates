@@ -1,4 +1,4 @@
-## Unreleased
+## 0.0.4
 
 - `LiveUpdateContent.timer`: a countdown or stopwatch counted by the system
   (iOS widget template, Android chronometer). Re-run

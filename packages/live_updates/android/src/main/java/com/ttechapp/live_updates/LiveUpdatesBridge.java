@@ -35,7 +35,9 @@ import org.json.JSONObject;
  * progress, iconName, route, image, actions}) plus Android options: {@code
  * channelId, channelName, shortCriticalText, colorArgb, whenEpochMillis,
  * showChronometer, requestPromotion, metrics, criticalMetric,
- * bodySemanticStyle, progressSemanticStyle}. On Android 16+ progress uses
+ * bodySemanticStyle, progressSemanticStyle, progressSegments, progressPoints,
+ * progressTrackerIcon, timeoutAfterMillis, androidAlert} and the timer
+ * ({@code timerStart} or {@code timerEnd}, seconds since 1970). On Android 16+ progress uses
  * {@link Notification.ProgressStyle} and promotion to a Live Update is
  * requested (shown on builds that support promoted notifications, Android 16
  * QPR1 and later); Android 17 shows {@code metrics} with {@code MetricStyle}
@@ -554,6 +556,7 @@ public final class LiveUpdatesBridge {
     }
     if (isNew) emit("started", id);
     Notification.Builder b = builder(c, content, remote);
+    if (content.optBoolean("androidAlert", false) && !mayAlert(id)) b.setOnlyAlertOnce(true);
     b.setDeleteIntent(LiveUpdatesDismissReceiver.intent(c, id));
     addActions(c, b, id, content);
     manager(c).notify(TAG_PREFIX + id, NOTIFICATION_ID, b.build());
@@ -623,7 +626,10 @@ public final class LiveUpdatesBridge {
           .setChronometerCountDown(countdown);
     }
     long timeout = content.optLong("timeoutAfterMillis", 0);
-    if (timeout > 0 && Build.VERSION.SDK_INT >= 26) b.setTimeoutAfter(timeout);
+    if (timeout > 0 && Build.VERSION.SDK_INT >= 26) {
+      // Not shorter than a minute, so a payload cannot make an update vanish at once.
+      b.setTimeoutAfter(Math.max(timeout, MIN_TIMEOUT_MS));
+    }
 
     String route = optString(content, "route");
     PendingIntent tap = tapIntent(c, route);
@@ -647,9 +653,26 @@ public final class LiveUpdatesBridge {
     return b;
   }
 
+  /** At most one requested alert per update in this interval (remote payloads included). */
+  private static final long MIN_ALERT_INTERVAL_MS = 10_000;
+
+  private static final Map<String, Long> lastAlert = new HashMap<>();
+
+  private static boolean mayAlert(String id) {
+    long now = SystemClock.uptimeMillis();
+    synchronized (lastAlert) {
+      Long last = lastAlert.get(id);
+      if (last != null && now - last < MIN_ALERT_INTERVAL_MS) return false;
+      lastAlert.put(id, now);
+      return true;
+    }
+  }
+
   private static boolean isTime(double seconds) {
     return !Double.isNaN(seconds) && !Double.isInfinite(seconds) && Math.abs(seconds) < 1e11;
   }
+
+  private static final long MIN_TIMEOUT_MS = 60_000;
 
   /** Limits for remote payloads; the system draws far fewer anyway. */
   private static final int MAX_PROGRESS_PARTS = 20;
@@ -790,6 +813,8 @@ public final class LiveUpdatesBridge {
   /** The app's drawable or mipmap {@code name}, or null. */
   @Nullable
   private static Icon drawable(Context c, String name) {
+    // A plain resource name only: getIdentifier also accepts "pkg:type/name".
+    if (!name.matches("[A-Za-z0-9_]{1,100}")) return null;
     int res = c.getResources().getIdentifier(name, "drawable", c.getPackageName());
     if (res == 0) res = c.getResources().getIdentifier(name, "mipmap", c.getPackageName());
     return res == 0 ? null : Icon.createWithResource(c, res);

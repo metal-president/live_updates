@@ -289,8 +289,11 @@ LiveUpdateContent(
 );
 ```
 
-`progress` still runs from 0 to 1 over the whole bar. Below Android 16 the
-segments, points and tracker icon are ignored. The iOS equivalent of `alert`
+`progress` still runs from 0 to 1 over the whole bar, and the segments,
+points and tracker icon need it. On Android 17 `metrics` replace the progress
+bar; below Android 16 the segments, points and tracker icon are ignored. The
+timeout counts from the latest post, and requested alerts are limited to one
+per update every 10 seconds. The iOS equivalent of `alert`
 is `IosLiveUpdateOptions.alert`.
 
 ### Android 17 metrics and semantic colors

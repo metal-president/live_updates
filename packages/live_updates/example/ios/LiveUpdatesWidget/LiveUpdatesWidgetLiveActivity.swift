@@ -93,10 +93,10 @@ private struct TimerText: View {
 
   var body: some View {
     Group {
-      if let end = state.timerEnd.map(Date.init(timeIntervalSince1970:)) {
+      if let end = state.timerEndDate {
         let now = Date()
         Text(timerInterval: min(now, end)...end, countsDown: true)
-      } else if let start = state.timerStart.map(Date.init(timeIntervalSince1970:)) {
+      } else if let start = state.timerStartDate {
         Text(start, style: .timer)
       }
     }
@@ -106,7 +106,15 @@ private struct TimerText: View {
 }
 
 extension LiveUpdatesAttributes.ContentState {
-  fileprivate var hasTimer: Bool { timerEnd != nil || timerStart != nil }
+  // Values from a push are checked: about 3,000 years either way of 1970.
+  fileprivate var timerEndDate: Date? { Self.date(timerEnd) }
+  fileprivate var timerStartDate: Date? { Self.date(timerStart) }
+  fileprivate var hasTimer: Bool { timerEndDate != nil || timerStartDate != nil }
+
+  private static func date(_ seconds: Double?) -> Date? {
+    guard let seconds, seconds.isFinite, abs(seconds) < 1e11 else { return nil }
+    return Date(timeIntervalSince1970: seconds)
+  }
 }
 
 /// Progress, else the timer, else the title. In iOS 27's landscape Dynamic

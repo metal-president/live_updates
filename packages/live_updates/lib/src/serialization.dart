@@ -63,7 +63,8 @@ extension LiveUpdateContentJson on LiveUpdateContent {
         'progressPoints': [
           for (final p in a.progressPoints)
             {
-              'position': p.position,
+              // jsonEncode rejects NaN; the platform skips a null position.
+              'position': p.position.isFinite ? p.position : null,
               'colorArgb': ?p.color?.toARGB32(),
               'semanticStyle': ?p.semanticStyle?.name,
             },

@@ -39,6 +39,7 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
+          cache: gradle
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           flutter-version-file: .fvmrc
@@ -57,6 +58,7 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
+          cache: gradle
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           flutter-version-file: .fvmrc
@@ -83,5 +85,29 @@ jobs:
         if: matrix.dependency-manager == 'cocoapods'
         run: sed -i '' '/enable-swift-package-manager/d; /^  config:$/d' pubspec.yaml
         working-directory: packages/live_updates/example
+      - run: xcodebuild -version
+      - run: flutter build ios --simulator --debug
+        working-directory: packages/live_updates/example
+
+  # Xcode 27 is a preview image on GitHub; not a required check, so the
+  # required build-ios jobs (Xcode 26 on macos-latest) keep their names.
+  build-ios-xcode-27:
+    runs-on: xcode-27
+    strategy:
+      matrix:
+        dependency-manager: [swiftpm, cocoapods]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version-file: .fvmrc
+          cache: true
+      - name: Switch example to CocoaPods
+        if: matrix.dependency-manager == 'cocoapods'
+        run: sed -i '' '/enable-swift-package-manager/d; /^  config:$/d' pubspec.yaml
+        working-directory: packages/live_updates/example
+      - run: xcodebuild -version
       - run: flutter build ios --simulator --debug
         working-directory: packages/live_updates/example

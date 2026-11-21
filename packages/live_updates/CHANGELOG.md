@@ -1,5 +1,10 @@
-## Unreleased
+## 0.0.4
 
+- `LiveUpdateContent.timer`: a countdown or stopwatch counted by the system
+  (iOS widget template, Android chronometer). Re-run
+  `create_widget --force` to update the widget.
+- Android: `progressSegments`, `progressPoints` and `progressTrackerIcon`
+  (Android 16+ `ProgressStyle`), `timeoutAfter` and `alert`.
 - Docs: Android 17 does not show the body text of a Live Update with
   `metrics`.
 

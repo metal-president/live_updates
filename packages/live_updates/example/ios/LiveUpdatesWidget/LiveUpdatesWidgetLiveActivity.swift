@@ -16,7 +16,9 @@ struct LiveUpdatesWidgetLiveActivity: Widget {
           Thumbnail(state: context.state).frame(width: 36, height: 36)
         }
         DynamicIslandExpandedRegion(.trailing) {
-          if let progress = context.state.progress {
+          if context.state.hasTimer {
+            TimerText(state: context.state).font(.headline)
+          } else if let progress = context.state.progress {
             Text(progress, format: .percent.precision(.fractionLength(0)))
               .font(.headline)
           }
@@ -66,7 +68,13 @@ private struct LockScreenView: View {
     HStack(alignment: .center, spacing: 12) {
       Thumbnail(state: state).frame(width: 40, height: 40)
       VStack(alignment: .leading, spacing: 4) {
-        Text(state.title).font(.headline).lineLimit(1)
+        HStack {
+          Text(state.title).font(.headline).lineLimit(1)
+          if state.hasTimer {
+            Spacer()
+            TimerText(state: state).font(.headline)
+          }
+        }
         if let body = state.body {
           Text(body).font(.subheadline).foregroundStyle(.secondary).lineLimit(2)
         }
@@ -78,14 +86,47 @@ private struct LockScreenView: View {
   }
 }
 
-/// Progress, else the title. In iOS 27's landscape Dynamic Island the compact
-/// views cannot grow, so the title is left out there.
+/// `LiveUpdateContent.timer`, counted by the system: it keeps running without
+/// updates. A countdown stops at zero.
+private struct TimerText: View {
+  let state: LiveUpdatesAttributes.ContentState
+
+  var body: some View {
+    Group {
+      if let end = state.timerEndDate {
+        let now = Date()
+        Text(timerInterval: min(now, end)...end, countsDown: true)
+      } else if let start = state.timerStartDate {
+        Text(start, style: .timer)
+      }
+    }
+    .monospacedDigit()
+    .multilineTextAlignment(.trailing)
+  }
+}
+
+extension LiveUpdatesAttributes.ContentState {
+  // Values from a push are checked: about 3,000 years either way of 1970.
+  fileprivate var timerEndDate: Date? { Self.date(timerEnd) }
+  fileprivate var timerStartDate: Date? { Self.date(timerStart) }
+  fileprivate var hasTimer: Bool { timerEndDate != nil || timerStartDate != nil }
+
+  private static func date(_ seconds: Double?) -> Date? {
+    guard let seconds, seconds.isFinite, abs(seconds) < 1e11 else { return nil }
+    return Date(timeIntervalSince1970: seconds)
+  }
+}
+
+/// Progress, else the timer, else the title. In iOS 27's landscape Dynamic
+/// Island the compact views cannot grow, so the title is left out there.
 private struct CompactTrailing: View {
   let state: LiveUpdatesAttributes.ContentState
 
   var body: some View {
     if let progress = state.progress {
       ProgressView(value: progress).progressViewStyle(.circular)
+    } else if state.hasTimer {
+      TimerText(state: state).frame(maxWidth: 52)
     } else {
       #if compiler(>=6.4)
         if #available(iOS 27.0, *) {

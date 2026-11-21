@@ -35,7 +35,9 @@ import org.json.JSONObject;
  * progress, iconName, route, image, actions}) plus Android options: {@code
  * channelId, channelName, shortCriticalText, colorArgb, whenEpochMillis,
  * showChronometer, requestPromotion, metrics, criticalMetric,
- * bodySemanticStyle, progressSemanticStyle}. On Android 16+ progress uses
+ * bodySemanticStyle, progressSemanticStyle, progressSegments, progressPoints,
+ * progressTrackerIcon, timeoutAfterMillis, androidAlert} and the timer
+ * ({@code timerStart} or {@code timerEnd}, seconds since 1970). On Android 16+ progress uses
  * {@link Notification.ProgressStyle} and promotion to a Live Update is
  * requested (shown on builds that support promoted notifications, Android 16
  * QPR1 and later); Android 17 shows {@code metrics} with {@code MetricStyle}
@@ -554,6 +556,7 @@ public final class LiveUpdatesBridge {
     }
     if (isNew) emit("started", id);
     Notification.Builder b = builder(c, content, remote);
+    if (content.optBoolean("androidAlert", false) && !mayAlert(id)) b.setOnlyAlertOnce(true);
     b.setDeleteIntent(LiveUpdatesDismissReceiver.intent(c, id));
     addActions(c, b, id, content);
     manager(c).notify(TAG_PREFIX + id, NOTIFICATION_ID, b.build());
@@ -592,7 +595,8 @@ public final class LiveUpdatesBridge {
     }
     b.setContentTitle(content.optString("title"))
         .setOngoing(true)
-        .setOnlyAlertOnce(true)
+        // Only the first post alerts, unless this post asks to.
+        .setOnlyAlertOnce(!content.optBoolean("androidAlert", false))
         .setSmallIcon(smallIcon(c, optString(content, "iconName")));
     String body = optString(content, "body");
     if (body != null) {
@@ -611,6 +615,21 @@ public final class LiveUpdatesBridge {
       b.setWhen(content.optLong("whenEpochMillis")).setShowWhen(true);
     }
     if (content.optBoolean("showChronometer", false)) b.setUsesChronometer(true);
+    // LiveUpdateContent.timer: a chronometer counted by the system.
+    double timerEnd = content.optDouble("timerEnd", Double.NaN);
+    double timerStart = content.optDouble("timerStart", Double.NaN);
+    boolean countdown = isTime(timerEnd);
+    if (countdown || isTime(timerStart)) {
+      b.setWhen((long) ((countdown ? timerEnd : timerStart) * 1000))
+          .setShowWhen(true)
+          .setUsesChronometer(true)
+          .setChronometerCountDown(countdown);
+    }
+    long timeout = content.optLong("timeoutAfterMillis", 0);
+    if (timeout > 0 && Build.VERSION.SDK_INT >= 26) {
+      // Not shorter than a minute, so a payload cannot make an update vanish at once.
+      b.setTimeoutAfter(Math.max(timeout, MIN_TIMEOUT_MS));
+    }
 
     String route = optString(content, "route");
     PendingIntent tap = tapIntent(c, route);
@@ -626,20 +645,93 @@ public final class LiveUpdatesBridge {
           LiveUpdatesApi37.setMetricStyle(
               b, content.optJSONArray("metrics"), content.optInt("criticalMetric", -1));
       if (!metrics && hasProgress) {
-        Notification.ProgressStyle style = new Notification.ProgressStyle().setProgress(progress);
-        int semantic =
-            LiveUpdatesApi37.semanticStyle(optString(content, "progressSemanticStyle"));
-        if (semantic != 0 && LiveUpdatesApi37.available()) {
-          Notification.ProgressStyle.Segment segment = new Notification.ProgressStyle.Segment(100);
-          LiveUpdatesApi37.styleSegment(segment, semantic);
-          style.addProgressSegment(segment);
-        }
-        b.setStyle(style);
+        b.setStyle(progressStyle(c, content, content.optDouble("progress")));
       }
     } else if (hasProgress) {
       b.setProgress(100, progress, false);
     }
     return b;
+  }
+
+  /** At most one requested alert per update in this interval (remote payloads included). */
+  private static final long MIN_ALERT_INTERVAL_MS = 10_000;
+
+  private static final Map<String, Long> lastAlert = new HashMap<>();
+
+  private static boolean mayAlert(String id) {
+    long now = SystemClock.uptimeMillis();
+    synchronized (lastAlert) {
+      Long last = lastAlert.get(id);
+      if (last != null && now - last < MIN_ALERT_INTERVAL_MS) return false;
+      lastAlert.put(id, now);
+      return true;
+    }
+  }
+
+  private static boolean isTime(double seconds) {
+    return !Double.isNaN(seconds) && !Double.isInfinite(seconds) && Math.abs(seconds) < 1e11;
+  }
+
+  private static final long MIN_TIMEOUT_MS = 60_000;
+
+  /** Limits for remote payloads; the system draws far fewer anyway. */
+  private static final int MAX_PROGRESS_PARTS = 20;
+
+  private static final int MAX_SEGMENT_LENGTH = 10_000;
+
+  /**
+   * Android 16 {@code ProgressStyle}: {@code progressSegments} (relative
+   * lengths), {@code progressPoints} (positions from 0 to 1) and {@code
+   * progressTrackerIcon}. {@code fraction} runs over the whole bar.
+   */
+  @androidx.annotation.RequiresApi(36)
+  private static Notification.ProgressStyle progressStyle(
+      Context c, JSONObject content, double fraction) {
+    Notification.ProgressStyle style = new Notification.ProgressStyle();
+    int total = 0;
+    org.json.JSONArray segments = content.optJSONArray("progressSegments");
+    if (segments != null) {
+      for (int i = 0; i < segments.length() && i < MAX_PROGRESS_PARTS; i++) {
+        JSONObject s = segments.optJSONObject(i);
+        if (s == null) continue;
+        int length = Math.max(1, Math.min(s.optInt("length", 1), MAX_SEGMENT_LENGTH));
+        Notification.ProgressStyle.Segment segment = new Notification.ProgressStyle.Segment(length);
+        if (s.has("colorArgb")) segment.setColor((int) s.optLong("colorArgb"));
+        LiveUpdatesApi37.styleSegment(
+            segment, LiveUpdatesApi37.semanticStyle(optString(s, "semanticStyle")));
+        style.addProgressSegment(segment);
+        total += length;
+      }
+    }
+    if (total == 0) {
+      total = 100;
+      int semantic = LiveUpdatesApi37.semanticStyle(optString(content, "progressSemanticStyle"));
+      if (semantic != 0 && LiveUpdatesApi37.available()) {
+        Notification.ProgressStyle.Segment segment = new Notification.ProgressStyle.Segment(total);
+        LiveUpdatesApi37.styleSegment(segment, semantic);
+        style.addProgressSegment(segment);
+      }
+    }
+    org.json.JSONArray points = content.optJSONArray("progressPoints");
+    if (points != null) {
+      for (int i = 0; i < points.length() && i < MAX_PROGRESS_PARTS; i++) {
+        JSONObject p = points.optJSONObject(i);
+        if (p == null) continue;
+        double position = p.optDouble("position", Double.NaN);
+        if (Double.isNaN(position)) continue;
+        int at = (int) Math.round(Math.max(0, Math.min(position, 1)) * total);
+        Notification.ProgressStyle.Point point = new Notification.ProgressStyle.Point(at);
+        if (p.has("colorArgb")) point.setColor((int) p.optLong("colorArgb"));
+        LiveUpdatesApi37.stylePoint(
+            point, LiveUpdatesApi37.semanticStyle(optString(p, "semanticStyle")));
+        style.addProgressPoint(point);
+      }
+    }
+    String tracker = optString(content, "progressTrackerIcon");
+    Icon trackerIcon = tracker == null ? null : drawable(c, tracker);
+    if (trackerIcon != null) style.setProgressTrackerIcon(trackerIcon);
+    double clamped = Double.isNaN(fraction) ? 0 : Math.max(0, Math.min(fraction, 1));
+    return style.setProgress((int) Math.round(clamped * total));
   }
 
   /** Adds {@code actions} (at most three are shown by the system). */
@@ -714,12 +806,18 @@ public final class LiveUpdatesBridge {
   }
 
   private static Icon smallIcon(Context c, @Nullable String name) {
-    if (name != null) {
-      int res = c.getResources().getIdentifier(name, "drawable", c.getPackageName());
-      if (res == 0) res = c.getResources().getIdentifier(name, "mipmap", c.getPackageName());
-      if (res != 0) return Icon.createWithResource(c, res);
-    }
-    return Icon.createWithResource(c, c.getApplicationInfo().icon);
+    Icon icon = name == null ? null : drawable(c, name);
+    return icon != null ? icon : Icon.createWithResource(c, c.getApplicationInfo().icon);
+  }
+
+  /** The app's drawable or mipmap {@code name}, or null. */
+  @Nullable
+  private static Icon drawable(Context c, String name) {
+    // A plain resource name only: getIdentifier also accepts "pkg:type/name".
+    if (!name.matches("[A-Za-z0-9_]{1,100}")) return null;
+    int res = c.getResources().getIdentifier(name, "drawable", c.getPackageName());
+    if (res == 0) res = c.getResources().getIdentifier(name, "mipmap", c.getPackageName());
+    return res == 0 ? null : Icon.createWithResource(c, res);
   }
 
   @Nullable

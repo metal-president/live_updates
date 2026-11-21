@@ -13,6 +13,10 @@ extension LiveUpdateContentJson on LiveUpdateContent {
     'progress': ?progress,
     'iconName': ?iconName,
     'route': ?route,
+    // Seconds since 1970, as the widget reads them.
+    if (timer?.start case final s?)
+      'timerStart': s.millisecondsSinceEpoch / 1000,
+    if (timer?.end case final e?) 'timerEnd': e.millisecondsSinceEpoch / 1000,
     if (actions.isNotEmpty)
       'actions': [
         for (final a in actions)
@@ -46,6 +50,29 @@ extension LiveUpdateContentJson on LiveUpdateContent {
       'criticalMetric': ?a.criticalMetric,
       'bodySemanticStyle': ?a.bodySemanticStyle?.name,
       'progressSemanticStyle': ?a.progressSemanticStyle?.name,
+      if (a.progressSegments.isNotEmpty)
+        'progressSegments': [
+          for (final s in a.progressSegments)
+            {
+              'length': s.length,
+              'colorArgb': ?s.color?.toARGB32(),
+              'semanticStyle': ?s.semanticStyle?.name,
+            },
+        ],
+      if (a.progressPoints.isNotEmpty)
+        'progressPoints': [
+          for (final p in a.progressPoints)
+            {
+              // jsonEncode rejects NaN; the platform skips a null position.
+              'position': p.position.isFinite ? p.position : null,
+              'colorArgb': ?p.color?.toARGB32(),
+              'semanticStyle': ?p.semanticStyle?.name,
+            },
+        ],
+      'progressTrackerIcon': ?a.progressTrackerIcon,
+      'timeoutAfterMillis': ?a.timeoutAfter?.inMilliseconds,
+      // Not 'alert': that key holds the iOS alert.
+      if (a.alert) 'androidAlert': true,
     },
   };
 }

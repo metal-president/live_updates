@@ -18,11 +18,16 @@ public struct LiveUpdatesAttributes: ActivityAttributes {
     /// Buttons, rendered by the widget template.
     public var actions: [LiveUpdatesAction]
     public var extra: [String: String]
+    /// Timer start (stopwatch) in seconds since 1970, counted by the system.
+    public var timerStart: Double?
+    /// Timer end (countdown) in seconds since 1970, counted by the system.
+    public var timerEnd: Double?
 
     public init(
       title: String, body: String? = nil, progress: Double? = nil,
       iconName: String? = nil, route: String? = nil, image: String? = nil,
-      actions: [LiveUpdatesAction] = [], extra: [String: String] = [:]
+      actions: [LiveUpdatesAction] = [], extra: [String: String] = [:],
+      timerStart: Double? = nil, timerEnd: Double? = nil
     ) {
       self.title = title
       self.body = body
@@ -32,6 +37,8 @@ public struct LiveUpdatesAttributes: ActivityAttributes {
       self.image = image
       self.actions = actions
       self.extra = extra
+      self.timerStart = timerStart
+      self.timerEnd = timerEnd
     }
 
     // Lenient decoding so APNs `content-state` may omit optional keys.
@@ -45,6 +52,8 @@ public struct LiveUpdatesAttributes: ActivityAttributes {
       image = try c.decodeIfPresent(String.self, forKey: .image)
       actions = try c.decodeIfPresent([LiveUpdatesAction].self, forKey: .actions) ?? []
       extra = try c.decodeIfPresent([String: String].self, forKey: .extra) ?? [:]
+      timerStart = try c.decodeIfPresent(Double.self, forKey: .timerStart)
+      timerEnd = try c.decodeIfPresent(Double.self, forKey: .timerEnd)
     }
   }
 

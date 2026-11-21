@@ -84,6 +84,16 @@ final class LiveUpdatesApi37 {
     }
   }
 
+  /** Sets the semantic style of a progress point. */
+  static void stylePoint(Notification.ProgressStyle.Point point, int style) {
+    if (!available() || style == 0) return;
+    try {
+      point.getClass().getMethod("setSemanticStyle", int.class).invoke(point, style);
+    } catch (ReflectiveOperationException | RuntimeException e) {
+      warn("Semantic style unavailable", e);
+    }
+  }
+
   /**
    * Sets a {@code MetricStyle} built from {@code metrics} (the JSON written
    * by the Dart {@code AndroidMetric}). Returns false when nothing was set.

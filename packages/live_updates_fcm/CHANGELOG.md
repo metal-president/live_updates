@@ -1,3 +1,8 @@
+## 0.0.4
+
+- Requires live_updates 0.0.4 (timers, Android progress stages, timeout
+  and alerts).
+
 ## 0.0.3
 
 - Requires live_updates 0.0.3 (iOS 18 broadcast, background button

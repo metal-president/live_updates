@@ -38,7 +38,7 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>LiveUpdatesAppGroup</key>
-	<string>group.com.ttechapp.liveUpdatesExample</string>
+	<string>$(LIVE_UPDATES_APP_GROUP)</string>
 	<key>NSSupportsLiveActivities</key>
 	<true/>
 	<key>NSSupportsLiveActivitiesFrequentUpdates</key>

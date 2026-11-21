@@ -7,7 +7,7 @@
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LiveUpdatesAppGroup</key>
-	<string>group.com.ttechapp.liveUpdatesExample</string>
+	<string>$(LIVE_UPDATES_APP_GROUP)</string>
 	<key>NSExtension</key>
 	<dict>
 		<key>NSExtensionPointIdentifier</key>

@@ -80,6 +80,36 @@ xcrun simctl openurl booted "liveupdates-com.ttechapp.liveUpdatesExample://tap?r
 - HTTP 200 but no change: check the device log (Console.app, process `LiveUpdatesWidget`) for `content-state` decoding errors; `title` is required.
 - Apple throttles frequent updates. Add `NSSupportsLiveActivitiesFrequentUpdates` (the example has it) and use `--priority 5` for non-urgent updates.
 
+## iOS broadcast channels (iOS 18+)
+
+Prerequisites: everything from the APNs section, plus **Broadcast Capability**
+enabled for the App ID (developer.apple.com > Identifiers > Push
+Notifications). It cannot be enabled from Xcode.
+
+1. Create a channel and copy `apns-channel-id` from the response headers:
+
+   ```bash
+   dart run tool/send_push.dart apns-channel --action create --sandbox \
+     --team-id <TEAM_ID> --key-id <KEY_ID> --key AuthKey_<KEY_ID>.p8 \
+     --bundle-id com.ttechapp.liveUpdatesExample
+   ```
+
+   Add `--store-latest` to keep the latest message for up to 8 hours (for
+   infrequent updates); the default stores nothing and allows a higher
+   publishing budget.
+2. In the app, start an activity with `iosChannelId: '<channel id>'` (or send
+   a push-to-start with `--input-push-channel <channel id>`).
+3. Update or end every subscribed activity at once:
+
+   ```bash
+   dart run tool/send_push.dart apns-broadcast --sandbox ... \
+     --channel <channel id> --event update \
+     --content '{"title":"FC Tokyo 2 - 1 Kashima","body":"78 min"}'
+   ```
+
+4. List or delete channels with `apns-channel --action list` and
+   `--action delete --channel <id>` (up to 10,000 channels per environment).
+
 ## Android with FCM
 
 ### Prerequisites
@@ -140,6 +170,19 @@ xcrun simctl openurl booted "liveupdates-com.ttechapp.liveUpdatesExample://tap?r
      promotion off per app in system settings. Android 16 builds without
      promoted notification support show `ProgressStyle` without the chip.
    - Android 15 or lower: a regular ongoing notification with a progress bar.
+   - Android 17: metrics and semantic colors replace the progress bar
+     (`type` is `integer`, `decimal`, `text`, `timer`, `stopwatch`,
+     `pausedTimer` or `pausedStopwatch`; timers take epoch milliseconds,
+     paused ones a duration in milliseconds):
+
+     ```bash
+     ETA=$(( ($(date +%s) + 600) * 1000 ))  # 10 minutes from now
+     dart run tool/send_push.dart fcm --service-account sa.json --fid <installation ID> \
+       --event update --id order-1 --content '{"title":"Order #1","body":"Nearby",
+       "bodySemanticStyle":"safe","metrics":[{"label":"Distance","type":"decimal",
+       "value":0.6,"unit":"km"},{"label":"Arrives in","type":"timer",
+       "value":'"$ETA"'}]}'
+     ```
 5. Tap the notification: the app logs `tap: /orders/1`.
 
 ## iOS through FCM

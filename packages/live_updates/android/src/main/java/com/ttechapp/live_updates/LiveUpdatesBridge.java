@@ -34,11 +34,13 @@ import org.json.JSONObject;
  * <p>Content is exchanged as the same JSON used on iOS ({@code title, body,
  * progress, iconName, route, image, actions}) plus Android options: {@code
  * channelId, channelName, shortCriticalText, colorArgb, whenEpochMillis,
- * showChronometer, requestPromotion}. On Android 16+ progress uses {@link
- * Notification.ProgressStyle} and promotion to a Live Update is requested
- * (shown on builds that support promoted notifications, Android 16 QPR1 and
- * later); older versions get a regular ongoing notification with a progress
- * bar.
+ * showChronometer, requestPromotion, metrics, criticalMetric,
+ * bodySemanticStyle, progressSemanticStyle}. On Android 16+ progress uses
+ * {@link Notification.ProgressStyle} and promotion to a Live Update is
+ * requested (shown on builds that support promoted notifications, Android 16
+ * QPR1 and later); Android 17 shows {@code metrics} with {@code MetricStyle}
+ * instead (see {@link LiveUpdatesApi37}). Older versions get a regular ongoing
+ * notification with a progress bar.
  */
 @Keep
 public final class LiveUpdatesBridge {
@@ -91,6 +93,8 @@ public final class LiveUpdatesBridge {
   private static final String PREF_PENDING_ACTIONS = "pendingActions";
   private static final String PREF_DISMISSED = "dismissedIds";
   private static final String PREF_INTENT_TOKEN = "intentToken";
+  private static final String PREF_BG_DISPATCHER = "backgroundDispatcher";
+  private static final String PREF_BG_HANDLER = "backgroundHandler";
   static final String EXTRA_TOKEN = "com.ttechapp.live_updates.TOKEN";
 
   /**
@@ -186,17 +190,80 @@ public final class LiveUpdatesBridge {
   }
 
   static void emitAction(Context c, String updateId, String actionId) {
+    emitAction(c, updateId, actionId, null);
+  }
+
+  /**
+   * Delivers a press to the Dart listener, or queues it and, when a
+   * background handler is registered, runs it in a headless engine.
+   * [result] (from a receiver's goAsync) is finished when that is done.
+   */
+  static void emitAction(
+      Context c,
+      String updateId,
+      String actionId,
+      @Nullable android.content.BroadcastReceiver.PendingResult result) {
+    emitAction(c, updateId, actionId, result, true);
+  }
+
+  private static void emitAction(
+      Context c,
+      String updateId,
+      String actionId,
+      @Nullable android.content.BroadcastReceiver.PendingResult result,
+      boolean allowBackground) {
+    long dispatcher;
     synchronized (actionLock) {
       ActionListener listener = actionListener;
       if (listener != null) {
         listener.onAction(updateId, actionId);
+        if (result != null) result.finish();
         return;
       }
       SharedPreferences prefs = prefs(c);
       org.json.JSONArray pending = readArray(prefs, PREF_PENDING_ACTIONS);
       pending.put(new org.json.JSONArray().put(updateId).put(actionId));
-      prefs.edit().putString(PREF_PENDING_ACTIONS, pending.toString()).apply();
+      // commit (not apply): the headless engine reads it right away.
+      prefs.edit().putString(PREF_PENDING_ACTIONS, pending.toString()).commit();
+      dispatcher = allowBackground ? prefs.getLong(PREF_BG_DISPATCHER, 0) : 0;
     }
+    if (dispatcher != 0) {
+      LiveUpdatesBackgroundRunner.run(c, dispatcher, result);
+    } else if (result != null) {
+      result.finish();
+    }
+  }
+
+  /** Stores the Dart callback handles of the background action handler. */
+  public static void setBackgroundActionHandler(long dispatcher, long handler) {
+    prefs(requireContext())
+        .edit()
+        .putLong(PREF_BG_DISPATCHER, dispatcher)
+        .putLong(PREF_BG_HANDLER, handler)
+        .apply();
+  }
+
+  /** Raw callback handle of the background handler, or 0. */
+  public static long backgroundActionHandler() {
+    Context c = context;
+    return c == null ? 0 : prefs(c).getLong(PREF_BG_HANDLER, 0);
+  }
+
+  /** Removes and returns queued presses as {@code "<update id>\n<action id>"}. */
+  @NonNull
+  public static String[] takeQueuedActions() {
+    Context c = context;
+    if (c == null) return new String[0];
+    List<String> out = new ArrayList<>();
+    synchronized (actionLock) {
+      for (String[] a : takePendingActions(c)) out.add(a[0] + "\n" + a[1]);
+    }
+    return out.toArray(new String[0]);
+  }
+
+  /** Called by the background engine when the handler finished. */
+  public static void backgroundActionsDone() {
+    LiveUpdatesBackgroundRunner.finish();
   }
 
   private static List<String[]> takePendingActions(Context c) {
@@ -457,7 +524,9 @@ public final class LiveUpdatesBridge {
     intent.removeExtra(EXTRA_UPDATE_ID);
     intent.removeExtra(EXTRA_ROUTE);
     if (!intentToken(c).equals(token)) return; // Not from our notifications.
-    if (actionId != null && updateId != null) emitAction(c, updateId, actionId);
+    // Open-app presses: the app is coming to the foreground, so its onAction
+    // listener handles them (no background engine).
+    if (actionId != null && updateId != null) emitAction(c, updateId, actionId, null, false);
     if (route == null) return;
     RouteListener listener = routeListener;
     if (listener != null) {
@@ -526,7 +595,11 @@ public final class LiveUpdatesBridge {
         .setOnlyAlertOnce(true)
         .setSmallIcon(smallIcon(c, optString(content, "iconName")));
     String body = optString(content, "body");
-    if (body != null) b.setContentText(body);
+    if (body != null) {
+      b.setContentText(
+          LiveUpdatesApi37.styledText(
+              body, LiveUpdatesApi37.semanticStyle(optString(content, "bodySemanticStyle"))));
+    }
     String image = optString(content, "image");
     if (image != null && !image.contains("/")) {
       android.graphics.Bitmap bitmap =
@@ -549,8 +622,19 @@ public final class LiveUpdatesBridge {
       requestPromotedOngoing(b, content.optBoolean("requestPromotion", true));
       String chip = optString(content, "shortCriticalText");
       if (chip != null) b.setShortCriticalText(chip);
-      if (hasProgress) {
-        b.setStyle(new Notification.ProgressStyle().setProgress(progress));
+      boolean metrics =
+          LiveUpdatesApi37.setMetricStyle(
+              b, content.optJSONArray("metrics"), content.optInt("criticalMetric", -1));
+      if (!metrics && hasProgress) {
+        Notification.ProgressStyle style = new Notification.ProgressStyle().setProgress(progress);
+        int semantic =
+            LiveUpdatesApi37.semanticStyle(optString(content, "progressSemanticStyle"));
+        if (semantic != 0 && LiveUpdatesApi37.available()) {
+          Notification.ProgressStyle.Segment segment = new Notification.ProgressStyle.Segment(100);
+          LiveUpdatesApi37.styleSegment(segment, semantic);
+          style.addProgressSegment(segment);
+        }
+        b.setStyle(style);
       }
     } else if (hasProgress) {
       b.setProgress(100, progress, false);
@@ -584,9 +668,12 @@ public final class LiveUpdatesBridge {
         pi = LiveUpdatesActionReceiver.intent(c, id, actionId);
       }
       String iconName = optString(a, "androidIcon");
-      b.addAction(
-          new Notification.Action.Builder(smallIcon(c, iconName), a.optString("title"), pi)
-              .build());
+      Notification.Action.Builder action =
+          new Notification.Action.Builder(smallIcon(c, iconName), a.optString("title"), pi);
+      if (a.optBoolean("requiresUnlock", false) && Build.VERSION.SDK_INT >= 31) {
+        action.setAuthenticationRequired(true);
+      }
+      b.addAction(action.build());
     }
   }
 
@@ -636,7 +723,7 @@ public final class LiveUpdatesBridge {
   }
 
   @Nullable
-  private static String optString(JSONObject o, String key) {
+  static String optString(JSONObject o, String key) {
     return o.has(key) && !o.isNull(key) ? o.optString(key) : null;
   }
 

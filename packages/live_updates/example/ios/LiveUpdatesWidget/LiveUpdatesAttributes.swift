@@ -65,12 +65,18 @@ public struct LiveUpdatesAction: Codable, Hashable, Identifiable {
   public var systemImage: String?
   /// Opens the app instead of running in the background.
   public var opensApp: Bool
+  /// Requires the device to be unlocked before the press is handled.
+  public var requiresUnlock: Bool
 
-  public init(id: String, title: String, systemImage: String? = nil, opensApp: Bool = false) {
+  public init(
+    id: String, title: String, systemImage: String? = nil, opensApp: Bool = false,
+    requiresUnlock: Bool = false
+  ) {
     self.id = id
     self.title = title
     self.systemImage = systemImage
     self.opensApp = opensApp
+    self.requiresUnlock = requiresUnlock
   }
 
   public init(from decoder: Decoder) throws {
@@ -79,6 +85,7 @@ public struct LiveUpdatesAction: Codable, Hashable, Identifiable {
     title = try c.decode(String.self, forKey: .title)
     systemImage = try c.decodeIfPresent(String.self, forKey: .systemImage)
     opensApp = try c.decodeIfPresent(Bool.self, forKey: .opensApp) ?? false
+    requiresUnlock = try c.decodeIfPresent(Bool.self, forKey: .requiresUnlock) ?? false
   }
 }
 

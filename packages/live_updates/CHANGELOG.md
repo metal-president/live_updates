@@ -1,3 +1,26 @@
+## 0.0.3
+
+- iOS 18 broadcast: `start(..., iosChannelId:)` and `startOrUpdate(...,
+  iosChannelId:)` subscribe a Live Activity to an APNs broadcast channel.
+- `tool/send_push.dart`: `apns-channel` (create, list, delete) and
+  `apns-broadcast` commands; `--input-push-channel` and `--activity-key` for
+  push-to-start.
+- `create_widget`: per-configuration widget bundle ids and App Groups for
+  flavors (`LIVE_UPDATES_APP_GROUP` build setting); offers to install the
+  xcodeproj gem when it is missing; manual setup steps in the README.
+- `LiveUpdates.setBackgroundActionHandler`: handle button presses while the
+  app is not running in a headless Flutter engine (Android and iOS).
+  Re-run `create_widget --force` to update `LiveUpdatesActionIntent.swift`.
+- `LiveUpdateAction.requiresUnlock`: ask for an unlock before a Lock Screen
+  press is handled (iOS, Android 12+).
+- Android 17: `AndroidLiveUpdateOptions.metrics` (`MetricStyle`, with
+  `criticalMetric`) and semantic colors for the body, the progress bar and
+  metrics (`LiveUpdateSemanticStyle`).
+- iOS 27: the generated widget leaves the title out of the compact Dynamic
+  Island view when it is limited in width (landscape). Re-run
+  `create_widget --force` to update the widget.
+- Fix: an Android `channelId` option no longer affects iOS push settings.
+
 ## 0.0.2
 
 - Push tokens (`LiveUpdate.pushTokens`, `LiveUpdates.pushToStartTokens`)

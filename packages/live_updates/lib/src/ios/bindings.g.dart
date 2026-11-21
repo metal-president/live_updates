@@ -158,6 +158,19 @@ extension type LiveUpdatesBridge._(objc.ObjCObject object$)
     return LiveUpdatesBridge.fromPointer($ret, retain: false, release: true);
   }
 
+  /// Raw callback handle of the background handler, or 0.
+  static int backgroundActionHandler() {
+    return _objc_msgSend_pysgoz(
+      _class_LiveUpdatesBridge,
+      _sel_backgroundActionHandler,
+    );
+  }
+
+  /// Called by the background engine when the handler finished.
+  static void backgroundActionsDone() {
+    _objc_msgSend_1pl9qdv(_class_LiveUpdatesBridge, _sel_backgroundActionsDone);
+  }
+
   /// Ends the activity with <code>id</code>. <code>dismissAfter</code> < 0 uses the system default
   /// policy, 0 dismisses immediately, otherwise seconds from now.
   static void end(
@@ -192,18 +205,21 @@ extension type LiveUpdatesBridge._(objc.ObjCObject object$)
   /// Queues a button press and delivers it if Dart listens. Called on the
   /// main thread by <code>LiveUpdatesActionIntent</code> (looked up by name, so the
   /// widget extension does not link the plugin) and for open-app URLs.
-  static void enqueueAction(
+  /// Returns <code>true</code> when the press started the background action handler;
+  /// the caller should then wait for <code>LiveUpdatesBackgroundDone</code>.
+  static objc.NSNumber enqueueAction(
     objc.NSString activityId, {
     required objc.NSString actionId,
   }) {
     final _$$ref = activityId.ref;
     final _$$ref$1 = actionId.ref;
-    _objc_msgSend_pfv6jd(
+    final $ret = _objc_msgSend_15qeuct(
       _class_LiveUpdatesBridge,
       _sel_enqueueAction_actionId_,
       _$$ref.pointer,
       _$$ref$1.pointer,
     );
+    return objc.NSNumber.fromPointer($ret, retain: true, release: true);
   }
 
   /// Id of the running activity whose key is <code>key</code>.
@@ -310,6 +326,19 @@ extension type LiveUpdatesBridge._(objc.ObjCObject object$)
     );
   }
 
+  /// Stores the Dart callback handles of the background action handler.
+  static void setBackgroundActionHandler(
+    int dispatcher, {
+    required int handler,
+  }) {
+    _objc_msgSend_160jq1d(
+      _class_LiveUpdatesBridge,
+      _sel_setBackgroundActionHandler_handler_,
+      dispatcher,
+      handler,
+    );
+  }
+
   /// Requests a new activity and returns its id.
   static objc.NSString? start(objc.NSString json) {
     final _$$ref = json.ref;
@@ -352,6 +381,15 @@ extension type LiveUpdatesBridge._(objc.ObjCObject object$)
       _$$ref$1.pointer,
       _$$ref$2.pointer,
     );
+  }
+
+  /// Removes and returns queued presses as <code>"<activity id>\n<action id>"</code>.
+  static objc.NSArray takeQueuedActions() {
+    final $ret = _objc_msgSend_151sglz(
+      _class_LiveUpdatesBridge,
+      _sel_takeQueuedActions,
+    );
+    return objc.NSArray.fromPointer($ret, retain: true, release: true);
   }
 
   /// Updates the activity with <code>id</code>. <code>completion</code> receives an error message
@@ -1278,6 +1316,44 @@ final _objc_msgSend_151sglz = objc.msgSendPointer
         ffi.Pointer<objc.ObjCSelector>,
       )
     >();
+final _objc_msgSend_15qeuct = objc.msgSendPointer
+    .cast<
+      ffi.NativeFunction<
+        ffi.Pointer<objc.ObjCObjectImpl> Function(
+          ffi.Pointer<objc.ObjCObjectImpl>,
+          ffi.Pointer<objc.ObjCSelector>,
+          ffi.Pointer<objc.ObjCObjectImpl>,
+          ffi.Pointer<objc.ObjCObjectImpl>,
+        )
+      >
+    >()
+    .asFunction<
+      ffi.Pointer<objc.ObjCObjectImpl> Function(
+        ffi.Pointer<objc.ObjCObjectImpl>,
+        ffi.Pointer<objc.ObjCSelector>,
+        ffi.Pointer<objc.ObjCObjectImpl>,
+        ffi.Pointer<objc.ObjCObjectImpl>,
+      )
+    >();
+final _objc_msgSend_160jq1d = objc.msgSendPointer
+    .cast<
+      ffi.NativeFunction<
+        ffi.Void Function(
+          ffi.Pointer<objc.ObjCObjectImpl>,
+          ffi.Pointer<objc.ObjCSelector>,
+          ffi.Int64,
+          ffi.Int64,
+        )
+      >
+    >()
+    .asFunction<
+      void Function(
+        ffi.Pointer<objc.ObjCObjectImpl>,
+        ffi.Pointer<objc.ObjCSelector>,
+        int,
+        int,
+      )
+    >();
 final _objc_msgSend_18qun1e = objc.msgSendPointer
     .cast<
       ffi.NativeFunction<
@@ -1350,6 +1426,21 @@ final _objc_msgSend_1lhpu4m = objc.msgSendPointer
         ffi.Pointer<objc.ObjCSelector>,
         ffi.Pointer<objc.ObjCObjectImpl>,
         ffi.Pointer<ffi.Pointer<objc.ObjCObjectImpl>>,
+      )
+    >();
+final _objc_msgSend_1pl9qdv = objc.msgSendPointer
+    .cast<
+      ffi.NativeFunction<
+        ffi.Void Function(
+          ffi.Pointer<objc.ObjCObjectImpl>,
+          ffi.Pointer<objc.ObjCSelector>,
+        )
+      >
+    >()
+    .asFunction<
+      void Function(
+        ffi.Pointer<objc.ObjCObjectImpl>,
+        ffi.Pointer<objc.ObjCSelector>,
       )
     >();
 final _objc_msgSend_1sotr3r = objc.msgSendPointer
@@ -1443,23 +1534,19 @@ final _objc_msgSend_o762yo = objc.msgSendPointer
         ffi.Pointer<objc.ObjCBlockImpl>,
       )
     >();
-final _objc_msgSend_pfv6jd = objc.msgSendPointer
+final _objc_msgSend_pysgoz = objc.msgSendPointer
     .cast<
       ffi.NativeFunction<
-        ffi.Void Function(
+        ffi.Int64 Function(
           ffi.Pointer<objc.ObjCObjectImpl>,
           ffi.Pointer<objc.ObjCSelector>,
-          ffi.Pointer<objc.ObjCObjectImpl>,
-          ffi.Pointer<objc.ObjCObjectImpl>,
         )
       >
     >()
     .asFunction<
-      void Function(
+      int Function(
         ffi.Pointer<objc.ObjCObjectImpl>,
         ffi.Pointer<objc.ObjCSelector>,
-        ffi.Pointer<objc.ObjCObjectImpl>,
-        ffi.Pointer<objc.ObjCObjectImpl>,
       )
     >();
 late final _sel_activeIds = objc.registerName("activeIds");
@@ -1467,6 +1554,12 @@ late final _sel_alloc = objc.registerName("alloc");
 late final _sel_allocWithZone_ = objc.registerName("allocWithZone:");
 late final _sel_arg0 = objc.registerName("arg0");
 late final _sel_arg1 = objc.registerName("arg1");
+late final _sel_backgroundActionHandler = objc.registerName(
+  "backgroundActionHandler",
+);
+late final _sel_backgroundActionsDone = objc.registerName(
+  "backgroundActionsDone",
+);
 late final _sel_endAll_ = objc.registerName("endAll:");
 late final _sel_end_json_dismissAfter_completion_ = objc.registerName(
   "end:json:dismissAfter:completion:",
@@ -1489,10 +1582,14 @@ late final _sel_observePushTokens_handler_ = objc.registerName(
   "observePushTokens:handler:",
 );
 late final _sel_observeTaps_ = objc.registerName("observeTaps:");
+late final _sel_setBackgroundActionHandler_handler_ = objc.registerName(
+  "setBackgroundActionHandler:handler:",
+);
 late final _sel_startOrUpdate_json_completion_ = objc.registerName(
   "startOrUpdate:json:completion:",
 );
 late final _sel_start_error_ = objc.registerName("start:error:");
+late final _sel_takeQueuedActions = objc.registerName("takeQueuedActions");
 late final _sel_update_json_completion_ = objc.registerName(
   "update:json:completion:",
 );

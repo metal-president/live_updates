@@ -7,6 +7,16 @@
 //     --token <push or push-to-start token> --event start \
 //     --content '{"title":"Order #1","body":"Preparing","progress":0.1,"route":"/orders/1"}'
 //
+// APNs broadcast (iOS 18; needs Broadcast Capability for the App ID):
+//   dart run tool/send_push.dart apns-channel --action create --sandbox \
+//     --team-id ... --key-id ... --key AuthKey.p8 --bundle-id com.example.app
+//   (prints apns-channel-id; --store-latest keeps the latest message 8 h;
+//    --action list, or --action delete --channel <id>)
+//   dart run tool/send_push.dart apns-broadcast --sandbox ... --channel <id> \
+//     --event update --content '{"title":"2 - 1","body":"78 min"}'
+//   Start with LiveUpdates.start(content, iosChannelId: <id>) or with a
+//   push-to-start that passes --input-push-channel <id>.
+//
 // FCM to Android (data message handled by live_updates_fcm):
 //   dart run tool/send_push.dart fcm --service-account sa.json \
 //     --fid <Firebase Installation ID> --event update --id order-1 \
@@ -21,13 +31,17 @@
 // Common options: --event start|update|end, --dismiss-after <seconds> (end),
 // --alert-title/--alert-body (APNs alert, required by Apple for start),
 // --dry-run (print the request instead of sending).
+// --activity-key <key> (start: sets the key that LiveUpdates.find() uses).
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
 Future<void> main(List<String> args) async {
   if (args.isEmpty || args.first.startsWith('-')) {
-    stderr.writeln('Usage: send_push.dart <apns|fcm|fcm-ios> [options]');
+    stderr.writeln(
+      'Usage: send_push.dart '
+      '<apns|apns-channel|apns-broadcast|fcm|fcm-ios> [options]',
+    );
     exit(64);
   }
   final command = args.first;
@@ -45,11 +59,7 @@ Future<void> main(List<String> args) async {
       final host = o.containsKey('sandbox')
           ? 'api.sandbox.push.apple.com'
           : 'api.push.apple.com';
-      final jwt = _apnsJwt(
-        _req(o, 'team-id'),
-        _req(o, 'key-id'),
-        File(_req(o, 'key')).readAsStringSync(),
-      );
+      final jwt = _apnsJwtFrom(o);
       await _curl(
         url: 'https://$host/3/device/${_req(o, 'token')}',
         headers: {
@@ -59,6 +69,68 @@ Future<void> main(List<String> args) async {
           'apns-priority': o['priority'] ?? '10',
         },
         body: {'aps': aps},
+        http2: true,
+        dryRun: dryRun,
+      );
+    case 'apns-channel':
+      // Channel management (iOS 18 broadcast). --action create|list|delete.
+      final bundle = _req(o, 'bundle-id');
+      final host = o.containsKey('sandbox')
+          ? 'api-manage-broadcast.sandbox.push.apple.com:2195'
+          : 'api-manage-broadcast.push.apple.com:2196';
+      final auth = {'authorization': 'bearer ${_apnsJwtFrom(o)}'};
+      switch (o['action'] ?? 'create') {
+        case 'create':
+          // apns-channel-id in the response headers is the new channel.
+          await _curl(
+            url: 'https://$host/1/apps/$bundle/channels',
+            headers: auth,
+            body: {
+              'message-storage-policy': o.containsKey('store-latest') ? 1 : 0,
+              'push-type': 'LiveActivity',
+            },
+            http2: true,
+            showHeaders: true,
+            success: {201},
+            dryRun: dryRun,
+          );
+        case 'list':
+          await _curl(
+            url: 'https://$host/1/apps/$bundle/all-channels',
+            method: 'GET',
+            headers: auth,
+            http2: true,
+            dryRun: dryRun,
+          );
+        case 'delete':
+          await _curl(
+            url: 'https://$host/1/apps/$bundle/channels',
+            method: 'DELETE',
+            headers: {...auth, 'apns-channel-id': _req(o, 'channel')},
+            http2: true,
+            success: {204},
+            dryRun: dryRun,
+          );
+        default:
+          _fail('--action must be create, list or delete');
+      }
+    case 'apns-broadcast':
+      // iOS 18 broadcast to every activity on a channel (update or end only).
+      if (event == 'start') _fail('Broadcasts cannot start Live Activities');
+      final host = o.containsKey('sandbox')
+          ? 'api.sandbox.push.apple.com'
+          : 'api.push.apple.com';
+      await _curl(
+        url: 'https://$host/4/broadcasts/apps/${_req(o, 'bundle-id')}',
+        headers: {
+          'authorization': 'bearer ${_apnsJwtFrom(o)}',
+          'apns-channel-id': _req(o, 'channel'),
+          'apns-push-type': 'liveactivity',
+          'apns-priority': o['priority'] ?? '10',
+          // 0: deliver once, do not store (required for no-storage channels).
+          'apns-expiration': o['expiration'] ?? '0',
+        },
+        body: {'aps': _aps(event, content, o)},
         http2: true,
         dryRun: dryRun,
       );
@@ -111,7 +183,9 @@ Map<String, Object?> _aps(
     'content-state': content,
     if (event == 'start') ...{
       'attributes-type': 'LiveUpdatesAttributes',
-      'attributes': <String, Object?>{},
+      'attributes': <String, Object?>{'key': ?o['activity-key']},
+      // iOS 18: the started activity listens to this broadcast channel.
+      'input-push-channel': ?o['input-push-channel'],
     },
     if (o['alert-title'] != null || event == 'start')
       'alert': {
@@ -159,6 +233,13 @@ Future<String> _googleAccessToken(Map<String, Object?> sa) async {
   if (token is! String) _fail('OAuth token request failed: ${result.stdout}');
   return token;
 }
+
+/// APNs JWT from --team-id, --key-id and --key.
+String _apnsJwtFrom(Map<String, String> o) => _apnsJwt(
+  _req(o, 'team-id'),
+  _req(o, 'key-id'),
+  File(_req(o, 'key')).readAsStringSync(),
+);
 
 /// ES256 JWT for APNs token-based authentication.
 String _apnsJwt(String teamId, String keyId, String p8) {
@@ -212,14 +293,16 @@ Uint8List _derToJose(Uint8List der) {
 Future<void> _curl({
   required String url,
   required Map<String, String> headers,
-  required Object body,
+  Object? body,
+  String method = 'POST',
   bool http2 = false,
   bool dryRun = false,
+  bool showHeaders = false,
+  Set<int> success = const {200},
 }) async {
-  final json = const JsonEncoder.withIndent('  ').convert(body);
   if (dryRun) {
     stdout
-      ..writeln('POST $url')
+      ..writeln('$method $url')
       ..writeln(
         headers.entries
             .map(
@@ -227,22 +310,32 @@ Future<void> _curl({
                   '${e.key}: ${e.key == 'authorization' ? '<redacted>' : e.value}',
             )
             .join('\n'),
-      )
-      ..writeln()
-      ..writeln(json);
+      );
+    if (body != null) {
+      stdout
+        ..writeln()
+        ..writeln(const JsonEncoder.withIndent('  ').convert(body));
+    }
     return;
   }
   final result = await _curlWithConfig([
     'url = ${_q(url)}',
+    'request = ${_q(method)}',
     'write-out = ${_q(r'\nHTTP %{http_code}\n')}',
     if (http2) 'http2',
+    if (showHeaders) 'include',
     for (final h in headers.entries) 'header = ${_q('${h.key}: ${h.value}')}',
-    'header = ${_q('content-type: application/json')}',
-    'data-raw = ${_q(jsonEncode(body))}',
+    if (body != null) ...[
+      'header = ${_q('content-type: application/json')}',
+      'data-raw = ${_q(jsonEncode(body))}',
+    ],
   ]);
   stdout.write(result.stdout);
   stderr.write(result.stderr);
-  if (!(result.stdout as String).contains('HTTP 200')) exitCode = 1;
+  final code = RegExp(r'HTTP (\d{3})').allMatches(result.stdout as String);
+  if (code.isEmpty || !success.contains(int.parse(code.last.group(1)!))) {
+    exitCode = 1;
+  }
 }
 
 /// Runs curl with its options read from stdin (`--config -`), so tokens and
@@ -257,9 +350,14 @@ Future<ProcessResult> _curlWithConfig(List<String> lines) async {
   return ProcessResult(process.pid, code, await out, await err);
 }
 
-/// Quotes a value for a curl config file.
-String _q(String value) =>
-    '"${value.replaceAll(r'\', r'\\').replaceAll('"', r'\"')}"';
+/// Quotes a value for a curl config file. Line breaks are rejected so a
+/// value can never start another config line.
+String _q(String value) {
+  if (value.contains('\n') || value.contains('\r')) {
+    _fail('Values must not contain line breaks');
+  }
+  return '"${value.replaceAll(r'\', r'\\').replaceAll('"', r'\"')}"';
+}
 
 String _b64(List<int> bytes) => base64Url.encode(bytes).replaceAll('=', '');
 

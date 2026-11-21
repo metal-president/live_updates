@@ -25,7 +25,8 @@ public final class LiveUpdatesActionReceiver extends BroadcastReceiver {
     String updateId = intent.getStringExtra(LiveUpdatesBridge.EXTRA_UPDATE_ID);
     String actionId = intent.getStringExtra(LiveUpdatesBridge.EXTRA_ACTION_ID);
     if (updateId != null && actionId != null) {
-      LiveUpdatesBridge.emitAction(context.getApplicationContext(), updateId, actionId);
+      LiveUpdatesBridge.emitAction(
+          context.getApplicationContext(), updateId, actionId, goAsync());
     }
   }
 }

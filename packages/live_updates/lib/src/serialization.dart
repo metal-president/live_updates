@@ -20,6 +20,7 @@ extension LiveUpdateContentJson on LiveUpdateContent {
             'id': a.id,
             'title': a.title,
             if (a.opensApp) 'opensApp': true,
+            if (a.requiresUnlock) 'requiresUnlock': true,
             'systemImage': ?a.iosSystemImage,
             'androidIcon': ?a.androidIcon,
           },
@@ -40,6 +41,28 @@ extension LiveUpdateContentJson on LiveUpdateContent {
       'whenEpochMillis': ?a.when?.millisecondsSinceEpoch,
       'showChronometer': a.showChronometer,
       if (!a.requestPromotion) 'requestPromotion': false,
+      if (a.metrics.isNotEmpty)
+        'metrics': [for (final m in a.metrics) m.toJson()],
+      'criticalMetric': ?a.criticalMetric,
+      'bodySemanticStyle': ?a.bodySemanticStyle?.name,
+      'progressSemanticStyle': ?a.progressSemanticStyle?.name,
     },
+  };
+}
+
+extension on AndroidMetric {
+  Map<String, Object?> toJson() => {
+    'label': label,
+    'type': kind.name,
+    'value': switch (value) {
+      final DateTime d => d.millisecondsSinceEpoch,
+      final Duration d => d.inMilliseconds,
+      // jsonEncode rejects NaN and infinity; the platform skips a null value.
+      final double d when !d.isFinite => null,
+      final v => v,
+    },
+    'unit': ?unit,
+    if (kind == AndroidMetricKind.decimal) 'fractionDigits': ?fractionDigits,
+    'semanticStyle': ?semanticStyle?.name,
   };
 }

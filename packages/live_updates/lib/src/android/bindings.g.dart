@@ -710,10 +710,13 @@ final class $LiveUpdatesBridge$RouteListener$Type$
 /// Content is exchanged as the same JSON used on iOS ({@code title, body,
 /// progress, iconName, route, image, actions}) plus Android options: {@code
 /// channelId, channelName, shortCriticalText, colorArgb, whenEpochMillis,
-/// showChronometer, requestPromotion}. On Android 16+ progress uses Notification.ProgressStyle and promotion to a Live Update is requested
-/// (shown on builds that support promoted notifications, Android 16 QPR1 and
-/// later); older versions get a regular ongoing notification with a progress
-/// bar.
+/// showChronometer, requestPromotion, metrics, criticalMetric,
+/// bodySemanticStyle, progressSemanticStyle}. On Android 16+ progress uses
+/// Notification.ProgressStyle and promotion to a Live Update is
+/// requested (shown on builds that support promoted notifications, Android 16
+/// QPR1 and later); Android 17 shows {@code metrics} with {@code MetricStyle}
+/// instead (see LiveUpdatesApi37). Older versions get a regular ongoing
+/// notification with a progress bar.
 extension type LiveUpdatesBridge._(jni$_.JObject _$this)
     implements jni$_.JObject {
   static final _class = jni$_.JClass.forName(
@@ -990,6 +993,143 @@ extension type LiveUpdatesBridge._(jni$_.JObject _$this)
     ).check();
   }
 
+  static final _id_setBackgroundActionHandler = _class.staticMethodId(
+    r'setBackgroundActionHandler',
+    r'(JJ)V',
+  );
+
+  static final _setBackgroundActionHandler =
+      jni$_.ProtectedJniExtensions.lookup<
+            jni$_.NativeFunction<
+              jni$_.JThrowablePtr Function(
+                jni$_.Pointer<jni$_.Void>,
+                jni$_.JMethodIDPtr,
+                jni$_.VarArgs<(jni$_.Int64, jni$_.Int64)>,
+              )
+            >
+          >('globalEnv_CallStaticVoidMethod')
+          .asFunction<
+            jni$_.JThrowablePtr Function(
+              jni$_.Pointer<jni$_.Void>,
+              jni$_.JMethodIDPtr,
+              core$_.int,
+              core$_.int,
+            )
+          >();
+
+  /// from: `static public void setBackgroundActionHandler(long dispatcher, long handler)`
+  ///
+  /// Stores the Dart callback handles of the background action handler.
+  static void setBackgroundActionHandler(
+    core$_.int dispatcher,
+    core$_.int handler,
+  ) {
+    final _$$classRef = _class.reference;
+    _setBackgroundActionHandler(
+      _$$classRef.pointer,
+      _id_setBackgroundActionHandler.pointer,
+      dispatcher,
+      handler,
+    ).check();
+  }
+
+  static final _id_backgroundActionHandler = _class.staticMethodId(
+    r'backgroundActionHandler',
+    r'()J',
+  );
+
+  static final _backgroundActionHandler =
+      jni$_.ProtectedJniExtensions.lookup<
+            jni$_.NativeFunction<
+              jni$_.JniResult Function(
+                jni$_.Pointer<jni$_.Void>,
+                jni$_.JMethodIDPtr,
+              )
+            >
+          >('globalEnv_CallStaticLongMethod')
+          .asFunction<
+            jni$_.JniResult Function(
+              jni$_.Pointer<jni$_.Void>,
+              jni$_.JMethodIDPtr,
+            )
+          >();
+
+  /// from: `static public long backgroundActionHandler()`
+  ///
+  /// Raw callback handle of the background handler, or 0.
+  static core$_.int backgroundActionHandler() {
+    final _$$classRef = _class.reference;
+    return _backgroundActionHandler(
+      _$$classRef.pointer,
+      _id_backgroundActionHandler.pointer,
+    ).long;
+  }
+
+  static final _id_takeQueuedActions = _class.staticMethodId(
+    r'takeQueuedActions',
+    r'()[Ljava/lang/String;',
+  );
+
+  static final _takeQueuedActions =
+      jni$_.ProtectedJniExtensions.lookup<
+            jni$_.NativeFunction<
+              jni$_.JniResult Function(
+                jni$_.Pointer<jni$_.Void>,
+                jni$_.JMethodIDPtr,
+              )
+            >
+          >('globalEnv_CallStaticObjectMethod')
+          .asFunction<
+            jni$_.JniResult Function(
+              jni$_.Pointer<jni$_.Void>,
+              jni$_.JMethodIDPtr,
+            )
+          >();
+
+  /// from: `static public java.lang.String[] takeQueuedActions()`
+  /// The returned object must be released after use, by calling the [release] method.
+  ///
+  /// Removes and returns queued presses as {@code "<update id>\n<action id>"}.
+  static jni$_.JArray<jni$_.JString?> takeQueuedActions() {
+    final _$$classRef = _class.reference;
+    return _takeQueuedActions(
+      _$$classRef.pointer,
+      _id_takeQueuedActions.pointer,
+    ).object<jni$_.JArray<jni$_.JString?>>();
+  }
+
+  static final _id_backgroundActionsDone = _class.staticMethodId(
+    r'backgroundActionsDone',
+    r'()V',
+  );
+
+  static final _backgroundActionsDone =
+      jni$_.ProtectedJniExtensions.lookup<
+            jni$_.NativeFunction<
+              jni$_.JThrowablePtr Function(
+                jni$_.Pointer<jni$_.Void>,
+                jni$_.JMethodIDPtr,
+              )
+            >
+          >('globalEnv_CallStaticVoidMethod')
+          .asFunction<
+            jni$_.JThrowablePtr Function(
+              jni$_.Pointer<jni$_.Void>,
+              jni$_.JMethodIDPtr,
+            )
+          >();
+
+  /// from: `static public void backgroundActionsDone()`
+  ///
+  /// Called by the background engine when the handler finished.
+  static void backgroundActionsDone() {
+    final _$$classRef = _class.reference;
+    _backgroundActionsDone(
+      _$$classRef.pointer,
+      _id_backgroundActionsDone.pointer,
+    ).check();
+  }
+
   static final _id_update = _class.staticMethodId(
     r'update',
     r'(Ljava/lang/String;Ljava/lang/String;)V',
@@ -1019,7 +1159,8 @@ extension type LiveUpdatesBridge._(jni$_.JObject _$this)
   /// from: `static public void update(java.lang.String id, java.lang.String json)`
   ///
   /// Replaces the content of the live update {@code id}. Fails when the user
-  /// dismissed it, so it is not posted again (platform guidance).
+  /// dismissed it (platform guidance: never repost it) or when it is no
+  /// longer shown.
   static void update(jni$_.JString id, jni$_.JString json) {
     final _$$classRef = _class.reference;
     final _$id = id.reference;

@@ -1,3 +1,4 @@
+import 'background.dart';
 import 'models.dart';
 import 'platform/live_updates_platform.dart';
 
@@ -82,11 +83,41 @@ abstract final class LiveUpdates {
   /// [LiveUpdate.pushTokens]); it needs the Push Notifications capability.
   /// It has no effect on Android, where remote updates arrive as payloads
   /// (see [handleRemotePayload]).
+  ///
+  /// [iosChannelId] subscribes the Live Activity to an APNs broadcast channel
+  /// (iOS 18+), so one push updates every device on that channel, such as a
+  /// sports score. Create the channel with APNs' channel management API (see
+  /// `tool/send_push.dart`); it needs Broadcast Capability for the App ID.
+  /// Broadcasts can update and end activities but not start them. It cannot
+  /// be combined with [pushUpdates], throws [LiveUpdateException] before
+  /// iOS 18, and is ignored on Android (broadcast there with FCM topics and
+  /// [handleRemotePayload]).
   static Future<LiveUpdate> start(
     LiveUpdateContent content, {
     bool pushUpdates = false,
-  }) async =>
-      LiveUpdate._(await _platform.start(content, pushUpdates: pushUpdates));
+    String? iosChannelId,
+  }) async {
+    _checkPushOptions(pushUpdates, iosChannelId);
+    return LiveUpdate._(
+      await _platform.start(
+        content,
+        pushUpdates: pushUpdates,
+        iosChannelId: iosChannelId,
+      ),
+    );
+  }
+
+  static void _checkPushOptions(bool pushUpdates, String? channel) {
+    if (channel != null && channel.isEmpty) {
+      throw ArgumentError.value(channel, 'iosChannelId', 'Must not be empty');
+    }
+    if (pushUpdates && channel != null) {
+      throw ArgumentError(
+        'pushUpdates and iosChannelId cannot be combined: an activity receives '
+        'either per-activity pushes or broadcasts.',
+      );
+    }
+  }
 
   /// Updates the running live update identified by [key], or starts a new
   /// one with that key. Use it when your own data has an id, such as an
@@ -102,15 +133,25 @@ abstract final class LiveUpdates {
   /// for that key, on iOS once the system no longer lists the ended activity.
   /// Use a new key for a new activity.
   ///
-  /// [pushUpdates] only applies when a new activity is started: an existing
-  /// activity keeps the push setting it was started with.
+  /// [pushUpdates] and [iosChannelId] only apply when a new activity is
+  /// started: an existing activity keeps the push setting it was started
+  /// with.
   static Future<LiveUpdate> startOrUpdate(
     String key,
     LiveUpdateContent content, {
     bool pushUpdates = false,
-  }) async => LiveUpdate._(
-    await _platform.startOrUpdate(key, content, pushUpdates: pushUpdates),
-  );
+    String? iosChannelId,
+  }) async {
+    _checkPushOptions(pushUpdates, iosChannelId);
+    return LiveUpdate._(
+      await _platform.startOrUpdate(
+        key,
+        content,
+        pushUpdates: pushUpdates,
+        iosChannelId: iosChannelId,
+      ),
+    );
+  }
 
   /// The running live update identified by [key], if any.
   static Future<LiveUpdate?> find(String key) async =>
@@ -124,6 +165,33 @@ abstract final class LiveUpdates {
   static Stream<LiveUpdateActionEvent> get onAction => _platform.actions.map(
     (e) => LiveUpdateActionEvent(updateId: e.$1, actionId: e.$2),
   );
+
+  /// Runs [handler] for button presses that arrive while the app is not
+  /// running (or no [onAction] listener is active): the plugin starts a
+  /// headless Flutter engine, calls [handler] for each press and shuts the
+  /// engine down. Call it early, for example in `main`, before `runApp`.
+  ///
+  /// [handler] must be a top-level or static function annotated with
+  /// `@pragma('vm:entry-point')`. It has a few seconds to finish (the system
+  /// limits background work). It also runs while the app is open if nothing
+  /// listens to [onAction].
+  ///
+  /// Buttons can be pressed on the Lock Screen, so the handler may run
+  /// without the device being unlocked. Make destructive actions require an
+  /// unlock with [LiveUpdateAction.requiresUnlock], and keep server-side
+  /// actions idempotent and authorized. On iOS, plugins that use platform channels are
+  /// only available to it if the app registers them for background engines
+  /// (see the README).
+  ///
+  /// ```dart
+  /// @pragma('vm:entry-point')
+  /// Future<void> onBackgroundAction(LiveUpdateActionEvent event) async {
+  ///   if (event.actionId == 'cancel') await api.cancelOrder(event.updateId);
+  /// }
+  /// ```
+  static Future<void> setBackgroundActionHandler(
+    LiveUpdateActionHandler handler,
+  ) => registerBackgroundActionHandler(handler);
 
   /// Currently running live updates started by this app, including ones
   /// started remotely with a push-to-start token.

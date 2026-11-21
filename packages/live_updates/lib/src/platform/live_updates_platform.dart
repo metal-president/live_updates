@@ -24,13 +24,18 @@ abstract class LiveUpdatesPlatform {
   Future<bool> canPostPromotedNotifications() async => false;
 
   /// Starts a live update and returns its id.
-  Future<String> start(LiveUpdateContent content, {bool pushUpdates = false});
+  Future<String> start(
+    LiveUpdateContent content, {
+    bool pushUpdates = false,
+    String? iosChannelId,
+  });
 
   /// Updates the live update with key [key] or starts one; returns its id.
   Future<String> startOrUpdate(
     String key,
     LiveUpdateContent content, {
     bool pushUpdates = false,
+    String? iosChannelId,
   });
 
   /// Id of the running live update with key [key].
@@ -38,6 +43,19 @@ abstract class LiveUpdatesPlatform {
 
   /// Button presses as `(update id, action id)`.
   Stream<(String, String)> get actions;
+
+  /// Stores the callback handles used to run [LiveUpdates.setBackgroundActionHandler]'s
+  /// handler in a headless engine.
+  Future<void> setBackgroundActionHandler(int dispatcher, int handler) async {}
+
+  /// Raw callback handle of the background action handler, if registered.
+  Future<int?> backgroundActionHandler() async => null;
+
+  /// Removes and returns the presses queued for the background handler.
+  Future<List<(String, String)>> takeQueuedActions() async => const [];
+
+  /// Signals that the background handler finished.
+  Future<void> backgroundActionsDone() async {}
 
   /// Updates the live update with [id].
   Future<void> update(String id, LiveUpdateContent content);
@@ -83,6 +101,7 @@ class NoopLiveUpdatesPlatform extends LiveUpdatesPlatform {
   Future<String> start(
     LiveUpdateContent content, {
     bool pushUpdates = false,
+    String? iosChannelId,
   }) async => 'noop-${_next++}';
 
   @override
@@ -90,6 +109,7 @@ class NoopLiveUpdatesPlatform extends LiveUpdatesPlatform {
     String key,
     LiveUpdateContent content, {
     bool pushUpdates = false,
+    String? iosChannelId,
   }) async => key;
 
   @override

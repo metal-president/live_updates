@@ -81,6 +81,7 @@ class AndroidLiveUpdatesPlatform extends LiveUpdatesPlatform
   Future<String> start(
     LiveUpdateContent content, {
     bool pushUpdates = false,
+    String? iosChannelId,
   }) async {
     final json = await encodeContent(content);
     return _call(
@@ -94,6 +95,7 @@ class AndroidLiveUpdatesPlatform extends LiveUpdatesPlatform
     String key,
     LiveUpdateContent content, {
     bool pushUpdates = false,
+    String? iosChannelId,
   }) async {
     final json = await encodeContent(content);
     return _call(
@@ -110,6 +112,33 @@ class AndroidLiveUpdatesPlatform extends LiveUpdatesPlatform
 
   @override
   Stream<(String, String)> get actions => _actions.stream;
+
+  @override
+  Future<void> setBackgroundActionHandler(int dispatcher, int handler) async =>
+      _call(
+        () => LiveUpdatesBridge.setBackgroundActionHandler(dispatcher, handler),
+      );
+
+  @override
+  Future<int?> backgroundActionHandler() async {
+    final raw = LiveUpdatesBridge.backgroundActionHandler();
+    return raw == 0 ? null : raw;
+  }
+
+  @override
+  Future<List<(String, String)>> takeQueuedActions() async {
+    final queued = LiveUpdatesBridge.takeQueuedActions();
+    return [
+      for (var i = 0; i < queued.length; i++)
+        if (queued[i]?.toDartString(releaseOriginal: true) case final s?)
+          if (s.indexOf('\n') case final at when at > 0)
+            (s.substring(0, at), s.substring(at + 1)),
+    ];
+  }
+
+  @override
+  Future<void> backgroundActionsDone() async =>
+      LiveUpdatesBridge.backgroundActionsDone();
 
   @override
   Future<void> update(String id, LiveUpdateContent content) async {

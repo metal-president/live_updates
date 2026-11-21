@@ -28,20 +28,30 @@ public final class LiveUpdatesBridge: NSObject {
 
   private static func request(_ payload: Payload, key: String?) throws -> String {
     let wantsPush = payload.enablePushUpdates ?? false
+    var pushType: PushType? = wantsPush ? .token : nil
+    if let channel = payload.broadcastChannelId {
+      guard #available(iOS 18.0, *) else {
+        throw NSError(
+          domain: "live_updates", code: 2,
+          userInfo: [NSLocalizedDescriptionKey: "Broadcast channels require iOS 18 or later."])
+      }
+      pushType = .channel(channel)
+    }
     do {
       let activity = try Activity<LiveUpdatesAttributes>.request(
         attributes: LiveUpdatesAttributes(key: key),
         content: payload.content,
-        pushType: wantsPush ? .token : nil
+        pushType: pushType
       )
       return activity.id
-    } catch where wantsPush {
+    } catch where pushType != nil {
       throw NSError(
         domain: "live_updates", code: 1,
         userInfo: [
           NSLocalizedDescriptionKey:
-            "\(error.localizedDescription) enablePushUpdates requires the Push "
-            + "Notifications capability (aps-environment entitlement) on the Runner target."
+            "\(error.localizedDescription) Push updates and broadcast channels "
+            + "require the Push Notifications capability (aps-environment entitlement) on the "
+            + "Runner target; channels also need Broadcast Capability for the App ID."
         ])
     }
   }
@@ -232,18 +242,79 @@ public final class LiveUpdatesBridge: NSObject {
   /// Queues a button press and delivers it if Dart listens. Called on the
   /// main thread by `LiveUpdatesActionIntent` (looked up by name, so the
   /// widget extension does not link the plugin) and for open-app URLs.
+  ///
+  /// Returns `true` when the press started the background action handler;
+  /// the caller should then wait for `LiveUpdatesBackgroundDone`.
   @objc(enqueueAction:actionId:)
-  public static func enqueueAction(_ activityId: String, actionId: String) {
+  @discardableResult
+  public static func enqueueAction(_ activityId: String, actionId: String) -> NSNumber {
+    queueAction(activityId, actionId: actionId, startBackground: true)
+  }
+
+  /// Queues a press. Open-app presses pass `startBackground: false`: the app
+  /// is coming to the foreground and its `onAction` listener handles them.
+  static func queueAction(_ activityId: String, actionId: String, startBackground: Bool)
+    -> NSNumber
+  {
     // Only accept presses of buttons the activity actually shows.
     guard
       let state = find(activityId)?.content.state,
       state.actions.contains(where: { $0.id == actionId })
-    else { return }
+    else { return false }
     let defaults = UserDefaults.standard
     var pending = defaults.stringArray(forKey: pendingActionsKey) ?? []
     pending.append("\(activityId)\n\(actionId)")
     defaults.set(pending, forKey: pendingActionsKey)
-    drainActions()
+    if actionHandler != nil || !startBackground {
+      drainActions()
+      return false
+    }
+    return startBackgroundHandler()
+  }
+
+  // MARK: - Background action handler
+
+  static let dispatcherKey = "live_updates.backgroundDispatcher"
+  static let handlerKey = "live_updates.backgroundHandler"
+
+  /// Stores the Dart callback handles of the background action handler.
+  @objc public static func setBackgroundActionHandler(_ dispatcher: Int64, handler: Int64) {
+    UserDefaults.standard.set(dispatcher, forKey: dispatcherKey)
+    UserDefaults.standard.set(handler, forKey: handlerKey)
+  }
+
+  /// Raw callback handle of the background handler, or 0.
+  @objc public static func backgroundActionHandler() -> Int64 {
+    Int64(UserDefaults.standard.integer(forKey: handlerKey))
+  }
+
+  /// Removes and returns queued presses as `"<activity id>\n<action id>"`.
+  @objc public static func takeQueuedActions() -> [String] {
+    // The queue is also written on the main thread (enqueueAction).
+    guard Thread.isMainThread else { return DispatchQueue.main.sync { takeQueuedActions() } }
+    let defaults = UserDefaults.standard
+    let pending = defaults.stringArray(forKey: pendingActionsKey) ?? []
+    defaults.removeObject(forKey: pendingActionsKey)
+    return pending
+  }
+
+  /// Called by the background engine when the handler finished.
+  @objc public static func backgroundActionsDone() {
+    guard let runner = NSClassFromString("LiveUpdatesBackgroundRunner") as AnyObject? else {
+      return
+    }
+    _ = runner.perform(NSSelectorFromString("finish"))
+  }
+
+  private static func startBackgroundHandler() -> NSNumber {
+    let dispatcher = Int64(UserDefaults.standard.integer(forKey: dispatcherKey))
+    guard dispatcher != 0,
+      let runner = NSClassFromString("LiveUpdatesBackgroundRunner") as AnyObject?,
+      let started = runner.perform(
+        NSSelectorFromString("startWithDispatcher:"), with: NSNumber(value: dispatcher)
+      )?.takeUnretainedValue() as? NSNumber
+    else { return false }
+    return started
   }
 
   private static var tapHandler: ((String) -> Void)?
@@ -281,6 +352,7 @@ private struct Payload: Decodable {
   var staleDate: Double?
   var relevanceScore: Double?
   var enablePushUpdates: Bool?
+  var broadcastChannelId: String?
   var alert: Alert?
 
   static func decode(_ json: String) throws -> Payload {
@@ -332,7 +404,7 @@ extension LiveUpdatesBridge {
         let state = find(activity)?.content.state,
         state.actions.contains(where: { $0.id == action && $0.opensApp })
       else { return true }
-      enqueueAction(activity, actionId: action)
+      queueAction(activity, actionId: action, startBackground: false)
       return true
     }
     guard url.host == "tap", let route = item("route") else { return false }

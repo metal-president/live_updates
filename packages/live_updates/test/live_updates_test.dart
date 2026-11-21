@@ -15,6 +15,7 @@ class FakePlatform extends NoopLiveUpdatesPlatform {
   Future<String> start(
     LiveUpdateContent content, {
     bool pushUpdates = false,
+    String? iosChannelId,
   }) async {
     calls.add('start:${content.title}');
     return 'a1';
@@ -63,6 +64,8 @@ void main() {
 
   group('events', eventTests);
   group('keys and actions', keyedTests);
+  group('broadcast', broadcastTests);
+  group('background handler', backgroundHandlerTests);
 
   test('noop platform is safe', () async {
     LiveUpdatesPlatform.instance = NoopLiveUpdatesPlatform();
@@ -121,6 +124,7 @@ class KeyedPlatform extends NoopLiveUpdatesPlatform {
     String key,
     LiveUpdateContent content, {
     bool pushUpdates = false,
+    String? iosChannelId,
   }) async => ids.putIfAbsent(key, () => 'id${counter++}');
 
   @override
@@ -158,5 +162,61 @@ void keyedTests() {
       const LiveUpdateActionEvent(updateId: 'other', actionId: 'x'),
     );
     expect(await own, 'cancel');
+  });
+}
+
+class _ChannelPlatform extends NoopLiveUpdatesPlatform {
+  String? channel;
+
+  @override
+  Future<String> start(
+    LiveUpdateContent content, {
+    bool pushUpdates = false,
+    String? iosChannelId,
+  }) async {
+    channel = iosChannelId;
+    return 'c1';
+  }
+}
+
+void broadcastTests() {
+  late _ChannelPlatform p;
+  setUp(() => LiveUpdatesPlatform.instance = p = _ChannelPlatform());
+
+  test('passes the broadcast channel to the platform', () async {
+    await LiveUpdates.start(
+      const LiveUpdateContent(title: 'Score'),
+      iosChannelId: 'Q0g=',
+    );
+    expect(p.channel, 'Q0g=');
+  });
+
+  test('rejects pushUpdates together with a channel', () {
+    expect(
+      () => LiveUpdates.start(
+        const LiveUpdateContent(title: 'Score'),
+        pushUpdates: true,
+        iosChannelId: 'Q0g=',
+      ),
+      throwsArgumentError,
+    );
+    expect(
+      () => LiveUpdates.startOrUpdate(
+        'k',
+        const LiveUpdateContent(title: 'Score'),
+        pushUpdates: true,
+        iosChannelId: 'Q0g=',
+      ),
+      throwsArgumentError,
+    );
+  });
+}
+
+void backgroundHandlerTests() {
+  test('background handler must be a top-level or static function', () {
+    expect(
+      () => LiveUpdates.setBackgroundActionHandler((event) async {}),
+      throwsArgumentError,
+    );
   });
 }

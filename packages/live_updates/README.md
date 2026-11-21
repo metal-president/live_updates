@@ -17,6 +17,7 @@ iOS **Live Activities** and Android **Live Update** notifications with one Dart 
 | --- | --- | --- | --- | --- |
 | Start / update / end | Live Activity | Live Update (when promoted) | Ongoing notification | no-op |
 | Progress | ✓ | `ProgressStyle` | progress bar | |
+| Metrics, semantic colors | – | Android 17+ | – | |
 | Tap route | ✓ | ✓ | ✓ | |
 | Lifecycle events | ✓ | ✓ | ✓ | |
 | Push tokens | ✓ | – | – | |
@@ -45,10 +46,36 @@ flutter pub add live_updates
    write the files and add the target yourself (File > New > Target > Widget
    Extension, deployment target 17.2).
 
+   Flavors are supported: every build configuration (for example
+   `Debug-dev`, `Release-prod`) gets a widget bundle id and an App Group
+   derived from that configuration's app bundle id (`LIVE_UPDATES_APP_GROUP`
+   build setting). If the bundle id is defined in an `.xcconfig` instead of
+   the project, pass `--app-group group.<bundle id>`.
+
+   The command needs Ruby with the `xcodeproj` gem (included with
+   CocoaPods). If it is missing, the command offers to run
+   `gem install --user-install xcodeproj` for you.
+
 2. Open the project in Xcode once and select a signing team for the new target.
 
 3. For push updates, add the **Push Notifications** capability to the Runner
    target.
+
+#### Manual setup
+
+With `--no-xcode` only the widget sources are written. Then, in Xcode:
+
+1. File > New > Target > Widget Extension named `LiveUpdatesWidget`
+   (no Live Activity or configuration intent templates), deployment target
+   17.2, and replace its generated Swift files with the files from
+   `ios/LiveUpdatesWidget/`.
+2. Add `LiveUpdatesActionIntent.swift` to both the Runner and the widget
+   target (Target Membership).
+3. Runner `Info.plist`: add `NSSupportsLiveActivities` = YES and a URL type
+   with the scheme `liveupdates-$(PRODUCT_BUNDLE_IDENTIFIER)`.
+4. For images: add the App Groups capability with the same group to both
+   targets and set `LiveUpdatesAppGroup` to that group in both Info.plist
+   files.
 
 The UI lives in `ios/LiveUpdatesWidget/LiveUpdatesWidgetLiveActivity.swift`;
 edit it freely. Keep `LiveUpdatesAttributes.swift` identical to the plugin's
@@ -79,7 +106,8 @@ Interface Guidelines for Live Activities and Android's
   a Live Update; it then stays a regular notification.
 - Do not bring back an update the user dismissed. On Android `update` fails
   for a dismissed update, and remote `update` payloads for it are ignored.
-- Keep `shortCriticalText` short (Android suggests at most 7 characters).
+- Keep `shortCriticalText` short (Android suggests at most 7 characters) and
+  metric labels to 10 characters or fewer.
 
 ## Usage
 
@@ -143,7 +171,12 @@ it with `"attributes": {"key": "order-1234"}`.
 const LiveUpdateContent(
   title: 'Order #1234',
   actions: [
-    LiveUpdateAction(id: 'cancel', title: 'Cancel', iosSystemImage: 'xmark'),
+    LiveUpdateAction(
+      id: 'cancel',
+      title: 'Cancel',
+      iosSystemImage: 'xmark',
+      requiresUnlock: true,
+    ),
     LiveUpdateAction(id: 'track', title: 'Track', opensApp: true),
   ],
 );
@@ -160,8 +193,89 @@ LiveUpdates.onAction.listen((event) {
   app was not running, it is queued and delivered once Dart listens; use
   `opensApp: true` when the press must be handled right away.
 - `opensApp: true` opens the app and delivers the press.
+- Background presses work on the Lock Screen without unlocking the device.
+  Set `requiresUnlock: true` on buttons with consequences, such as cancelling
+  an order: iOS asks for Face ID or the passcode first, and Android 12+ asks
+  the user to unlock.
+
+#### Handling presses while the app is not running
+
+Register a background handler to act on a press immediately, even when the
+app is not running. The plugin starts a headless Flutter engine, runs the
+handler and shuts the engine down:
+
+```dart
+@pragma('vm:entry-point')
+Future<void> onBackgroundAction(LiveUpdateActionEvent event) async {
+  if (event.actionId == 'cancel') {
+    await api.cancelOrder(event.updateId);
+    final updates = await LiveUpdates.active();
+    await updates
+        .where((u) => u.id == event.updateId)
+        .firstOrNull
+        ?.end(dismissAfter: Duration.zero);
+  }
+}
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await LiveUpdates.setBackgroundActionHandler(onBackgroundAction);
+  runApp(const App());
+}
+```
+
+- The handler runs only when no `onAction` listener is active; otherwise the
+  press goes to `onAction` as usual. (On iOS the system may launch your app
+  in the background for the press; if your app subscribes to `onAction` at
+  startup, that listener receives it.)
+- It must be a top-level or static function with
+  `@pragma('vm:entry-point')`, and it has limited time (about 9 seconds on
+  Android, 25 seconds on iOS).
+- live_updates itself works in the handler. On iOS, other plugins that use
+  platform channels need to be registered for the background engine:
+
+  ```swift
+  // AppDelegate.swift
+  LiveUpdatesPlugin.setPluginRegistrantCallback { registry in
+    GeneratedPluginRegistrant.register(with: registry)
+  }
+  ```
+
+  On Android, plugins are registered automatically.
+- Apps that set up the widget with an older version should run
+  `dart run live_updates:create_widget --force` to update
+  `LiveUpdatesActionIntent.swift`.
 - Android shows up to three actions. On iOS keep labels short: the whole
   content must stay under ActivityKit's 4 KB limit.
+
+### Android 17 metrics and semantic colors
+
+On Android 17 a Live Update can show up to three values, such as a countdown
+and a distance, with `MetricStyle` instead of the progress bar. Timers and
+stopwatches are counted by the system, so they keep running between updates.
+Semantic styles let Android color the body text, the progress bar or a metric
+by meaning (info, safe, caution, danger); the system picks the colors and
+applies them to promoted Live Updates.
+
+```dart
+LiveUpdateContent(
+  title: 'Order #1234',
+  body: 'Driver is nearby',
+  progress: 0.8,
+  android: AndroidLiveUpdateOptions(
+    metrics: [
+      AndroidMetric.timer('Arrives in', eta),
+      AndroidMetric.decimal('Distance', 0.6, unit: 'km'),
+    ],
+    criticalMetric: 0, // may be shown in the status bar chip
+    bodySemanticStyle: LiveUpdateSemanticStyle.safe,
+  ),
+);
+```
+
+Below Android 17 metrics and semantic styles are ignored and the progress bar
+is shown as before. The same keys work in remote payloads (see
+[docs/testing-remote.md](https://github.com/metal-president/live_updates/blob/main/docs/testing-remote.md)).
 
 ### Images
 
@@ -215,6 +329,31 @@ Send pushes with `apns-push-type: liveactivity` and topic
 `LiveUpdateContent`: `title`, `body`, `progress`, `iconName`, `route`, `extra`.
 For push-to-start, set `"attributes-type": "LiveUpdatesAttributes"` and
 `"attributes": {}`.
+
+### iOS broadcast (iOS 18+)
+
+For updates that many users share, such as a match score, subscribe the
+activity to an APNs broadcast channel instead of collecting per-activity
+tokens. One push to the channel updates every subscribed device.
+
+```dart
+final update = await LiveUpdates.start(
+  const LiveUpdateContent(title: 'FC Tokyo 2 - 1 Kashima', body: '78 min'),
+  iosChannelId: channelIdFromYourServer,
+);
+```
+
+- Enable **Broadcast Capability** for the App ID in your Apple Developer
+  account (Identifiers > Push Notifications); Xcode cannot enable it.
+- Your server creates channels with APNs' channel management API and sends
+  `update` / `end` pushes to them; `tool/send_push.dart apns-channel` and
+  `apns-broadcast` show both requests.
+- Broadcasts cannot start activities. Start locally with `iosChannelId`, or
+  send a push-to-start with `input-push-channel` so the started activity
+  joins the channel.
+- `iosChannelId` cannot be combined with `pushUpdates`, and throws a
+  `LiveUpdateException` before iOS 18. On Android, use FCM topic messages
+  with the payload below.
 
 ### Android
 

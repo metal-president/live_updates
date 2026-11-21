@@ -121,6 +121,7 @@ final class LiveUpdateAction {
     required this.id,
     required this.title,
     this.opensApp = false,
+    this.requiresUnlock = false,
     this.iosSystemImage,
     this.androidIcon,
   });
@@ -136,6 +137,12 @@ final class LiveUpdateAction {
   /// Android, delivered to Dart while the app runs (or when it next listens).
   final bool opensApp;
 
+  /// Requires the device to be unlocked before a background press is
+  /// handled (Lock Screen presses ask for Face ID / passcode). Use it for
+  /// destructive actions such as cancelling an order. Android 12+ and iOS;
+  /// ignored for [opensApp] buttons, which always open the app.
+  final bool requiresUnlock;
+
   /// SF Symbol shown on iOS, such as `xmark`.
   final String? iosSystemImage;
 
@@ -148,12 +155,19 @@ final class LiveUpdateAction {
       other.id == id &&
       other.title == title &&
       other.opensApp == opensApp &&
+      other.requiresUnlock == requiresUnlock &&
       other.iosSystemImage == iosSystemImage &&
       other.androidIcon == androidIcon;
 
   @override
-  int get hashCode =>
-      Object.hash(id, title, opensApp, iosSystemImage, androidIcon);
+  int get hashCode => Object.hash(
+    id,
+    title,
+    opensApp,
+    requiresUnlock,
+    iosSystemImage,
+    androidIcon,
+  );
 }
 
 /// A press of a [LiveUpdateAction].
@@ -320,7 +334,11 @@ final class AndroidLiveUpdateOptions {
     this.when,
     this.showChronometer = false,
     this.requestPromotion = true,
-  });
+    this.metrics = const [],
+    this.criticalMetric,
+    this.bodySemanticStyle,
+    this.progressSemanticStyle,
+  }) : assert(criticalMetric == null || criticalMetric >= 0);
 
   /// Notification channel id. The channel is created on first use.
   final String channelId;
@@ -351,6 +369,26 @@ final class AndroidLiveUpdateOptions {
   /// ongoing notification.
   final bool requestPromotion;
 
+  /// Values such as a distance, a speed or a countdown, shown with Android
+  /// 17's `MetricStyle` instead of the progress bar. Up to three are used.
+  /// Ignored below Android 17, where [LiveUpdateContent.progress] is shown as
+  /// usual.
+  ///
+  /// Keep labels short: Android recommends 10 characters or fewer.
+  final List<AndroidMetric> metrics;
+
+  /// Index in [metrics] of the most important metric, which Android may show
+  /// in the status bar chip of a promoted Live Update. Defaults to the first;
+  /// ignored when out of range.
+  final int? criticalMetric;
+
+  /// Semantic color of [LiveUpdateContent.body] (Android 17+). The system
+  /// picks the actual color, and only applies it to promoted Live Updates.
+  final LiveUpdateSemanticStyle? bodySemanticStyle;
+
+  /// Semantic color of the progress bar (Android 17+, promoted Live Updates).
+  final LiveUpdateSemanticStyle? progressSemanticStyle;
+
   @override
   bool operator ==(Object other) =>
       other is AndroidLiveUpdateOptions &&
@@ -360,7 +398,11 @@ final class AndroidLiveUpdateOptions {
       other.color == color &&
       other.when == when &&
       other.showChronometer == showChronometer &&
-      other.requestPromotion == requestPromotion;
+      other.requestPromotion == requestPromotion &&
+      listEquals(other.metrics, metrics) &&
+      other.criticalMetric == criticalMetric &&
+      other.bodySemanticStyle == bodySemanticStyle &&
+      other.progressSemanticStyle == progressSemanticStyle;
 
   @override
   int get hashCode => Object.hash(
@@ -371,7 +413,164 @@ final class AndroidLiveUpdateOptions {
     when,
     showChronometer,
     requestPromotion,
+    Object.hashAll(metrics),
+    criticalMetric,
+    bodySemanticStyle,
+    progressSemanticStyle,
   );
+}
+
+/// Meaning of a color in an Android 17 Live Update. Android chooses the
+/// actual color so that it stays consistent across apps.
+///
+/// New values may be added in minor releases.
+enum LiveUpdateSemanticStyle {
+  /// Neutral, informational content.
+  info,
+
+  /// A safe situation.
+  safe,
+
+  /// Caution.
+  caution,
+
+  /// Danger: stop.
+  danger,
+}
+
+/// Kind of value held by an [AndroidMetric].
+///
+/// New values may be added in minor releases; handle unknown values with a
+/// default branch.
+enum AndroidMetricKind {
+  /// [AndroidMetric.integer].
+  integer,
+
+  /// [AndroidMetric.decimal].
+  decimal,
+
+  /// [AndroidMetric.text].
+  text,
+
+  /// [AndroidMetric.timer].
+  timer,
+
+  /// [AndroidMetric.stopwatch].
+  stopwatch,
+
+  /// [AndroidMetric.pausedTimer].
+  pausedTimer,
+
+  /// [AndroidMetric.pausedStopwatch].
+  pausedStopwatch,
+}
+
+/// One value of [AndroidLiveUpdateOptions.metrics] (Android 17+).
+///
+/// Timers and stopwatches are counted by the system, so they keep running
+/// without updates from the app.
+@immutable
+final class AndroidMetric {
+  /// A whole number, such as `1979` steps. Android stores it as a 32-bit
+  /// integer, so larger values are clamped.
+  const AndroidMetric.integer(
+    this.label,
+    int this.value, {
+    this.unit,
+    this.semanticStyle,
+  }) : kind = AndroidMetricKind.integer,
+       fractionDigits = null;
+
+  /// A decimal number, such as `4.2` km, shown with at most
+  /// [fractionDigits] digits after the decimal point. NaN and infinite values
+  /// are left out.
+  const AndroidMetric.decimal(
+    this.label,
+    double this.value, {
+    this.unit,
+    this.fractionDigits = 1,
+    this.semanticStyle,
+  }) : kind = AndroidMetricKind.decimal,
+       assert(fractionDigits == null || fractionDigits >= 0);
+
+  /// Short text, such as a gate or a platform number.
+  const AndroidMetric.text(
+    this.label,
+    String this.value, {
+    this.unit,
+    this.semanticStyle,
+  }) : kind = AndroidMetricKind.text,
+       fractionDigits = null;
+
+  /// A countdown to [end].
+  const AndroidMetric.timer(this.label, DateTime end, {this.semanticStyle})
+    : kind = AndroidMetricKind.timer,
+      value = end,
+      unit = null,
+      fractionDigits = null;
+
+  /// Time elapsed since [start].
+  const AndroidMetric.stopwatch(
+    this.label,
+    DateTime start, {
+    this.semanticStyle,
+  }) : kind = AndroidMetricKind.stopwatch,
+       value = start,
+       unit = null,
+       fractionDigits = null;
+
+  /// A paused countdown with [remaining] time left.
+  const AndroidMetric.pausedTimer(
+    this.label,
+    Duration remaining, {
+    this.semanticStyle,
+  }) : kind = AndroidMetricKind.pausedTimer,
+       value = remaining,
+       unit = null,
+       fractionDigits = null;
+
+  /// A paused stopwatch showing [elapsed].
+  const AndroidMetric.pausedStopwatch(
+    this.label,
+    Duration elapsed, {
+    this.semanticStyle,
+  }) : kind = AndroidMetricKind.pausedStopwatch,
+       value = elapsed,
+       unit = null,
+       fractionDigits = null;
+
+  /// What the value means, such as "Distance".
+  final String label;
+
+  /// Kind of [value].
+  final AndroidMetricKind kind;
+
+  /// An `int`, `double`, `String`, `DateTime` or `Duration`, depending on
+  /// [kind].
+  final Object value;
+
+  /// Unit shown with a number or text, such as "km".
+  final String? unit;
+
+  /// Maximum digits after the decimal point of [AndroidMetricKind.decimal].
+  final int? fractionDigits;
+
+  /// Semantic color of the value on a promoted Live Update.
+  final LiveUpdateSemanticStyle? semanticStyle;
+
+  @override
+  bool operator ==(Object other) =>
+      other is AndroidMetric &&
+      other.label == label &&
+      other.kind == kind &&
+      other.value == value &&
+      other.unit == unit &&
+      other.fractionDigits == fractionDigits &&
+      other.semanticStyle == semanticStyle;
+
+  @override
+  int get hashCode =>
+      Object.hash(label, kind, value, unit, fractionDigits, semanticStyle);
 }
 
 /// Lifecycle state of a live update.

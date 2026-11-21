@@ -33,6 +33,35 @@ Future<void> main() async {
 `handleMessage` returns `false` for messages that are not live_updates
 messages, so you can chain your own handling.
 
+## Registering tokens with your server
+
+`LiveUpdatesFcm.tokens()` merges everything your server needs into one
+stream:
+
+| Type | Platform | Send with |
+| --- | --- | --- |
+| `fcmInstallationId` | all | `message.fid` |
+| `fcmRegistrationToken` (opt-in, legacy) | all | `message.token` |
+| `pushToStart` | iOS 17.2+ | `message.apns.live_activity_token`, `"event": "start"` |
+| `activity` (with `updateId`) | iOS | `message.apns.live_activity_token`, `"event": "update"` / `"end"` |
+
+```dart
+LiveUpdatesFcm.tokens().listen((token) {
+  api.registerToken(
+    type: token.type.name,
+    value: token.value,
+    updateId: token.updateId,
+  );
+});
+// The installation ID is reported once the app registers with FCM.
+await FirebaseMessaging.instance.register();
+```
+
+Keep the latest token per type (and per `updateId`). Activity tokens are
+emitted for live updates started with `pushUpdates: true`. Tokens allow
+pushing to the device, so send them over an authenticated connection and do
+not log them; `LiveUpdatesToken.toString()` leaves the value out.
+
 ## Message format
 
 Send a data message (no `notification` block) with high priority:
@@ -40,7 +69,7 @@ Send a data message (no `notification` block) with high priority:
 ```json
 {
   "message": {
-    "token": "<FCM registration token>",
+    "fid": "<Firebase Installation ID>",
     "android": { "priority": "high" },
     "data": {
       "live_updates_event": "update",

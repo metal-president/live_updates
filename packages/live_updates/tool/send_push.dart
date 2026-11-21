@@ -9,14 +9,15 @@
 //
 // FCM to Android (data message handled by live_updates_fcm):
 //   dart run tool/send_push.dart fcm --service-account sa.json \
-//     --token <FCM registration token> --event update --id order-1 \
+//     --fid <Firebase Installation ID> --event update --id order-1 \
 //     --content '{"title":"Order #1","progress":0.5}'
 //
 // FCM to iOS Live Activity (FCM forwards to APNs):
 //   dart run tool/send_push.dart fcm-ios --service-account sa.json \
-//     --token <FCM registration token> --live-activity-token <hex> \
+//     --fid <Firebase Installation ID> --live-activity-token <hex> \
 //     --event update --content '{"title":"Order #1","progress":0.5}'
 //
+// FCM targets: --fid <installation ID> (recommended) or --token <legacy token>.
 // Common options: --event start|update|end, --dismiss-after <seconds> (end),
 // --alert-title/--alert-body (APNs alert, required by Apple for start),
 // --dry-run (print the request instead of sending).
@@ -63,7 +64,7 @@ Future<void> main(List<String> args) async {
       );
     case 'fcm':
       final message = {
-        'token': _req(o, 'token'),
+        ..._fcmTarget(o),
         'android': {'priority': 'high'},
         'data': {
           'live_updates_event': event,
@@ -75,7 +76,7 @@ Future<void> main(List<String> args) async {
       await _sendFcm(o, message, dryRun);
     case 'fcm-ios':
       final message = {
-        'token': _req(o, 'token'),
+        ..._fcmTarget(o),
         'apns': {
           'live_activity_token': _req(o, 'live-activity-token'),
           'headers': {'apns-priority': o['priority'] ?? '10'},
@@ -87,6 +88,14 @@ Future<void> main(List<String> args) async {
       _fail('Unknown command $command');
   }
 }
+
+/// FCM send target: `--fid` (Firebase Installation ID, recommended) or
+/// `--token` (legacy registration token).
+Map<String, String> _fcmTarget(Map<String, String> o) => switch (o) {
+  {'fid': final fid} => {'fid': fid},
+  {'token': final token} => {'token': token},
+  _ => _fail('Missing --fid (or legacy --token)'),
+};
 
 /// The `aps` dictionary of a Live Activity push.
 Map<String, Object?> _aps(

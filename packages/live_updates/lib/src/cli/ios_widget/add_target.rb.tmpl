@@ -6,21 +6,31 @@ project_path, name, ext_dir, app_group = ARGV
 project = Xcodeproj::Project.open(project_path)
 ios_dir = File.dirname(project_path)
 
-# Adds the App Group to an entitlements file (created when missing).
-def add_app_group(path, group)
+# The App Group is a per-configuration build setting, so flavors with
+# different bundle ids (Debug-dev, Release-prod, ...) each get their own.
+# Entitlements and Info.plist refer to it as $(LIVE_UPDATES_APP_GROUP).
+GROUP_SETTING = 'LIVE_UPDATES_APP_GROUP'
+GROUP_REF = "$(#{GROUP_SETTING})"
+VALID_GROUP = /\Agroup\.[A-Za-z0-9.\-]+(\$\([A-Za-z0-9_]+\)[A-Za-z0-9.\-]*)*\z/
+
+# Adds the App Group reference to an entitlements file (created when missing),
+# replacing literal copies of the same groups written by older versions.
+def add_app_group(path, literal_groups)
   plist = File.exist?(path) ? Xcodeproj::Plist.read_from_path(path) : {}
   groups = plist['com.apple.security.application-groups'] ||= []
-  groups << group unless groups.include?(group)
+  groups.reject! { |g| literal_groups.include?(g) }
+  groups << GROUP_REF unless groups.include?(GROUP_REF)
   Xcodeproj::Plist.write_to_path(plist, path)
 end
 
 # Points every configuration of `target` at an entitlements file with the
-# App Group, reusing one that is already configured.
-def configure_app_group(project, target, ios_dir, default_rel, group)
+# App Group, reusing one that is already configured, and sets the group.
+def configure_app_group(project, target, ios_dir, default_rel, groups)
   target.build_configurations.each do |config|
     rel = config.build_settings['CODE_SIGN_ENTITLEMENTS'] || default_rel
-    add_app_group(File.join(ios_dir, rel), group)
+    add_app_group(File.join(ios_dir, rel), groups.values)
     config.build_settings['CODE_SIGN_ENTITLEMENTS'] = rel
+    config.build_settings[GROUP_SETTING] = groups.fetch(config.name)
   end
   dir, file = File.split(default_rel)
   group_ref = project.main_group.find_subpath(dir, false)
@@ -30,20 +40,35 @@ def configure_app_group(project, target, ios_dir, default_rel, group)
 end
 
 runner = project.targets.find { |t| t.name == 'Runner' } or abort('Runner target not found')
-app_id = runner.build_configurations.first.build_settings['PRODUCT_BUNDLE_IDENTIFIER']
-app_group = "group.#{app_id}" if app_group == 'auto'
-if app_group && !app_group.empty? && app_group !~ /\Agroup\.[A-Za-z0-9.-]+\z/
-  abort("App Group \"#{app_group}\" is not valid (bundle id with build variables?). " \
-        'Pass --app-group group.<your bundle id>.')
+
+# Bundle id of the app per build configuration (flavors may differ).
+app_ids = runner.build_configurations.to_h do |c|
+  [c.name, c.build_settings['PRODUCT_BUNDLE_IDENTIFIER']]
+end
+missing = app_ids.select { |_, id| id.nil? || id.empty? }.keys
+use_group = app_group && !app_group.empty?
+if missing.any? && (app_group == 'auto')
+  abort("PRODUCT_BUNDLE_IDENTIFIER is not set in Runner.xcodeproj for #{missing.join(', ')} " \
+        '(set in an .xcconfig?). Pass --app-group group.<your bundle id>, or --no-app-group.')
+end
+groups = app_ids.to_h do |config, id|
+  [config, app_group == 'auto' ? "group.#{id}" : app_group]
+end
+if use_group
+  groups.each do |config, group|
+    next if group =~ VALID_GROUP
+    abort("App Group \"#{group}\" for #{config} is not valid. Pass --app-group group.<your bundle id>.")
+  end
 end
 
-# Both targets find the App Group through this Info.plist key.
-if app_group && !app_group.empty?
+# Both targets read the App Group from this Info.plist key.
+if use_group
   [File.join(ios_dir, 'Runner/Info.plist'), File.join(ext_dir, 'Info.plist')].each do |plist|
     next unless File.exist?(plist)
-    unless system('/usr/libexec/PlistBuddy', '-c', "Set :LiveUpdatesAppGroup #{app_group}", plist,
+    unless system('/usr/libexec/PlistBuddy', '-c', "Set :LiveUpdatesAppGroup #{GROUP_REF}", plist,
                   out: File::NULL, err: File::NULL)
-      system('/usr/libexec/PlistBuddy', '-c', "Add :LiveUpdatesAppGroup string #{app_group}", plist)
+      system('/usr/libexec/PlistBuddy', '-c', "Add :LiveUpdatesAppGroup string #{GROUP_REF}", plist) or
+        abort("Could not set LiveUpdatesAppGroup in #{plist}")
     end
   end
 end
@@ -63,11 +88,11 @@ end
 if (existing = project.targets.find { |t| t.name == name })
   ensure_shared_intent(project, [runner, existing], name)
   project.save
-  if app_group && !app_group.empty?
-    configure_app_group(project, runner, ios_dir, 'Runner/Runner.entitlements', app_group)
-    configure_app_group(project, existing, ios_dir, "#{name}/#{name}.entitlements", app_group)
+  if use_group
+    configure_app_group(project, runner, ios_dir, 'Runner/Runner.entitlements', groups)
+    configure_app_group(project, existing, ios_dir, "#{name}/#{name}.entitlements", groups)
     project.save
-    puts "Target #{name} already exists; configured App Group #{app_group}."
+    puts "Target #{name} already exists; configured App Groups #{groups.values.uniq.join(', ')}."
   else
     puts "Target #{name} already exists; skipping Xcode changes."
   end
@@ -90,7 +115,9 @@ target.build_configurations.each do |config|
   config.base_configuration_reference = runner_config&.base_configuration_reference
   s = config.build_settings
   s['PRODUCT_NAME'] = '$(TARGET_NAME)'
-  s['PRODUCT_BUNDLE_IDENTIFIER'] = "#{app_id}.#{name}"
+  # Per configuration, so each flavor's widget belongs to that flavor's app.
+  app_id = app_ids[config.name]
+  s['PRODUCT_BUNDLE_IDENTIFIER'] = app_id ? "#{app_id}.#{name}" : "$(inherited).#{name}"
   s['INFOPLIST_FILE'] = "#{name}/Info.plist"
   s['GENERATE_INFOPLIST_FILE'] = 'YES'
   s['INFOPLIST_KEY_CFBundleDisplayName'] = name
@@ -101,7 +128,7 @@ target.build_configurations.each do |config|
   s['TARGETED_DEVICE_FAMILY'] = '1,2'
   s['SKIP_INSTALL'] = 'YES'
   s['CODE_SIGN_STYLE'] = 'Automatic'
-  team = runner.build_configurations.first.build_settings['DEVELOPMENT_TEAM']
+  team = runner_config&.build_settings&.dig('DEVELOPMENT_TEAM')
   s['DEVELOPMENT_TEAM'] = team if team
   s['LD_RUNPATH_SEARCH_PATHS'] = ['$(inherited)', '@executable_path/Frameworks', '@executable_path/../../Frameworks']
 end
@@ -126,11 +153,11 @@ if thin
   runner.build_phases.insert(runner.build_phases.index(thin), embed)
 end
 
-if app_group && !app_group.empty?
-  configure_app_group(project, runner, ios_dir, 'Runner/Runner.entitlements', app_group)
-  configure_app_group(project, target, ios_dir, "#{name}/#{name}.entitlements", app_group)
+if use_group
+  configure_app_group(project, runner, ios_dir, 'Runner/Runner.entitlements', groups)
+  configure_app_group(project, target, ios_dir, "#{name}/#{name}.entitlements", groups)
 end
 ensure_shared_intent(project, [runner, target], name)
 
 project.save
-puts "Added target #{name} (#{app_id}.#{name})."
+puts "Added target #{name} for #{app_ids.values.compact.uniq.join(', ')}."

@@ -45,10 +45,36 @@ flutter pub add live_updates
    write the files and add the target yourself (File > New > Target > Widget
    Extension, deployment target 17.2).
 
+   Flavors are supported: every build configuration (for example
+   `Debug-dev`, `Release-prod`) gets a widget bundle id and an App Group
+   derived from that configuration's app bundle id (`LIVE_UPDATES_APP_GROUP`
+   build setting). If the bundle id is defined in an `.xcconfig` instead of
+   the project, pass `--app-group group.<bundle id>`.
+
+   The command needs Ruby with the `xcodeproj` gem (included with
+   CocoaPods). If it is missing, the command offers to run
+   `gem install --user-install xcodeproj` for you.
+
 2. Open the project in Xcode once and select a signing team for the new target.
 
 3. For push updates, add the **Push Notifications** capability to the Runner
    target.
+
+#### Manual setup
+
+With `--no-xcode` only the widget sources are written. Then, in Xcode:
+
+1. File > New > Target > Widget Extension named `LiveUpdatesWidget`
+   (no Live Activity or configuration intent templates), deployment target
+   17.2, and replace its generated Swift files with the files from
+   `ios/LiveUpdatesWidget/`.
+2. Add `LiveUpdatesActionIntent.swift` to both the Runner and the widget
+   target (Target Membership).
+3. Runner `Info.plist`: add `NSSupportsLiveActivities` = YES and a URL type
+   with the scheme `liveupdates-$(PRODUCT_BUNDLE_IDENTIFIER)`.
+4. For images: add the App Groups capability with the same group to both
+   targets and set `LiveUpdatesAppGroup` to that group in both Info.plist
+   files.
 
 The UI lives in `ios/LiveUpdatesWidget/LiveUpdatesWidgetLiveActivity.swift`;
 edit it freely. Keep `LiveUpdatesAttributes.swift` identical to the plugin's

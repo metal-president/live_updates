@@ -64,6 +64,8 @@ Future<int> createWidget(List<String> args) async {
     return 66;
   }
 
+  if (editXcode && !_ensureXcodeprojGem()) return 69;
+
   final templates = await _templatesDir();
   String render(String file) =>
       File('${templates.path}/$file')
@@ -149,6 +151,51 @@ String _attributesSource(Directory templates) => File.fromUri(
     '../../../../ios/live_updates/Sources/live_updates/LiveUpdatesAttributes.swift',
   ),
 ).readAsStringSync();
+
+/// Whether Ruby can load the `xcodeproj` gem; offers to install it for the
+/// current user (no sudo) when it is missing and stdin is a terminal.
+bool _ensureXcodeprojGem() {
+  bool available() =>
+      Process.runSync('ruby', ['-e', "require 'xcodeproj'"]).exitCode == 0;
+  try {
+    if (available()) return true;
+  } on ProcessException {
+    stderr.writeln('Ruby was not found. $_manualSteps');
+    return false;
+  }
+  stderr.writeln(
+    'The xcodeproj Ruby gem (used to add the widget target to Runner.xcodeproj) '
+    'is not installed.',
+  );
+  if (stdin.hasTerminal) {
+    stdout.write(
+      'Install it for your user now with "gem install --user-install '
+      'xcodeproj"? [y/N] ',
+    );
+    final answer = stdin.readLineSync()?.trim().toLowerCase();
+    if (answer == 'y' || answer == 'yes') {
+      final install = Process.runSync('gem', [
+        'install',
+        '--user-install',
+        '--no-document',
+        'xcodeproj',
+      ]);
+      stdout.write(install.stdout);
+      stderr.write(install.stderr);
+      if (install.exitCode == 0 && available()) return true;
+      stderr.writeln('Installing the gem did not work.');
+    }
+  }
+  stderr.writeln(
+    'Install it with "gem install --user-install xcodeproj" (or install '
+    'CocoaPods, which includes it) and run this command again. $_manualSteps',
+  );
+  return false;
+}
+
+const _manualSteps =
+    'Alternatively run with --no-xcode and follow "Manual setup" in the '
+    'live_updates README.';
 
 /// Runs one PlistBuddy command; returns whether it succeeded.
 bool _plistBuddy(String command, String plist) =>

@@ -5,6 +5,9 @@
 - `tool/send_push.dart`: `apns-channel` (create, list, delete) and
   `apns-broadcast` commands; `--input-push-channel` and `--activity-key` for
   push-to-start.
+- `create_widget`: per-configuration widget bundle ids and App Groups for
+  flavors (`LIVE_UPDATES_APP_GROUP` build setting); offers to install the
+  xcodeproj gem when it is missing; manual setup steps in the README.
 
 ## 0.0.2
 

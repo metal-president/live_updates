@@ -15,7 +15,12 @@ concurrency:
 
 jobs:
   integration-ios:
-    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Xcode 26 (macos-latest) and the Xcode 27 preview image.
+        runner: [macos-latest, xcode-27]
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -25,6 +30,7 @@ jobs:
         with:
           flutter-version-file: .fvmrc
           cache: true
+      - run: xcodebuild -version
       - name: Boot an iPhone simulator
         id: sim
         run: |
@@ -36,9 +42,17 @@ jobs:
           for runtime, items in devices.items():
               if ".iOS-" not in runtime:
                   continue
-              version = tuple(int(p) for p in runtime.split(".iOS-")[1].split("-"))
+              # e.g. ...SimRuntime.iOS-26-5. Skip device-specific runtimes
+              # (a suffix such as -iPhone19) and foldable models.
+              parts = runtime.split(".iOS-")[1].split("-")
+              if not all(p.isdigit() for p in parts):
+                  continue
+              version = tuple(int(p) for p in parts)
               for d in items:
-                  if d["name"].startswith("iPhone") and (best is None or version > best[0]):
+                  name = d["name"]
+                  if not name.startswith("iPhone") or "Duo" in name:
+                      continue
+                  if best is None or version > best[0]:
                       best = (version, d["udid"], d["name"])
           print(best[1]); print(best, file=sys.stderr)
           ')
@@ -64,6 +78,7 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
+          cache: gradle
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           flutter-version-file: .fvmrc

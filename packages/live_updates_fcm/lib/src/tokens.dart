@@ -34,6 +34,7 @@ final class LiveUpdatesToken {
     required this.type,
     required this.value,
     this.updateId,
+    this.key,
   });
 
   /// What the token is for.
@@ -45,15 +46,20 @@ final class LiveUpdatesToken {
   /// [LiveUpdate.id] for [LiveUpdatesTokenType.activity] tokens, else `null`.
   final String? updateId;
 
+  /// [LiveUpdate.key] of that update, so your server can address it by your
+  /// own id (the same id Android uses as `live_updates_id`).
+  final String? key;
+
   @override
   bool operator ==(Object other) =>
       other is LiveUpdatesToken &&
       other.type == type &&
       other.value == value &&
-      other.updateId == updateId;
+      other.updateId == updateId &&
+      other.key == key;
 
   @override
-  int get hashCode => Object.hash(type, value, updateId);
+  int get hashCode => Object.hash(type, value, updateId, key);
 
   @override
   String toString() =>
@@ -101,6 +107,7 @@ Stream<LiveUpdatesToken> mergeTokens({
             type: LiveUpdatesTokenType.activity,
             value: t.hex,
             updateId: update.id,
+            key: update.key,
           ),
         ),
         onError: error,

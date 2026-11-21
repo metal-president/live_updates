@@ -711,7 +711,9 @@ final class $LiveUpdatesBridge$RouteListener$Type$
 /// progress, iconName, route, image, actions}) plus Android options: {@code
 /// channelId, channelName, shortCriticalText, colorArgb, whenEpochMillis,
 /// showChronometer, requestPromotion, metrics, criticalMetric,
-/// bodySemanticStyle, progressSemanticStyle}. On Android 16+ progress uses
+/// bodySemanticStyle, progressSemanticStyle, progressSegments, progressPoints,
+/// progressTrackerIcon, timeoutAfterMillis, androidAlert} and the timer
+/// ({@code timerStart} or {@code timerEnd}, seconds since 1970). On Android 16+ progress uses
 /// Notification.ProgressStyle and promotion to a Live Update is
 /// requested (shown on builds that support promoted notifications, Android 16
 /// QPR1 and later); Android 17 shows {@code metrics} with {@code MetricStyle}
@@ -916,6 +918,44 @@ extension type LiveUpdatesBridge._(jni$_.JObject _$this)
       _$key.pointer,
       _$json.pointer,
     ).object<jni$_.JString>();
+  }
+
+  static final _id_keyForId = _class.staticMethodId(
+    r'keyForId',
+    r'(Ljava/lang/String;)Ljava/lang/String;',
+  );
+
+  static final _keyForId =
+      jni$_.ProtectedJniExtensions.lookup<
+            jni$_.NativeFunction<
+              jni$_.JniResult Function(
+                jni$_.Pointer<jni$_.Void>,
+                jni$_.JMethodIDPtr,
+                jni$_.VarArgs<(jni$_.Pointer<jni$_.Void>,)>,
+              )
+            >
+          >('globalEnv_CallStaticObjectMethod')
+          .asFunction<
+            jni$_.JniResult Function(
+              jni$_.Pointer<jni$_.Void>,
+              jni$_.JMethodIDPtr,
+              jni$_.Pointer<jni$_.Void>,
+            )
+          >();
+
+  /// from: `static public java.lang.String keyForId(java.lang.String id)`
+  /// The returned object must be released after use, by calling the [release] method.
+  ///
+  /// Key of the shown live update {@code id}: its id when it was started with
+  /// a key (startOrUpdate or a remote payload), else {@code null}.
+  static jni$_.JString? keyForId(jni$_.JString id) {
+    final _$$classRef = _class.reference;
+    final _$id = id.reference;
+    return _keyForId(
+      _$$classRef.pointer,
+      _id_keyForId.pointer,
+      _$id.pointer,
+    ).object<jni$_.JString?>();
   }
 
   static final _id_idForKey = _class.staticMethodId(

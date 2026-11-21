@@ -1,0 +1,92 @@
+name: Integration tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: integration-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  integration-ios:
+    runs-on: macos-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version-file: .fvmrc
+          cache: true
+      - name: Boot an iPhone simulator
+        id: sim
+        run: |
+          # Newest available iPhone runtime (Live Activities need iOS 17.2+).
+          udid=$(xcrun simctl list devices available --json | python3 -c '
+          import json, sys
+          devices = json.load(sys.stdin)["devices"]
+          best = None
+          for runtime, items in devices.items():
+              if ".iOS-" not in runtime:
+                  continue
+              version = tuple(int(p) for p in runtime.split(".iOS-")[1].split("-"))
+              for d in items:
+                  if d["name"].startswith("iPhone") and (best is None or version > best[0]):
+                      best = (version, d["udid"], d["name"])
+          print(best[1]); print(best, file=sys.stderr)
+          ')
+          xcrun simctl boot "$udid"
+          xcrun simctl bootstatus "$udid" -b
+          echo "udid=$udid" >> "$GITHUB_OUTPUT"
+      - run: flutter test integration_test -d "${{ steps.sim.outputs.udid }}"
+        working-directory: packages/live_updates/example
+
+  integration-android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        # 36.1: promoted Live Updates; 37.0: MetricStyle and semantic colors.
+        api-level: ["36.1", "37.0"]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version-file: .fvmrc
+          cache: true
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - run: flutter build apk --debug
+        working-directory: packages/live_updates/example
+      - uses: ReactiveCircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
+        with:
+          api-level: ${{ matrix.api-level }}
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disk-size: 6G
+          ram-size: 4096M
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          # avdmanager writes target=android-0 for minor API levels such as
+          # 37.0, which makes the emulator run without acceleration.
+          pre-emulator-launch-script: |
+            api=${{ matrix.api-level }}; sed -i -E "s/^target=android-0$/target=android-${api%%.*}/" "$ANDROID_AVD_HOME"/*.ini; cat "$ANDROID_AVD_HOME"/*.ini
+          working-directory: packages/live_updates/example
+          script: ./tool/integration_test_android.sh emulator-5554

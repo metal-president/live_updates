@@ -73,4 +73,7 @@ kotlin {
 
 dependencies {
     testImplementation("org.jetbrains.kotlin:kotlin-test")
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.robolectric:robolectric:4.18.1")
+    testRuntimeOnly("org.junit.vintage:junit-vintage-engine:5.13.4")
 }

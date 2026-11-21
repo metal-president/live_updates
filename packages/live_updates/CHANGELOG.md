@@ -1,3 +1,7 @@
+## Unreleased
+
+- Screenshots on pub.dev and in the README; the example app has its own icon.
+
 ## 0.0.4
 
 - `LiveUpdateContent.timer`: a countdown or stopwatch counted by the system

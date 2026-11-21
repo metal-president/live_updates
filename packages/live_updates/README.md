@@ -2,7 +2,7 @@
 
 iOS **Live Activities** and Android **Live Update** notifications with one Dart API.
 
-- One API to start, update and end a live update: title, body, progress, icon and a tap route.
+- One API to start, update and end a live update: title, body, progress, a system-counted timer, an image, buttons and a tap route.
 - iOS 17.2+: ActivityKit Live Activities on the Lock Screen and in the Dynamic Island, with a ready-made SwiftUI widget you generate and customize.
 - Android: ongoing notifications that Android 16 renders with `ProgressStyle` and, on builds that support promoted notifications (Android 16 QPR1 and later), promotes to Live Updates with a status bar chip. Older Android versions show a regular ongoing notification with a progress bar.
 - Remote updates: iOS push-to-start and per-activity push tokens as streams; Android updates from a received payload (FCM glue lives in [`live_updates_fcm`](https://pub.dev/packages/live_updates_fcm)).
@@ -10,6 +10,14 @@ iOS **Live Activities** and Android **Live Update** notifications with one Dart 
 - Other platforms are a safe no-op.
 
 > **Status:** 0.x. The API may still change between minor versions.
+
+| iOS Lock Screen | iOS Dynamic Island |
+| --- | --- |
+| <img src="https://raw.githubusercontent.com/metal-president/live_updates/main/packages/live_updates/doc/screenshots/ios_lock_screen.png" alt="Live Activity on the iOS Lock Screen" width="360"> | <img src="https://raw.githubusercontent.com/metal-president/live_updates/main/packages/live_updates/doc/screenshots/ios_dynamic_island.png" alt="Live Activity in the Dynamic Island" width="240"> |
+| **Android 16** | **Android 17** |
+| <img src="https://raw.githubusercontent.com/metal-president/live_updates/main/packages/live_updates/doc/screenshots/android_16.png" alt="Android 16 Live Update with progress stages" width="360"> | <img src="https://raw.githubusercontent.com/metal-president/live_updates/main/packages/live_updates/doc/screenshots/android_17.png" alt="Android 17 Live Update with metrics" width="360"> |
+
+Screenshots of the example app in this repository.
 
 ## Platform support
 

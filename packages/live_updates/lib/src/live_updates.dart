@@ -215,9 +215,15 @@ abstract final class LiveUpdates {
   /// a push-to-start notification (iOS) or a remote payload (Android).
   static Stream<LiveUpdate> get onStarted => _platform.events
       .where((e) => e.$2 == 'started')
-      .asyncMap(
-        (e) async => LiveUpdate._(e.$1, await _platform.keyForId(e.$1)),
-      );
+      .asyncMap((e) async => LiveUpdate._(e.$1, await _keyOrNull(e.$1)));
+
+  static Future<String?> _keyOrNull(String id) async {
+    try {
+      return await _platform.keyForId(id);
+    } on Object {
+      return null; // A missing key must not drop the update from the stream.
+    }
+  }
 
   /// Ends every live update started by this app.
   static Future<void> endAll() => _platform.endAll();

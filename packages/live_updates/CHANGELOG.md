@@ -1,4 +1,4 @@
-## Unreleased
+## 0.0.5
 
 - `LiveUpdate.key`: the key from `startOrUpdate`, a push-to-start
   `attributes.key` (iOS) or a remote `live_updates_id` (Android), also on
@@ -10,7 +10,9 @@
   `create_widget` always updates together with `LiveUpdatesAttributes.swift`
   and `LiveUpdatesActionIntent.swift`. Your layout file is kept unless you pass
   `--force`. Existing layouts keep working; run `create_widget --force` once
-  to switch to the shorter layout that uses the shared views.
+  to switch to the shorter layout that uses the shared views (needed for
+  `compactTrailing` / `minimal`). `LiveUpdatesActionIntent.swift` is now
+  always replaced; a file without the generated header is kept as `.bak`.
 - Screenshots on pub.dev and in the README; the example app has its own icon.
 
 ## 0.0.4

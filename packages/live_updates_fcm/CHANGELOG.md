@@ -1,8 +1,9 @@
-## Unreleased
+## 0.0.5
 
 - `LiveUpdatesToken.key`: activity tokens carry the update's key, so a server
   can find the iOS token for the id it uses on Android.
 - Example for pub.dev, package topics.
+- Requires live_updates 0.0.5.
 
 ## 0.0.4
 

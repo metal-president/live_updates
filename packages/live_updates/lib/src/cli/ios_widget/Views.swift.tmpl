@@ -164,13 +164,15 @@ struct LiveUpdatesStepperRow: View {
 
   var body: some View {
     if let steps = state.steps, !steps.labels.isEmpty {
-      let count = min(steps.labels.count, 8)
-      let current = max(0, min(steps.current, count - 1))
+      let total = steps.labels.count
+      let current = max(0, min(steps.current, total - 1))
+      // At most 8 dots: a window around the current stage.
+      let first = max(0, min(current - 3, total - 8))
       let accent = palette.tint ?? .accentColor
       VStack(alignment: .leading, spacing: 6) {
         HStack(spacing: 0) {
-          ForEach(0..<count, id: \.self) { index in
-            if index > 0 {
+          ForEach(first..<min(total, first + 8), id: \.self) { index in
+            if index > first {
               Rectangle()
                 .fill(index <= current ? accent : Color.secondary.opacity(0.4))
                 .frame(height: 3)
@@ -184,7 +186,7 @@ struct LiveUpdatesStepperRow: View {
           Text(steps.labels[current]).font(.subheadline.weight(.semibold)).lineLimit(1)
             .foregroundStyle(palette.foreground ?? .primary)
           Spacer()
-          Text("\(current + 1)/\(count)").font(.caption).monospacedDigit()
+          Text("\(current + 1)/\(total)").font(.caption).monospacedDigit()
             .foregroundStyle(palette.secondaryText)
         }
       }
@@ -240,7 +242,8 @@ struct LiveUpdatesExpandedTrailing: View {
   }
 }
 
-/// Expanded Dynamic Island, bottom region: body, progress bar and buttons.
+/// Expanded Dynamic Island, bottom region: the metrics, steps or journey of
+/// the layout (else the body and progress bar) and buttons.
 struct LiveUpdatesExpandedBottom: View {
   let state: LiveUpdatesAttributes.ContentState
   let activityID: String
@@ -250,14 +253,17 @@ struct LiveUpdatesExpandedBottom: View {
   }
 
   var body: some View {
+    // The Dynamic Island keeps its own dark colors: only the accent applies.
+    let island = palette.islandOnly
     VStack(alignment: .leading, spacing: 6) {
+      // The rows take the room of the body: the expanded island is short.
       switch state.liveUpdatesLayout {
       case "metrics":
-        LiveUpdatesMetricsRow(state: state, palette: palette)
+        LiveUpdatesMetricsRow(state: state, palette: island)
       case "stepper":
-        LiveUpdatesStepperRow(state: state, palette: palette)
+        LiveUpdatesStepperRow(state: state, palette: island)
       case "journey":
-        LiveUpdatesJourneyRow(state: state, palette: palette)
+        LiveUpdatesJourneyRow(state: state, palette: island)
       default:
         if let body = state.body {
           Text(body).font(.subheadline).foregroundStyle(.secondary)
@@ -332,6 +338,15 @@ struct LiveUpdatesPalette {
     background = luminanceReduced ? nil : Self.color(state.backgroundArgb)
     foreground = luminanceReduced ? nil : Self.color(state.foregroundArgb)
   }
+
+  private init(tint: Color?) {
+    self.tint = tint
+    background = nil
+    foreground = nil
+  }
+
+  /// The accent alone, for the Dynamic Island (whose background stays dark).
+  var islandOnly: LiveUpdatesPalette { LiveUpdatesPalette(tint: tint) }
 
   static func color(_ argb: Int?) -> Color? {
     guard let argb, argb >= 0, argb <= 0xFFFF_FFFF else { return nil }

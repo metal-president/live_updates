@@ -205,6 +205,9 @@ final class LiveUpdateSteps {
     : assert(current >= 0);
 
   /// Short names of the stages, in order.
+  ///
+  /// iOS draws at most 8 dots, around the current stage; Android 16+ makes
+  /// progress segments for up to 21 stages and shows only the text beyond.
   final List<String> labels;
 
   /// Index of the current stage in [labels].

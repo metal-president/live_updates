@@ -117,7 +117,8 @@ activity token for that key (or the push-to-start token to start one).
   (also a UNIX time), `relevance-score` and
   `alert` go next to `content-state`, not inside it.
 - A push replaces the whole content state: send every field that should stay,
-  including `extra`, `layout`, `compactTrailing` and `minimal`.
+  including `extra`, `layout`, `metrics`, `steps`, `journey`,
+  `compactTrailing` and `minimal`.
 - Delete the activity token once the update has ended; it cannot be used
   again.
 

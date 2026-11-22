@@ -362,8 +362,9 @@ LiveUpdateContent(
 | `journey` | from and to with the progress between them | `journey`, `progress` | "Shop → Home" in the text |
 
 A layout whose data is missing falls back to `standard`. The expanded Dynamic
-Island shows the metrics, steps or journey of the chosen layout, and buttons
-stay at the bottom of every layout. The layout can change with each update.
+Island shows the metrics, steps or journey of the chosen layout in place of
+the body (there is no room for both), and buttons stay at the bottom of every
+layout. The layout can change with each update.
 
 For a layout of your own, pass `IosLiveUpdateLayout.custom('name')` and add a
 case to the switch in `LiveUpdatesWidgetLiveActivity.swift`:

@@ -301,8 +301,8 @@ public class LiveUpdatesBridgeTest {
         (Notification.ProgressStyle) Notification.Builder.recoverBuilder(app, n).getStyle();
     assertEquals(3, style.getProgressSegments().size());
     assertEquals(3, style.getProgressPoints().size());
-    assertEquals(3, style.getProgressMax());
-    assertEquals(1, style.getProgress());
+    assertEquals(300, style.getProgressMax());
+    assertEquals(100, style.getProgress());
     assertEquals("2/4 Preparing", n.extras.getCharSequence(Notification.EXTRA_TEXT).toString());
   }
 
@@ -319,5 +319,37 @@ public class LiveUpdatesBridgeTest {
     assertEquals(
         "A \u2192 B \u00b7 Home: 2 \u00b7 Dist: 4.2 km",
         n.extras.getCharSequence(Notification.EXTRA_SUB_TEXT).toString());
+  }
+
+  @Test
+  public void explicitProgressKeepsItsResolutionWithSteps() throws Exception {
+    String id =
+        LiveUpdatesBridge.start(
+            "{\"title\":\"Order\",\"progress\":0.6,\"steps\":{\"labels\":[\"A\",\"B\",\"C\",\"D\"],\"current\":1}}");
+    Notification.ProgressStyle style =
+        (Notification.ProgressStyle)
+            Notification.Builder.recoverBuilder(app, shown(id)).getStyle();
+    assertEquals(180, style.getProgress());
+  }
+
+  @Test
+  public void manyStepsAreShownAsTextOnly() throws Exception {
+    StringBuilder labels = new StringBuilder();
+    for (int i = 1; i <= 25; i++) labels.append(i > 1 ? "," : "").append("\"S").append(i).append('"');
+    String id =
+        LiveUpdatesBridge.start(
+            "{\"title\":\"Long\",\"steps\":{\"labels\":[" + labels + "],\"current\":22}}");
+    Notification n = shown(id);
+    Notification.ProgressStyle style =
+        (Notification.ProgressStyle) Notification.Builder.recoverBuilder(app, n).getStyle();
+    assertEquals(0, style.getProgressPoints().size());
+    assertEquals("23/25 S23", n.extras.getCharSequence(Notification.EXTRA_TEXT).toString());
+  }
+
+  @Test
+  public void journeyWithANullEndIsLeftOut() throws Exception {
+    String id =
+        LiveUpdatesBridge.start("{\"title\":\"Trip\",\"journey\":{\"from\":null,\"to\":\"B\"}}");
+    assertEquals(null, shown(id).extras.getCharSequence(Notification.EXTRA_TEXT));
   }
 }

@@ -93,9 +93,13 @@ public struct LiveUpdatesAttributes: ActivityAttributes {
       backgroundArgb = try c.decodeIfPresent(Int.self, forKey: .backgroundArgb)
       foregroundArgb = try c.decodeIfPresent(Int.self, forKey: .foregroundArgb)
       layout = try c.decodeIfPresent(String.self, forKey: .layout)
-      metrics = try c.decodeIfPresent([LiveUpdatesMetric].self, forKey: .metrics) ?? []
-      steps = try c.decodeIfPresent(LiveUpdatesSteps.self, forKey: .steps)
-      journey = try c.decodeIfPresent(LiveUpdatesJourney.self, forKey: .journey)
+      // Layout data that does not decode is left out (one bad metric is
+      // skipped) instead of rejecting the whole content state.
+      metrics =
+        ((try? c.decodeIfPresent([LiveUpdatesLossy<LiveUpdatesMetric>].self, forKey: .metrics))
+          ?? nil)?.compactMap(\.value) ?? []
+      steps = (try? c.decodeIfPresent(LiveUpdatesSteps.self, forKey: .steps)) ?? nil
+      journey = (try? c.decodeIfPresent(LiveUpdatesJourney.self, forKey: .journey)) ?? nil
     }
   }
 
@@ -140,7 +144,7 @@ public struct LiveUpdatesMetric: Codable, Hashable {
 
   public init(from decoder: Decoder) throws {
     let c = try decoder.container(keyedBy: CodingKeys.self)
-    label = try c.decode(String.self, forKey: .label)
+    label = try c.decodeIfPresent(String.self, forKey: .label) ?? ""
     type = try c.decode(String.self, forKey: .type)
     number = try? c.decodeIfPresent(Double.self, forKey: .value)
     text = number == nil ? try? c.decodeIfPresent(String.self, forKey: .value) : nil
@@ -165,9 +169,26 @@ public struct LiveUpdatesSteps: Codable, Hashable {
   public var labels: [String]
   public var current: Int
 
+  enum CodingKeys: String, CodingKey { case labels, current }
+
   public init(labels: [String], current: Int) {
     self.labels = labels
     self.current = current
+  }
+
+  public init(from decoder: Decoder) throws {
+    let c = try decoder.container(keyedBy: CodingKeys.self)
+    labels = (try? c.decodeIfPresent([String].self, forKey: .labels)) ?? []
+    current = (try? c.decodeIfPresent(Int.self, forKey: .current)) ?? 0
+  }
+}
+
+/// Decodes a `T`, or `nil` when the value does not decode.
+struct LiveUpdatesLossy<T: Decodable>: Decodable {
+  let value: T?
+
+  init(from decoder: Decoder) throws {
+    value = try? T(from: decoder)
   }
 }
 

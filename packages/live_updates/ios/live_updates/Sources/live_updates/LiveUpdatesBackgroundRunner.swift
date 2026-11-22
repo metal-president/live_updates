@@ -1,10 +1,9 @@
 import Flutter
 import Foundation
 
-/// Runs the Dart background action handler in a headless engine when a Live
-/// Activity button is pressed while no Dart listener is attached (for
-/// example when the system launched the app in the background for the
-/// press). Looked up by name from `LiveUpdatesBridge`, which does not link
+/// Runs the Dart background action handler in a headless engine for presses
+/// that no Dart listener of the app takes (all of them while the app is in
+/// the background, for example when the system launched it for the press). Looked up by name from `LiveUpdatesBridge`, which does not link
 /// Flutter.
 @objc(LiveUpdatesBackgroundRunner)
 public final class LiveUpdatesBackgroundRunner: NSObject {

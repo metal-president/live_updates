@@ -25,7 +25,8 @@ final class LiveUpdate {
       _platform.update(id, content);
 
   /// Ends the update. On iOS [dismissAfter] keeps it on the Lock Screen for
-  /// that long; `Duration.zero` removes it immediately. On Android the
+  /// that long (the system allows at most four hours); `Duration.zero`
+  /// removes it immediately and `null` uses the system default. On Android the
   /// notification is removed at once unless [finalContent] is given: then
   /// that content stays as a regular notification for [dismissAfter]
   /// (Android 8.0+; until dismissed when [dismissAfter] is `null`).
@@ -179,16 +180,17 @@ abstract final class LiveUpdates {
         null => null,
       };
 
-  /// Button presses on any live update, including presses made while the
-  /// app was not running once Dart listens again.
+  /// Button presses on any live update, while the app is in the foreground.
+  /// Presses made while it was in the background are run by the background
+  /// action handler, or, without one, delivered here once the app listens in
+  /// the foreground.
   static Stream<LiveUpdateActionEvent> get onAction => _platform.actions().map(
     (e) => LiveUpdateActionEvent(updateId: e.$1, actionId: e.$2),
   );
 
-  /// Runs [handler] for button presses that arrive while the app is not
-  /// running (or no [onAction] listener is active): the plugin starts a
-  /// headless Flutter engine, calls [handler] for each press and shuts the
-  /// engine down. Call it early, for example in `main`, before `runApp`.
+  /// Runs [handler] for button presses made while the app is in the
+  /// background or not running: the plugin starts a headless Flutter engine,
+  /// calls [handler] for each press and shuts the engine down. Call it early, for example in `main`, before `runApp`.
   ///
   /// [handler] must be a top-level or static function annotated with
   /// `@pragma('vm:entry-point')`. It has a few seconds to finish (the system

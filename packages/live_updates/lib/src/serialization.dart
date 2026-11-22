@@ -2,9 +2,9 @@ import 'models.dart';
 
 /// Wire format shared with the native bridges.
 ///
-/// Keys match `LiveUpdatesAttributes.ContentState` on iOS (title, body,
-/// progress, iconName, route, extra), so the same JSON can be sent as the
-/// `content-state` of an APNs Live Activity push.
+/// Keys match `LiveUpdatesAttributes.ContentState` on iOS (content, timer,
+/// layout data, Dynamic Island and color options), so the same JSON can be
+/// sent as the `content-state` of an APNs Live Activity push.
 extension LiveUpdateContentJson on LiveUpdateContent {
   /// Encodes this content for the native side.
   Map<String, Object?> toJson() => {

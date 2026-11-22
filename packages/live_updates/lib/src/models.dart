@@ -46,13 +46,16 @@ final class LiveUpdateContent {
   final String? route;
 
   /// Picture shown with the update: a thumbnail in the iOS widget template
-  /// and the large icon of the Android notification.
+  /// and the large icon of the Android notification (not shown on Android 17
+  /// with [metrics]).
   ///
   /// On iOS it is shared with the widget extension through an App Group set
   /// up by `create_widget`.
   final LiveUpdateImage? image;
 
-  /// Buttons. Presses arrive on [LiveUpdates.onAction].
+  /// Buttons. Presses arrive on [LiveUpdates.onAction] and
+  /// [LiveUpdate.actions] while the app is in the foreground, else at the
+  /// background action handler.
   ///
   /// iOS renders them in the widget template (keep the list short: the whole
   /// content must stay under ActivityKit's 4 KB limit). Android shows up to
@@ -84,7 +87,8 @@ final class LiveUpdateContent {
   /// Stages of a process and the current one, such as an order going from
   /// placed to delivered. iOS shows them with [IosLiveUpdateLayout.stepper];
   /// Android 16+ turns them into progress segments and points (unless
-  /// [AndroidLiveUpdateOptions.progressSegments] are set) and shows the
+  /// [AndroidLiveUpdateOptions.progressSegments] or `progressPoints` are
+  /// set) and shows the
   /// current stage in the text.
   final LiveUpdateSteps? steps;
 
@@ -208,7 +212,8 @@ final class LiveUpdateSteps {
   /// Short names of the stages, in order.
   ///
   /// iOS draws at most 8 dots, around the current stage; Android 16+ makes
-  /// progress segments for up to 21 stages and shows only the text beyond.
+  /// progress segments for up to 21 stages; beyond that it shows a plain
+  /// progress bar and the stage in the text.
   final List<String> labels;
 
   /// Index of the current stage in [labels].
@@ -280,7 +285,10 @@ final class LiveUpdateAction {
 
   /// Opens the app when pressed. Otherwise the press is handled in the
   /// background: through a `LiveActivityIntent` on iOS and a broadcast on
-  /// Android, delivered to Dart while the app runs (or when it next listens).
+  /// Android. It reaches [LiveUpdates.onAction] (or that update's
+  /// [LiveUpdate.actions]) while the app is in the foreground; otherwise the
+  /// background action handler runs it (without one, it waits until the app
+  /// listens in the foreground).
   final bool opensApp;
 
   /// Requires the device to be unlocked before a background press is
@@ -455,18 +463,21 @@ final class IosLiveUpdateOptions {
   /// and the Dynamic Island keyline. `null` keeps the system colors. The
   /// Android counterpart is [AndroidLiveUpdateOptions.color].
   ///
-  /// The system draws Live Activities on a dark background in both light and
-  /// dark mode, so pick a color that reads well on dark. While the Always-On
-  /// display dims the Lock Screen, the system colors are used.
+  /// The default Lock Screen card is white in Light Mode and black in Dark
+  /// Mode, and the Dynamic Island is always black, so pick a color that reads
+  /// well on both. While the Always-On display dims the Lock Screen, the
+  /// system colors are used.
   final Color? color;
 
   /// Background of the Lock Screen presentation. `null` keeps the system
-  /// (dark) background. With a light background, also set [foregroundColor].
+  /// background (white in Light Mode, black in Dark Mode). With a custom
+  /// background, also set [foregroundColor].
   final Color? backgroundColor;
 
-  /// Text color of the Lock Screen presentation (title and timer; the body
-  /// uses it at 70% opacity). `null` keeps the system's light text. The
-  /// Dynamic Island keeps its own (dark) colors.
+  /// Text color of the Lock Screen presentation: the title and other primary
+  /// text (and the timer when no [color] is set); secondary text uses it at
+  /// 70% opacity. `null` keeps the system text color. The Dynamic Island
+  /// keeps its own (dark) colors.
   final Color? foregroundColor;
 
   @override
@@ -546,7 +557,7 @@ final class IosLiveUpdateLayout {
 /// ([IosLiveUpdateOptions.compactTrailing], [IosLiveUpdateOptions.minimal]).
 ///
 /// Text (title, body, extra) is left out when the island is limited in width
-/// (iOS 27 landscape). A customized widget can read the choice as
+/// (iOS 27, for example in landscape). A customized widget can read the choice as
 /// `context.state.compactTrailing` / `context.state.minimal`.
 @immutable
 final class IosIslandContent {
@@ -658,7 +669,8 @@ final class AndroidLiveUpdateOptions {
   /// Android reserves Live Updates ([AndroidLiveUpdateMode.liveUpdate]) for
   /// ongoing, user-initiated, time-sensitive activities such as navigation,
   /// calls, rides or food delivery, and not for ads, promotions, chat
-  /// messages or reminders. Use [AndroidLiveUpdateMode.ongoing] or
+  /// messages, alerts, upcoming calendar events or quick access to app
+  /// features. Use [AndroidLiveUpdateMode.ongoing] or
   /// [AndroidLiveUpdateMode.classic] for anything else.
   final AndroidLiveUpdateMode mode;
 
@@ -676,7 +688,8 @@ final class AndroidLiveUpdateOptions {
   /// 16+ `ProgressStyle`). Lengths are relative; [LiveUpdateContent.progress]
   /// still runs from 0 to 1 over the whole bar.
   ///
-  /// Shown only with a [LiveUpdateContent.progress], and not on Android 17
+  /// Shown only with a [LiveUpdateContent.progress] (or
+  /// [LiveUpdateContent.steps]), and not on Android 17
   /// when [LiveUpdateContent.metrics] are set (they replace the progress
   /// bar). The same applies
   /// to [progressPoints] and [progressTrackerIcon].
@@ -980,8 +993,9 @@ enum LiveUpdateState {
   /// iOS: past its stale date; update it or end it.
   stale,
 
-  /// Ended by the app or a remote update; may still be visible on iOS until
-  /// its dismissal time.
+  /// Ended by the app or a remote update (on Android also removed by
+  /// [AndroidLiveUpdateOptions.timeoutAfter]); may still be visible on iOS
+  /// until its dismissal time.
   ended,
 
   /// Removed from the screen, by the system or the user.

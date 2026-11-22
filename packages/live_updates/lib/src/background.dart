@@ -6,14 +6,14 @@ import 'package:flutter/widgets.dart' show WidgetsFlutterBinding;
 import 'models.dart';
 import 'platform/live_updates_platform.dart';
 
-/// Handles a button press while the app is not running (see
-/// `LiveUpdates.setBackgroundActionHandler`).
+/// Handles a button press made while the app is in the background or not
+/// running (see `LiveUpdates.setBackgroundActionHandler`).
 typedef LiveUpdateActionHandler = Future<void> Function(
   LiveUpdateActionEvent event,
 );
 
-/// Registers [handler] for presses that arrive while no Dart listener of
-/// `LiveUpdates.onAction` is active.
+/// Registers [handler] for presses that no Dart listener of the app takes
+/// (all of them while the app is in the background).
 Future<void> registerBackgroundActionHandler(
   LiveUpdateActionHandler handler,
 ) async {

@@ -281,7 +281,7 @@ struct LiveUpdatesExpandedBottom: View {
 /// Compact Dynamic Island, trailing side. Shows
 /// `IosLiveUpdateOptions.compactTrailing` when set and available; otherwise
 /// the progress, else the timer, else the title. Text is left out when the
-/// island is limited in width (iOS 27 landscape).
+/// island is limited in width (iOS 27, for example in landscape).
 struct LiveUpdatesCompactTrailing: View {
   let state: LiveUpdatesAttributes.ContentState
   @Environment(\.isLuminanceReduced) private var luminanceReduced

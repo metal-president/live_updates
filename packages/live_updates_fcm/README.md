@@ -25,7 +25,8 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
   FirebaseMessaging.onBackgroundMessage(onBackgroundMessage);
-  LiveUpdatesFcm.listen(onError: report); // foreground messages
+  // Foreground messages; errors are malformed live_updates payloads.
+  LiveUpdatesFcm.listen(onError: (e, _) => debugPrint('$e'));
   runApp(const App());
 }
 ```

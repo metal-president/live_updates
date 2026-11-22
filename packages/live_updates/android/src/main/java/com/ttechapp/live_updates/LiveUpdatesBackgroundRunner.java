@@ -15,8 +15,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Runs the Dart background action handler in a headless engine when a button
- * is pressed while no Dart listener is attached (typically: app not running).
+ * Runs the Dart background action handler in a headless engine for presses
+ * that no Dart listener of the app takes (all of them while the app is in the
+ * background).
  */
 final class LiveUpdatesBackgroundRunner {
   private static final String TAG = "live_updates";

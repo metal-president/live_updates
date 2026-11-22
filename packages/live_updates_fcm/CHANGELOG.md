@@ -1,7 +1,8 @@
-## Unreleased
+## 0.1.0
 
 - `LiveUpdatesFcm.listen(onError:)`: a live_updates message that cannot be
   applied is reported instead of becoming an uncaught error.
+- Requires live_updates 0.1.0.
 
 ## 0.0.6
 

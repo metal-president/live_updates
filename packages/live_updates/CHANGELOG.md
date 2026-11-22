@@ -1,64 +1,70 @@
-## Unreleased
+## 0.1.0
 
-- **Breaking:** `AndroidMetric` is renamed to `LiveUpdateMetric`
-  (`AndroidMetricKind` to `LiveUpdateMetricKind`), and `metrics` /
-  `criticalMetric` move from `AndroidLiveUpdateOptions` to
-  `LiveUpdateContent`. The content-state keys are unchanged.
+Breaking changes (from now on they come only with a new minor version):
+
+- `AndroidMetric` is renamed to `LiveUpdateMetric` (`AndroidMetricKind` to
+  `LiveUpdateMetricKind`), and `metrics` / `criticalMetric` move from
+  `AndroidLiveUpdateOptions` to `LiveUpdateContent`. The content-state keys
+  are unchanged.
+- `AndroidLiveUpdateOptions.requestPromotion` is replaced by `mode`
+  (`AndroidLiveUpdateMode.liveUpdate`, `ongoing`, `classic`).
+  `requestPromotion: false` becomes `mode: AndroidLiveUpdateMode.ongoing`;
+  `classic` shows the same notification as Android 15 and earlier on every
+  version. Remote payloads with `requestPromotion: false` still work.
+- Button presses reach the app's Dart listeners only while the app is in the
+  foreground; otherwise the background handler runs them, so the system
+  keeps the app alive for them. `LiveUpdates.onAction` takes every press,
+  `LiveUpdate.actions` only that update's; other presses stay queued and run
+  the background handler, also while the app is open. An open-app press that
+  no listener takes within 5 seconds runs the background handler.
+- Platform interface: `LiveUpdatesPlatform.actions` is now
+  `actions({String? updateId})`.
+
+New:
+
 - Layouts: `IosLiveUpdateOptions.layout` (`IosLiveUpdateLayout.standard`,
   `timer`, `metrics`, `stepper`, `journey`, or `custom('name')` for a layout
   of your own) chooses the Lock Screen and expanded Dynamic Island pattern of
   the generated widget. New shared data `LiveUpdateContent.steps`
-  (`LiveUpdateSteps`) and `journey` (`LiveUpdateJourney`).
-  Android uses the same data: steps become progress segments and points on
-  Android 16+, and steps, journey and metrics are added to the notification
-  text where the system does not show them otherwise. Run `create_widget` to
-  update `LiveUpdatesViews.swift`; the generated layout file now switches on
-  `context.state.layout` for custom layouts.
-
-- **Breaking:** `AndroidLiveUpdateOptions.requestPromotion` is replaced by
-  `mode` (`AndroidLiveUpdateMode.liveUpdate`, `ongoing`, `classic`).
-  `requestPromotion: false` becomes `mode: AndroidLiveUpdateMode.ongoing`;
-  `classic` shows the same notification as Android 15 and earlier on every
-  version. Remote payloads with `requestPromotion: false` still work.
+  (`LiveUpdateSteps`) and `journey` (`LiveUpdateJourney`). Android uses the
+  same data: steps become progress segments and points on Android 16+, and
+  steps, journey and number and text metrics are added to the notification
+  text where the system does not show them otherwise.
 - `IosLiveUpdateOptions.color`, `backgroundColor` and `foregroundColor`:
   accent, Lock Screen background and text of the generated widget
   (content-state keys `tintArgb` / `backgroundArgb` / `foregroundArgb`); the
-  Always-On display uses system colors. Run
-  `create_widget` to update `LiveUpdatesViews.swift`.
-- **Breaking (platform interface):** `LiveUpdatesPlatform.actions` is now
-  `actions({String? updateId})`.
-- Fixes:
-  - Presses reach the app's Dart listeners only while the app is in the
-    foreground; otherwise the background handler runs them, so the system
-    keeps the app alive for them. A background handler that can no longer be
-    found drops the queued presses instead of starting engines repeatedly.
-  - Button presses go to the app only for the updates it listens to
-    (`LiveUpdates.onAction`: all; `LiveUpdate.actions`: that update); other
-    presses stay queued natively and run the background handler, also while
-    the app is open. A press that arrives as the background handler finishes
-    is run, and an open-app press that no `onAction` listener takes within
-    5 seconds runs the background handler.
-  - Android: listeners of an engine that went away (with another engine,
-    such as FCM's, still attached) no longer swallow presses and taps; a
-    tap no longer passes the plugin's internal URI to Flutter as a deep link;
-    an update removed by `timeoutAfter` reports `ended` and its key can be
-    started again; a remote `end` no longer brings back a dismissed update,
-    and keeps final content when `live_updates_dismiss_after` is missing;
-    concurrent `requestPermission` calls all complete; a local `end` does
-    not bring back a dismissed update; `update` no longer throws when the
-    user turned the channel off; reopening from Recents does not deliver a
-    tap again.
-  - Taps and lifecycle events reach every engine that listens (a
-    background engine no longer takes them from the app), and handlers of
-    a destroyed engine are dropped on iOS too.
-  - iOS: a tap that launches an app without scenes is delivered once; taps
-    keep working when the background handler started first; `active()`
-    leaves out ended activities, `update` on an ended one throws,
-    `startOrUpdate` prefers the running activity with the key, and `states`
-    reports `dismissed` after `ended`.
-  - A non-finite `progress` is left out instead of breaking the content.
-  - Network images: redirects must stay on https; image files are written
-    atomically. `create_widget` reports a missing option value.
+  Always-On display uses system colors.
+- Run `dart run live_updates:create_widget` after updating to refresh
+  `LiveUpdatesViews.swift`, `LiveUpdatesAttributes.swift` and
+  `LiveUpdatesActionIntent.swift`; the generated layout file now switches on
+  `context.state.layout` for custom layouts (add the switch to an older
+  layout file, or regenerate it with `--force`).
+
+Fixes:
+
+- Background handler: a press that arrives as a run finishes is run; a
+  handler that can no longer be found drops the queued presses instead of
+  starting engines repeatedly.
+- Taps and lifecycle events reach every engine that listens (a background
+  engine no longer takes them from the app), and listeners of a destroyed
+  engine are dropped.
+- Android: a tap no longer passes the plugin's internal URI to Flutter as a
+  deep link; an update removed by `timeoutAfter` is not treated as dismissed
+  by the user (it reports `ended`, and its key can be started again); a
+  remote or local `end` never brings back a dismissed update, and a remote
+  `end` keeps final content when `live_updates_dismiss_after` is missing;
+  concurrent `requestPermission` calls all complete; `update` no longer
+  throws when the user turned the channel off; reopening from Recents does
+  not deliver a tap again.
+- iOS: a tap that launches an app without scenes is delivered once; taps
+  keep working when the background handler started first; `active()` leaves
+  out ended activities, `update` on an ended one throws, `startOrUpdate`
+  prefers the running activity with the key, and `states` reports
+  `dismissed` after `ended`.
+- A non-finite `progress` is left out instead of breaking the content.
+- Network images: redirects must stay on https; image files are written
+  atomically; `maxDimension` must be positive.
+- `create_widget` reports a missing option value.
 
 ## 0.0.6
 

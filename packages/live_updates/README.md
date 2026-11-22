@@ -120,9 +120,14 @@ ios: const IosLiveUpdateOptions(
 ),
 ```
 
-Colors work the same way: `IosLiveUpdateOptions(tint: ..., backgroundColor:
-...)` sets the accent (progress, buttons, timer, Dynamic Island keyline) and
-the Lock Screen background, like `AndroidLiveUpdateOptions.color` on Android.
+Colors work the same way: `IosLiveUpdateOptions(color: ..., backgroundColor:
+..., foregroundColor: ...)` sets the accent (progress, buttons, timer, Dynamic
+Island keyline), the Lock Screen background and its text color, like
+`AndroidLiveUpdateOptions.color` on Android. For a light card, set both:
+`backgroundColor: Colors.white, foregroundColor: Colors.black`.
+The system draws Live Activities on a dark background in light and dark mode
+alike, so choose colors that read well on dark. While the Always-On display
+dims the Lock Screen, the system colors are used.
 
 Content that is missing (such as `progress` without a progress) falls back to
 the default, and text is left out when the island is limited in width (iOS 27
@@ -441,7 +446,7 @@ Send pushes with `apns-push-type: liveactivity` and topic
 `LiveUpdateContent` (`title` is required): `title`, `body`, `progress`,
 `iconName`, `route`, `actions`, `extra`, `timerStart` / `timerEnd`
 (seconds since 1970), the island options `compactTrailing` / `minimal` and the
-colors `tintArgb` / `backgroundArgb` (ARGB integers).
+colors `tintArgb` / `backgroundArgb` / `foregroundArgb` (ARGB integers).
 For push-to-start, set `"attributes-type": "LiveUpdatesAttributes"`,
 `"attributes": {"key": "<your id>"}` (or `{}` without a key) and an `alert`.
 [docs/server-fcm.md](https://github.com/metal-president/live_updates/blob/main/docs/server-fcm.md)

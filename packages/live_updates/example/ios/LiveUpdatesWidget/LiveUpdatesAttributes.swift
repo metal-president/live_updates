@@ -27,10 +27,12 @@ public struct LiveUpdatesAttributes: ActivityAttributes {
     public var compactTrailing: String?
     /// What the minimal Dynamic Island shows (`IosLiveUpdateOptions.minimal`).
     public var minimal: String?
-    /// Accent color as ARGB (`IosLiveUpdateOptions.tint`).
+    /// Accent color as ARGB (`IosLiveUpdateOptions.color`).
     public var tintArgb: Int?
     /// Lock Screen background as ARGB (`IosLiveUpdateOptions.backgroundColor`).
     public var backgroundArgb: Int?
+    /// Lock Screen text as ARGB (`IosLiveUpdateOptions.foregroundColor`).
+    public var foregroundArgb: Int?
 
     public init(
       title: String, body: String? = nil, progress: Double? = nil,
@@ -38,7 +40,7 @@ public struct LiveUpdatesAttributes: ActivityAttributes {
       actions: [LiveUpdatesAction] = [], extra: [String: String] = [:],
       timerStart: Double? = nil, timerEnd: Double? = nil,
       compactTrailing: String? = nil, minimal: String? = nil,
-      tintArgb: Int? = nil, backgroundArgb: Int? = nil
+      tintArgb: Int? = nil, backgroundArgb: Int? = nil, foregroundArgb: Int? = nil
     ) {
       self.title = title
       self.body = body
@@ -54,6 +56,7 @@ public struct LiveUpdatesAttributes: ActivityAttributes {
       self.minimal = minimal
       self.tintArgb = tintArgb
       self.backgroundArgb = backgroundArgb
+      self.foregroundArgb = foregroundArgb
     }
 
     // Lenient decoding so APNs `content-state` may omit optional keys.
@@ -73,6 +76,7 @@ public struct LiveUpdatesAttributes: ActivityAttributes {
       minimal = try c.decodeIfPresent(String.self, forKey: .minimal)
       tintArgb = try c.decodeIfPresent(Int.self, forKey: .tintArgb)
       backgroundArgb = try c.decodeIfPresent(Int.self, forKey: .backgroundArgb)
+      foregroundArgb = try c.decodeIfPresent(Int.self, forKey: .foregroundArgb)
     }
   }
 

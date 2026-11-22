@@ -40,7 +40,7 @@ struct LiveUpdatesWidgetLiveActivity: Widget {
         // IosLiveUpdateOptions.minimal chooses what appears here.
         LiveUpdatesMinimal(state: context.state)
       }
-      .keylineTint(context.state.liveUpdatesTint)
+      .keylineTint(context.state.liveUpdatesKeylineTint)
       .widgetURL(context.state.liveUpdatesTapURL)
     }
   }

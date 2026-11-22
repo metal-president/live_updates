@@ -38,8 +38,10 @@ extension LiveUpdateContentJson on LiveUpdateContent {
         'alert': {'title': a.title, 'body': a.body, 'sound': ?a.sound},
       'compactTrailing': ?ios.compactTrailing?.value,
       'minimal': ?ios.minimal?.value,
-      'tintArgb': ?ios.tint?.toARGB32(),
+      // Not 'colorArgb': that key holds the Android color.
+      'tintArgb': ?ios.color?.toARGB32(),
       'backgroundArgb': ?ios.backgroundColor?.toARGB32(),
+      'foregroundArgb': ?ios.foregroundColor?.toARGB32(),
     },
     if (android case final a?) ...{
       'channelId': a.channelId,

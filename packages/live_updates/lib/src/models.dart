@@ -305,8 +305,9 @@ final class IosLiveUpdateOptions {
     this.extra = const {},
     this.compactTrailing,
     this.minimal,
-    this.tint,
+    this.color,
     this.backgroundColor,
+    this.foregroundColor,
   });
 
   /// When the system marks the activity as stale.
@@ -336,12 +337,20 @@ final class IosLiveUpdateOptions {
   /// Accent color of the generated widget: progress bars, buttons, the timer
   /// and the Dynamic Island keyline. `null` keeps the system colors. The
   /// Android counterpart is [AndroidLiveUpdateOptions.color].
-  final Color? tint;
+  ///
+  /// The system draws Live Activities on a dark background in both light and
+  /// dark mode, so pick a color that reads well on dark. While the Always-On
+  /// display dims the Lock Screen, the system colors are used.
+  final Color? color;
 
   /// Background of the Lock Screen presentation. `null` keeps the system
-  /// background. Choose one that keeps the text readable in light and dark
-  /// mode.
+  /// (dark) background. With a light background, also set [foregroundColor].
   final Color? backgroundColor;
+
+  /// Text color of the Lock Screen presentation (title and timer; the body
+  /// uses it at 70% opacity). `null` keeps the system's light text. The
+  /// Dynamic Island keeps its own (dark) colors.
+  final Color? foregroundColor;
 
   @override
   bool operator ==(Object other) =>
@@ -352,8 +361,9 @@ final class IosLiveUpdateOptions {
       mapEquals(other.extra, extra) &&
       other.compactTrailing == compactTrailing &&
       other.minimal == minimal &&
-      other.tint == tint &&
-      other.backgroundColor == backgroundColor;
+      other.color == color &&
+      other.backgroundColor == backgroundColor &&
+      other.foregroundColor == foregroundColor;
 
   @override
   int get hashCode => Object.hash(
@@ -363,8 +373,9 @@ final class IosLiveUpdateOptions {
     Object.hashAllUnordered(extra.entries.map((e) => (e.key, e.value))),
     compactTrailing,
     minimal,
-    tint,
+    color,
     backgroundColor,
+    foregroundColor,
   );
 }
 

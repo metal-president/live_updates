@@ -1,8 +1,10 @@
 ## Unreleased
 
-- `IosLiveUpdateOptions.tint` and `backgroundColor`: accent and Lock Screen
-  background of the generated widget (content-state keys `tintArgb` /
-  `backgroundArgb`). Run `create_widget` to update `LiveUpdatesViews.swift`.
+- `IosLiveUpdateOptions.color`, `backgroundColor` and `foregroundColor`:
+  accent, Lock Screen background and text of the generated widget
+  (content-state keys `tintArgb` / `backgroundArgb` / `foregroundArgb`); the
+  Always-On display uses system colors. Run
+  `create_widget` to update `LiveUpdatesViews.swift`.
 
 ## 0.0.6
 

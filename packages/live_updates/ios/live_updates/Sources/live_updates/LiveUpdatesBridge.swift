@@ -361,6 +361,7 @@ private struct Payload: Decodable {
   var minimal: String?
   var tintArgb: Int?
   var backgroundArgb: Int?
+  var foregroundArgb: Int?
   var staleDate: Double?
   var relevanceScore: Double?
   var enablePushUpdates: Bool?
@@ -378,7 +379,7 @@ private struct Payload: Decodable {
         route: route, image: image, actions: actions ?? [], extra: extra ?? [:],
         timerStart: timerStart, timerEnd: timerEnd,
         compactTrailing: compactTrailing, minimal: minimal,
-        tintArgb: tintArgb, backgroundArgb: backgroundArgb),
+        tintArgb: tintArgb, backgroundArgb: backgroundArgb, foregroundArgb: foregroundArgb),
       staleDate: staleDate.map { Date(timeIntervalSince1970: $0) },
       relevanceScore: relevanceScore ?? 0
     )

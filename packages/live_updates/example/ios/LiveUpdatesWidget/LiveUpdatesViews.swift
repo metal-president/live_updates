@@ -12,6 +12,10 @@ import WidgetKit
 struct LiveUpdatesLockScreen: View {
   let state: LiveUpdatesAttributes.ContentState
   let activityID: String
+  @Environment(\.isLuminanceReduced) private var luminanceReduced
+  private var palette: LiveUpdatesPalette {
+    LiveUpdatesPalette(state, luminanceReduced: luminanceReduced)
+  }
 
   var body: some View {
     VStack(spacing: 10) {
@@ -20,14 +24,16 @@ struct LiveUpdatesLockScreen: View {
         VStack(alignment: .leading, spacing: 4) {
           HStack {
             Text(state.title).font(.headline).lineLimit(1)
+              .foregroundStyle(palette.foreground ?? .primary)
             if state.liveUpdatesHasTimer {
               Spacer()
               LiveUpdatesTimerText(state: state).font(.headline)
-                .foregroundStyle(state.liveUpdatesTint ?? .primary)
+                .foregroundStyle(palette.tint ?? palette.foreground ?? .primary)
             }
           }
           if let body = state.body {
-            Text(body).font(.subheadline).foregroundStyle(.secondary).lineLimit(2)
+            Text(body).font(.subheadline).lineLimit(2)
+              .foregroundStyle(palette.foreground.map { AnyShapeStyle($0.opacity(0.7)) } ?? AnyShapeStyle(.secondary))
           }
           if let progress = state.progress {
             ProgressView(value: progress)
@@ -36,15 +42,19 @@ struct LiveUpdatesLockScreen: View {
       }
       LiveUpdatesActionButtons(actions: state.actions, activityID: activityID)
     }
-    .tint(state.liveUpdatesTint)
-    .activityBackgroundTint(state.liveUpdatesBackground)
-    .activitySystemActionForegroundColor(state.liveUpdatesTint)
+    .tint(palette.tint)
+    .activityBackgroundTint(palette.background)
+    .activitySystemActionForegroundColor(palette.tint)
   }
 }
 
 /// Expanded Dynamic Island, trailing region: the timer, else the progress.
 struct LiveUpdatesExpandedTrailing: View {
   let state: LiveUpdatesAttributes.ContentState
+  @Environment(\.isLuminanceReduced) private var luminanceReduced
+  private var palette: LiveUpdatesPalette {
+    LiveUpdatesPalette(state, luminanceReduced: luminanceReduced)
+  }
 
   var body: some View {
     Group {
@@ -54,7 +64,7 @@ struct LiveUpdatesExpandedTrailing: View {
         Text(progress, format: .percent.precision(.fractionLength(0))).font(.headline)
       }
     }
-    .foregroundStyle(state.liveUpdatesTint ?? .primary)
+    .foregroundStyle(palette.tint ?? .primary)
   }
 }
 
@@ -62,6 +72,10 @@ struct LiveUpdatesExpandedTrailing: View {
 struct LiveUpdatesExpandedBottom: View {
   let state: LiveUpdatesAttributes.ContentState
   let activityID: String
+  @Environment(\.isLuminanceReduced) private var luminanceReduced
+  private var palette: LiveUpdatesPalette {
+    LiveUpdatesPalette(state, luminanceReduced: luminanceReduced)
+  }
 
   var body: some View {
     VStack(alignment: .leading, spacing: 6) {
@@ -73,7 +87,7 @@ struct LiveUpdatesExpandedBottom: View {
       }
       LiveUpdatesActionButtons(actions: state.actions, activityID: activityID)
     }
-    .tint(state.liveUpdatesTint)
+    .tint(palette.tint)
   }
 }
 
@@ -83,14 +97,18 @@ struct LiveUpdatesExpandedBottom: View {
 /// island is limited in width (iOS 27 landscape).
 struct LiveUpdatesCompactTrailing: View {
   let state: LiveUpdatesAttributes.ContentState
+  @Environment(\.isLuminanceReduced) private var luminanceReduced
+  private var palette: LiveUpdatesPalette {
+    LiveUpdatesPalette(state, luminanceReduced: luminanceReduced)
+  }
 
   var body: some View {
     LiveUpdatesIslandItem(
       state: state,
       content: state.liveUpdatesPick(state.compactTrailing, fallback: ["progress", "timer", "title"])
     )
-    .tint(state.liveUpdatesTint)
-    .foregroundStyle(state.liveUpdatesTint ?? .primary)
+    .tint(palette.tint)
+    .foregroundStyle(palette.tint ?? .primary)
   }
 }
 
@@ -99,14 +117,40 @@ struct LiveUpdatesCompactTrailing: View {
 /// progress, else the icon.
 struct LiveUpdatesMinimal: View {
   let state: LiveUpdatesAttributes.ContentState
+  @Environment(\.isLuminanceReduced) private var luminanceReduced
+  private var palette: LiveUpdatesPalette {
+    LiveUpdatesPalette(state, luminanceReduced: luminanceReduced)
+  }
 
   var body: some View {
     LiveUpdatesIslandItem(
       state: state,
       content: state.liveUpdatesPick(state.minimal, fallback: ["progress", "icon"])
     )
-    .tint(state.liveUpdatesTint)
-    .foregroundStyle(state.liveUpdatesTint ?? .primary)
+    .tint(palette.tint)
+    .foregroundStyle(palette.tint ?? .primary)
+  }
+}
+
+/// `IosLiveUpdateOptions.color`, `backgroundColor` and `foregroundColor`, or
+/// system colors while
+/// the Always-On display dims the Lock Screen.
+struct LiveUpdatesPalette {
+  let tint: Color?
+  let background: Color?
+  /// Lock Screen text (`IosLiveUpdateOptions.foregroundColor`).
+  let foreground: Color?
+
+  init(_ state: LiveUpdatesAttributes.ContentState, luminanceReduced: Bool) {
+    tint = luminanceReduced ? nil : Self.color(state.tintArgb)
+    background = luminanceReduced ? nil : Self.color(state.backgroundArgb)
+    foreground = luminanceReduced ? nil : Self.color(state.foregroundArgb)
+  }
+
+  static func color(_ argb: Int?) -> Color? {
+    guard let argb, argb >= 0, argb <= 0xFFFF_FFFF else { return nil }
+    func channel(_ shift: Int) -> Double { Double((argb >> shift) & 0xFF) / 255 }
+    return Color(.sRGB, red: channel(16), green: channel(8), blue: channel(0), opacity: channel(24))
   }
 }
 
@@ -275,17 +319,8 @@ extension LiveUpdatesAttributes.ContentState {
   var liveUpdatesTimerStart: Date? { Self.liveUpdatesDate(timerStart) }
   var liveUpdatesHasTimer: Bool { liveUpdatesTimerEnd != nil || liveUpdatesTimerStart != nil }
 
-  /// `IosLiveUpdateOptions.tint`, or `nil` for the system default.
-  var liveUpdatesTint: Color? { Self.liveUpdatesColor(tintArgb) }
-
-  /// `IosLiveUpdateOptions.backgroundColor`, or `nil` for the system default.
-  var liveUpdatesBackground: Color? { Self.liveUpdatesColor(backgroundArgb) }
-
-  private static func liveUpdatesColor(_ argb: Int?) -> Color? {
-    guard let argb, argb >= 0, argb <= 0xFFFF_FFFF else { return nil }
-    func channel(_ shift: Int) -> Double { Double((argb >> shift) & 0xFF) / 255 }
-    return Color(.sRGB, red: channel(16), green: channel(8), blue: channel(0), opacity: channel(24))
-  }
+  /// `IosLiveUpdateOptions.color` for the Dynamic Island keyline.
+  var liveUpdatesKeylineTint: Color? { LiveUpdatesPalette.color(tintArgb) }
 
   /// Text for "title", "body" or "extra:<key>".
   func liveUpdatesText(_ content: String) -> String? {

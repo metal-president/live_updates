@@ -89,21 +89,21 @@ void main() {
     final end = DateTime.fromMillisecondsSinceEpoch(1700000000000);
     final json = LiveUpdateContent(
       title: 't',
+      metrics: [
+        const LiveUpdateMetric.integer('Steps', 1979),
+        const LiveUpdateMetric.decimal(
+          'Distance',
+          4.25,
+          unit: 'km',
+          fractionDigits: 2,
+          semanticStyle: LiveUpdateSemanticStyle.caution,
+        ),
+        const LiveUpdateMetric.text('Gate', 'B12'),
+        LiveUpdateMetric.timer('ETA', end),
+        const LiveUpdateMetric.pausedStopwatch('Time', Duration(seconds: 90)),
+      ],
+      criticalMetric: 3,
       android: AndroidLiveUpdateOptions(
-        metrics: [
-          const AndroidMetric.integer('Steps', 1979),
-          const AndroidMetric.decimal(
-            'Distance',
-            4.25,
-            unit: 'km',
-            fractionDigits: 2,
-            semanticStyle: LiveUpdateSemanticStyle.caution,
-          ),
-          const AndroidMetric.text('Gate', 'B12'),
-          AndroidMetric.timer('ETA', end),
-          const AndroidMetric.pausedStopwatch('Time', Duration(seconds: 90)),
-        ],
-        criticalMetric: 3,
         bodySemanticStyle: LiveUpdateSemanticStyle.danger,
         progressSemanticStyle: LiveUpdateSemanticStyle.safe,
       ),
@@ -137,14 +137,15 @@ void main() {
   });
 
   test('non-finite decimals are left out; const options compile', () {
-    const options = AndroidLiveUpdateOptions(
+    const content = LiveUpdateContent(
+      title: 't',
       metrics: [
-        AndroidMetric.decimal('Bad', double.nan),
-        AndroidMetric.integer('Steps', 1),
+        LiveUpdateMetric.decimal('Bad', double.nan),
+        LiveUpdateMetric.integer('Steps', 1),
       ],
       criticalMetric: 1,
     );
-    final json = const LiveUpdateContent(title: 't', android: options).toJson();
+    final json = content.toJson();
     expect(json['metrics'], [
       {'label': 'Bad', 'type': 'decimal', 'value': null, 'fractionDigits': 1},
       {'label': 'Steps', 'type': 'integer', 'value': 1},
@@ -233,5 +234,27 @@ void main() {
     expect(json['backgroundArgb'], 0xCC000000);
     expect(json['foregroundArgb'], 0xFF111111);
     expect(json.containsKey('colorArgb'), isFalse);
+  });
+
+  test('steps, journey and layout', () {
+    final json = const LiveUpdateContent(
+      title: 't',
+      steps: LiveUpdateSteps(['Placed', 'Preparing', 'Delivered'], current: 1),
+      journey: LiveUpdateJourney(from: 'A', to: 'B', toDetail: '12:30'),
+      ios: IosLiveUpdateOptions(layout: IosLiveUpdateLayout.stepper),
+    ).toJson();
+    expect(json['steps'], {
+      'labels': ['Placed', 'Preparing', 'Delivered'],
+      'current': 1,
+    });
+    expect(json['journey'], {'from': 'A', 'to': 'B', 'toDetail': '12:30'});
+    expect(json['layout'], 'stepper');
+    expect(
+      const LiveUpdateContent(
+        title: 't',
+        ios: IosLiveUpdateOptions(layout: IosLiveUpdateLayout.custom('map')),
+      ).toJson()['layout'],
+      'map',
+    );
   });
 }

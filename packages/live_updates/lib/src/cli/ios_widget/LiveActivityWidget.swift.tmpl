@@ -14,9 +14,18 @@ import WidgetKit
 struct {{name}}LiveActivity: Widget {
   var body: some WidgetConfiguration {
     ActivityConfiguration(for: LiveUpdatesAttributes.self) { context in
-      LiveUpdatesLockScreen(state: context.state, activityID: context.activityID)
-        .padding()
-        .widgetURL(context.state.liveUpdatesTapURL)
+      Group {
+        switch context.state.layout {
+        // Layouts of your own, chosen with
+        // IosLiveUpdateOptions(layout: IosLiveUpdateLayout.custom("name")):
+        // case "name": MyLayout(state: context.state)
+        default:
+          // The built-in patterns: standard, timer, metrics, stepper, journey.
+          LiveUpdatesLockScreen(state: context.state, activityID: context.activityID)
+        }
+      }
+      .padding()
+      .widgetURL(context.state.liveUpdatesTapURL)
     } dynamicIsland: { context in
       DynamicIsland {
         DynamicIslandExpandedRegion(.leading) {

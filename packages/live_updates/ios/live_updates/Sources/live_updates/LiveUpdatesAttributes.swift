@@ -33,6 +33,15 @@ public struct LiveUpdatesAttributes: ActivityAttributes {
     public var backgroundArgb: Int?
     /// Lock Screen text as ARGB (`IosLiveUpdateOptions.foregroundColor`).
     public var foregroundArgb: Int?
+    /// Lock Screen UI pattern (`IosLiveUpdateOptions.layout`), such as
+    /// "timer", "metrics", "stepper" or "journey"; `nil` for the standard one.
+    public var layout: String?
+    /// `LiveUpdateContent.metrics`.
+    public var metrics: [LiveUpdatesMetric]
+    /// `LiveUpdateContent.steps`.
+    public var steps: LiveUpdatesSteps?
+    /// `LiveUpdateContent.journey`.
+    public var journey: LiveUpdatesJourney?
 
     public init(
       title: String, body: String? = nil, progress: Double? = nil,
@@ -40,7 +49,9 @@ public struct LiveUpdatesAttributes: ActivityAttributes {
       actions: [LiveUpdatesAction] = [], extra: [String: String] = [:],
       timerStart: Double? = nil, timerEnd: Double? = nil,
       compactTrailing: String? = nil, minimal: String? = nil,
-      tintArgb: Int? = nil, backgroundArgb: Int? = nil, foregroundArgb: Int? = nil
+      tintArgb: Int? = nil, backgroundArgb: Int? = nil, foregroundArgb: Int? = nil,
+      layout: String? = nil, metrics: [LiveUpdatesMetric] = [], steps: LiveUpdatesSteps? = nil,
+      journey: LiveUpdatesJourney? = nil
     ) {
       self.title = title
       self.body = body
@@ -57,6 +68,10 @@ public struct LiveUpdatesAttributes: ActivityAttributes {
       self.tintArgb = tintArgb
       self.backgroundArgb = backgroundArgb
       self.foregroundArgb = foregroundArgb
+      self.layout = layout
+      self.metrics = metrics
+      self.steps = steps
+      self.journey = journey
     }
 
     // Lenient decoding so APNs `content-state` may omit optional keys.
@@ -77,6 +92,14 @@ public struct LiveUpdatesAttributes: ActivityAttributes {
       tintArgb = try c.decodeIfPresent(Int.self, forKey: .tintArgb)
       backgroundArgb = try c.decodeIfPresent(Int.self, forKey: .backgroundArgb)
       foregroundArgb = try c.decodeIfPresent(Int.self, forKey: .foregroundArgb)
+      layout = try c.decodeIfPresent(String.self, forKey: .layout)
+      // Layout data that does not decode is left out (one bad metric is
+      // skipped) instead of rejecting the whole content state.
+      metrics =
+        ((try? c.decodeIfPresent([LiveUpdatesLossy<LiveUpdatesMetric>].self, forKey: .metrics))
+          ?? nil)?.compactMap(\.value) ?? []
+      steps = (try? c.decodeIfPresent(LiveUpdatesSteps.self, forKey: .steps)) ?? nil
+      journey = (try? c.decodeIfPresent(LiveUpdatesJourney.self, forKey: .journey)) ?? nil
     }
   }
 
@@ -86,6 +109,101 @@ public struct LiveUpdatesAttributes: ActivityAttributes {
 
   public init(key: String? = nil) {
     self.key = key
+  }
+}
+
+/// A value of `LiveUpdateContent.metrics`. `type` is "integer", "decimal",
+/// "text", "timer", "stopwatch" (with `number` in milliseconds since 1970),
+/// "pausedTimer" or "pausedStopwatch" (with `number` as a duration in
+/// milliseconds).
+public struct LiveUpdatesMetric: Codable, Hashable {
+  public var label: String
+  public var type: String
+  public var number: Double?
+  public var text: String?
+  public var unit: String?
+  public var fractionDigits: Int?
+  public var semanticStyle: String?
+
+  enum CodingKeys: String, CodingKey {
+    case label, type, value, unit, fractionDigits, semanticStyle
+  }
+
+  public init(
+    label: String, type: String, number: Double? = nil, text: String? = nil,
+    unit: String? = nil, fractionDigits: Int? = nil, semanticStyle: String? = nil
+  ) {
+    self.label = label
+    self.type = type
+    self.number = number
+    self.text = text
+    self.unit = unit
+    self.fractionDigits = fractionDigits
+    self.semanticStyle = semanticStyle
+  }
+
+  public init(from decoder: Decoder) throws {
+    let c = try decoder.container(keyedBy: CodingKeys.self)
+    label = try c.decodeIfPresent(String.self, forKey: .label) ?? ""
+    type = try c.decode(String.self, forKey: .type)
+    number = try? c.decodeIfPresent(Double.self, forKey: .value)
+    text = number == nil ? try? c.decodeIfPresent(String.self, forKey: .value) : nil
+    unit = try c.decodeIfPresent(String.self, forKey: .unit)
+    fractionDigits = try c.decodeIfPresent(Int.self, forKey: .fractionDigits)
+    semanticStyle = try c.decodeIfPresent(String.self, forKey: .semanticStyle)
+  }
+
+  public func encode(to encoder: Encoder) throws {
+    var c = encoder.container(keyedBy: CodingKeys.self)
+    try c.encode(label, forKey: .label)
+    try c.encode(type, forKey: .type)
+    if let number { try c.encode(number, forKey: .value) } else { try c.encodeIfPresent(text, forKey: .value) }
+    try c.encodeIfPresent(unit, forKey: .unit)
+    try c.encodeIfPresent(fractionDigits, forKey: .fractionDigits)
+    try c.encodeIfPresent(semanticStyle, forKey: .semanticStyle)
+  }
+}
+
+/// `LiveUpdateContent.steps`: stage names and the index of the current one.
+public struct LiveUpdatesSteps: Codable, Hashable {
+  public var labels: [String]
+  public var current: Int
+
+  enum CodingKeys: String, CodingKey { case labels, current }
+
+  public init(labels: [String], current: Int) {
+    self.labels = labels
+    self.current = current
+  }
+
+  public init(from decoder: Decoder) throws {
+    let c = try decoder.container(keyedBy: CodingKeys.self)
+    labels = (try? c.decodeIfPresent([String].self, forKey: .labels)) ?? []
+    current = (try? c.decodeIfPresent(Int.self, forKey: .current)) ?? 0
+  }
+}
+
+/// Decodes a `T`, or `nil` when the value does not decode.
+struct LiveUpdatesLossy<T: Decodable>: Decodable {
+  let value: T?
+
+  init(from decoder: Decoder) throws {
+    value = try? T(from: decoder)
+  }
+}
+
+/// `LiveUpdateContent.journey`.
+public struct LiveUpdatesJourney: Codable, Hashable {
+  public var from: String
+  public var to: String
+  public var fromDetail: String?
+  public var toDetail: String?
+
+  public init(from: String, to: String, fromDetail: String? = nil, toDetail: String? = nil) {
+    self.from = from
+    self.to = to
+    self.fromDetail = fromDetail
+    self.toDetail = toDetail
   }
 }
 

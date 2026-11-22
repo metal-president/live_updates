@@ -290,4 +290,66 @@ public class LiveUpdatesBridgeTest {
         LiveUpdatesBridge.start("{\"title\":\"A\",\"progress\":0.5,\"requestPromotion\":false}");
     assertFalse(shown(old).extras.getBoolean("android.requestPromotedOngoing"));
   }
+
+  @Test
+  public void stepsBecomeSegmentsPointsAndText() throws Exception {
+    String id =
+        LiveUpdatesBridge.start(
+            "{\"title\":\"Order\",\"steps\":{\"labels\":[\"Placed\",\"Preparing\",\"On the way\",\"Delivered\"],\"current\":1}}");
+    Notification n = shown(id);
+    Notification.ProgressStyle style =
+        (Notification.ProgressStyle) Notification.Builder.recoverBuilder(app, n).getStyle();
+    assertEquals(3, style.getProgressSegments().size());
+    assertEquals(3, style.getProgressPoints().size());
+    assertEquals(300, style.getProgressMax());
+    assertEquals(100, style.getProgress());
+    assertEquals("2/4 Preparing", n.extras.getCharSequence(Notification.EXTRA_TEXT).toString());
+  }
+
+  @Test
+  public void journeyAndMetricsAreShownAsText() throws Exception {
+    String id =
+        LiveUpdatesBridge.start(
+            "{\"title\":\"Trip\",\"body\":\"On time\",\"journey\":{\"from\":\"A\",\"to\":\"B\"},"
+                + "\"metrics\":[{\"label\":\"Home\",\"type\":\"integer\",\"value\":2},"
+                + "{\"label\":\"Dist\",\"type\":\"decimal\",\"value\":4.25,\"unit\":\"km\"},"
+                + "{\"label\":\"ETA\",\"type\":\"timer\",\"value\":1}]}");
+    Notification n = shown(id);
+    assertEquals("On time", n.extras.getCharSequence(Notification.EXTRA_TEXT).toString());
+    assertEquals(
+        "A \u2192 B \u00b7 Home: 2 \u00b7 Dist: 4.2 km",
+        n.extras.getCharSequence(Notification.EXTRA_SUB_TEXT).toString());
+  }
+
+  @Test
+  public void explicitProgressKeepsItsResolutionWithSteps() throws Exception {
+    String id =
+        LiveUpdatesBridge.start(
+            "{\"title\":\"Order\",\"progress\":0.6,\"steps\":{\"labels\":[\"A\",\"B\",\"C\",\"D\"],\"current\":1}}");
+    Notification.ProgressStyle style =
+        (Notification.ProgressStyle)
+            Notification.Builder.recoverBuilder(app, shown(id)).getStyle();
+    assertEquals(180, style.getProgress());
+  }
+
+  @Test
+  public void manyStepsAreShownAsTextOnly() throws Exception {
+    StringBuilder labels = new StringBuilder();
+    for (int i = 1; i <= 25; i++) labels.append(i > 1 ? "," : "").append("\"S").append(i).append('"');
+    String id =
+        LiveUpdatesBridge.start(
+            "{\"title\":\"Long\",\"steps\":{\"labels\":[" + labels + "],\"current\":22}}");
+    Notification n = shown(id);
+    Notification.ProgressStyle style =
+        (Notification.ProgressStyle) Notification.Builder.recoverBuilder(app, n).getStyle();
+    assertEquals(0, style.getProgressPoints().size());
+    assertEquals("23/25 S23", n.extras.getCharSequence(Notification.EXTRA_TEXT).toString());
+  }
+
+  @Test
+  public void journeyWithANullEndIsLeftOut() throws Exception {
+    String id =
+        LiveUpdatesBridge.start("{\"title\":\"Trip\",\"journey\":{\"from\":null,\"to\":\"B\"}}");
+    assertEquals(null, shown(id).extras.getCharSequence(Notification.EXTRA_TEXT));
+  }
 }

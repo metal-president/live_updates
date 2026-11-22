@@ -25,7 +25,9 @@ for attempt in 1 2 3; do
     flutter test integration_test ${DEVICE:+-d "$DEVICE"} || status=$?
   kill "$GRANTER" 2>/dev/null || true
   [ "$status" -eq 0 ] && exit 0
-  echo "Attempt $attempt failed or timed out (status $status); retrying."
+  # Only a hang (killed by the alarm: 142) is retried; a failure is reported.
+  [ "$status" -ne 142 ] && exit "$status"
+  echo "Attempt $attempt timed out; retrying."
   $ADB ${DEVICE:+-s "$DEVICE"} uninstall "$PKG" >/dev/null 2>&1 || true
 done
 exit 1

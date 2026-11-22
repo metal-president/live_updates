@@ -49,6 +49,7 @@ struct ContentStateDecodingTests {
 
 /// Button press routing between the app's Dart listeners and the background
 /// handler. Uses the bridge's real queue, so the tests run one at a time.
+/// Engine ids 1001 and 1002 stay clear of the host app's own engine.
 @MainActor
 @Suite(.serialized)
 struct PressRoutingTests {
@@ -57,8 +58,8 @@ struct PressRoutingTests {
     defaults.removeObject(forKey: LiveUpdatesBridge.pendingActionsKey)
     // No background handler: queued presses stay in the queue for checking.
     defaults.removeObject(forKey: LiveUpdatesBridge.dispatcherKey)
-    LiveUpdatesBridge.engineDetached(1)
-    LiveUpdatesBridge.engineDetached(2)
+    LiveUpdatesBridge.engineDetached(1001)
+    LiveUpdatesBridge.engineDetached(1002)
   }
 
   private var queued: [String] {
@@ -71,7 +72,7 @@ struct PressRoutingTests {
   @Test func aPerUpdateListenerTakesOnlyItsPresses() async throws {
     try #require(appActive)
     var got: [String] = []
-    LiveUpdatesBridge.observeActions({ got.append($0) }, activityIds: ["a"], engineId: 1)
+    LiveUpdatesBridge.observeActions({ got.append($0) }, activityIds: ["a"], engineId: 1001)
     LiveUpdatesBridge.requeueActions(["a\nx", "b\ny"])
     #expect(got == ["a\nx"])
     #expect(queued == ["b\ny"])
@@ -84,13 +85,13 @@ struct PressRoutingTests {
   @Test func wideningTheFilterHandsOverQueuedPresses() async throws {
     try #require(appActive)
     var got: [String] = []
-    LiveUpdatesBridge.observeActions({ got.append($0) }, activityIds: ["a"], engineId: 1)
+    LiveUpdatesBridge.observeActions({ got.append($0) }, activityIds: ["a"], engineId: 1001)
     LiveUpdatesBridge.requeueActions(["b\ny"])
     #expect(got.isEmpty)
     // Another engine cannot change this engine's filter.
-    LiveUpdatesBridge.setActionFilter(nil, engineId: 2)
+    LiveUpdatesBridge.setActionFilter(nil, engineId: 1002)
     #expect(got.isEmpty)
-    LiveUpdatesBridge.setActionFilter(nil, engineId: 1)
+    LiveUpdatesBridge.setActionFilter(nil, engineId: 1001)
     #expect(got == ["b\ny"])
   }
 
@@ -103,11 +104,11 @@ struct PressRoutingTests {
   @Test func aDetachedEngineNoLongerTakesPresses() async throws {
     try #require(appActive)
     var got: [String] = []
-    LiveUpdatesBridge.observeActions({ got.append($0) }, activityIds: nil, engineId: 1)
-    LiveUpdatesBridge.engineDetached(2)  // another engine: still listening
+    LiveUpdatesBridge.observeActions({ got.append($0) }, activityIds: nil, engineId: 1001)
+    LiveUpdatesBridge.engineDetached(1002)  // another engine: still listening
     LiveUpdatesBridge.requeueActions(["a\nx"])
     #expect(got == ["a\nx"])
-    LiveUpdatesBridge.engineDetached(1)
+    LiveUpdatesBridge.engineDetached(1001)
     LiveUpdatesBridge.requeueActions(["a\ny"])
     #expect(got == ["a\nx"])
     #expect(queued == ["a\ny"])
@@ -116,10 +117,10 @@ struct PressRoutingTests {
   @Test func unobservingLeavesPressesForTheBackground() async throws {
     try #require(appActive)
     var got: [String] = []
-    LiveUpdatesBridge.observeActions({ got.append($0) }, activityIds: nil, engineId: 1)
-    LiveUpdatesBridge.unobserveActions(2)  // not the owner: ignored
+    LiveUpdatesBridge.observeActions({ got.append($0) }, activityIds: nil, engineId: 1001)
+    LiveUpdatesBridge.unobserveActions(1002)  // not the owner: ignored
     LiveUpdatesBridge.requeueActions(["a\nx"])
-    LiveUpdatesBridge.unobserveActions(1)
+    LiveUpdatesBridge.unobserveActions(1001)
     LiveUpdatesBridge.requeueActions(["a\ny"])
     #expect(got == ["a\nx"])
     #expect(queued == ["a\ny"])
@@ -146,10 +147,10 @@ struct ForgedURLTests {
 
   @Test func aRouteNoActivityCarriesIsNotDelivered() {
     var routes: [String] = []
-    LiveUpdatesBridge.observeTaps({ routes.append($0) }, engineId: 1)
+    LiveUpdatesBridge.observeTaps({ routes.append($0) }, engineId: 1001)
     let url = URL(string: LiveUpdatesBridge.tapScheme + "://tap?route=/evil")!
     #expect(LiveUpdatesBridge.handleURL(url))
     #expect(routes.isEmpty)
-    LiveUpdatesBridge.engineDetached(1)
+    LiveUpdatesBridge.engineDetached(1001)
   }
 }

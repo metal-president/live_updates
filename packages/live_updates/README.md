@@ -6,10 +6,10 @@ iOS **Live Activities** and Android **Live Update** notifications with one Dart 
 - iOS 17.2+: ActivityKit Live Activities on the Lock Screen and in the Dynamic Island, with a ready-made SwiftUI widget you generate and customize.
 - Android: ongoing notifications that Android 16 renders with `ProgressStyle` and, on builds that support promoted notifications (Android 16 QPR1 and later), promotes to Live Updates with a status bar chip. Older Android versions show a regular ongoing notification with a progress bar.
 - Remote updates: iOS push-to-start and per-activity push tokens as streams; Android updates from a received payload (FCM glue lives in [`live_updates_fcm`](https://pub.dev/packages/live_updates_fcm)).
-- No platform channels: native code is called through [FFIgen](https://pub.dev/packages/ffigen) (iOS) and [JNIgen](https://pub.dev/packages/jnigen) (Android). No third-party dependencies beyond the official `objective_c` and `jni` interop runtimes.
+- No platform channels: native code is called through [FFIgen](https://pub.dev/packages/ffigen) (iOS) and [JNIgen](https://pub.dev/packages/jnigen) (Android). Runtime dependencies are only Dart and Flutter team packages (`objective_c`, `jni`, `crypto`, `meta`).
 - Other platforms are a safe no-op.
 
-> **Status:** 0.x. The API may still change between minor versions.
+> **Status:** 0.0.x. The API may still change in any release; pin the version you test with.
 
 | iOS Lock Screen | iOS Dynamic Island |
 | --- | --- |
@@ -27,12 +27,17 @@ Screenshots of the example app in this repository.
 | Progress | ✓ | `ProgressStyle` (segments, points) | progress bar | |
 | Timer (countdown, stopwatch) | ✓ | chronometer | chronometer | |
 | Metrics, semantic colors | – | Android 17+ | – | |
-| Tap route | ✓ | ✓ | ✓ | |
-| Lifecycle events | ✓ | ✓ | ✓ | |
-| Push tokens | ✓ | – | – | |
-| Remote payload | APNs (direct) | `handleRemotePayload` | `handleRemotePayload` | |
+| Buttons (`actions`) | ✓ | ✓ | ✓ | |
+| Image | ✓ | large icon | large icon | |
+| Tap route (`onTap`) | ✓ | ✓ | ✓ | |
+| Lifecycle events (`states`, `onStarted`) | ✓ | ✓ | ✓ | |
+| Live Activity push tokens | ✓ | – (FCM via `live_updates_fcm`) | – (FCM via `live_updates_fcm`) | |
+| Remote updates | push to the system (APNs, or FCM), no app code | data message → `handleRemotePayload` | data message → `handleRemotePayload` | |
+| One push to many devices | broadcast channels (iOS 18+) | FCM topics | FCM topics | |
 
-Requirements: Flutter 3.50+, iOS 17.2+, Android minSdk as set by Flutter.
+Requirements: Flutter 3.50+, iOS 17.2+, Android 7.0 (API 24)+. Promotion to
+a Live Update needs Android 16 QPR1 or later; the "Android 16+" column
+otherwise describes an ongoing notification with those features.
 
 ## Getting started
 
@@ -170,6 +175,9 @@ if (await LiveUpdates.requestPermission()) {
     const LiveUpdateContent(title: 'Order #1234', body: 'On the way', progress: 0.6),
   );
 
+  // iOS keeps the last content on the Lock Screen for 5 minutes. Android
+  // removes the notification now, unless you pass finalContent: then that
+  // content stays as a regular notification for the duration.
   await update.end(dismissAfter: const Duration(minutes: 5));
 }
 
@@ -425,10 +433,13 @@ update.pushTokens.listen((token) => api.registerActivity(update.id, token.hex));
 
 Send pushes with `apns-push-type: liveactivity` and topic
 `<bundle id>.push-type.liveactivity`. The `content-state` uses the same keys as
-`LiveUpdateContent`: `title`, `body`, `progress`, `iconName`, `route`, `extra`,
-and `timerStart` / `timerEnd` (seconds since 1970) for a timer.
-For push-to-start, set `"attributes-type": "LiveUpdatesAttributes"` and
-`"attributes": {}`.
+`LiveUpdateContent` (`title` is required): `title`, `body`, `progress`,
+`iconName`, `route`, `actions`, `extra`, `timerStart` / `timerEnd`
+(seconds since 1970) and the island options `compactTrailing` / `minimal`.
+For push-to-start, set `"attributes-type": "LiveUpdatesAttributes"`,
+`"attributes": {"key": "<your id>"}` (or `{}` without a key) and an `alert`.
+[docs/server-fcm.md](https://github.com/metal-president/live_updates/blob/main/docs/server-fcm.md)
+has complete payloads.
 
 ### iOS broadcast (iOS 18+)
 
@@ -438,7 +449,7 @@ tokens. One push to the channel updates every subscribed device.
 
 ```dart
 final update = await LiveUpdates.start(
-  const LiveUpdateContent(title: 'FC Tokyo 2 - 1 Kashima', body: '78 min'),
+  const LiveUpdateContent(title: 'Home 2 - 1 Away', body: '78 min'),
   iosChannelId: channelIdFromYourServer,
 );
 ```

@@ -4,9 +4,9 @@ Firebase Cloud Messaging integration for [`live_updates`](https://pub.dev/packag
 
 - **Android:** FCM data messages with `live_updates_*` keys start, update and
   end Live Update notifications, in the foreground and in the background.
-- **iOS:** Live Activities are updated by APNs directly. Send the tokens from
-  `LiveUpdates.pushToStartTokens` and `LiveUpdate.pushTokens` to your server
-  and deliver through APNs or FCM's `apns.live_activity_token`.
+- **iOS:** the system applies Live Activity pushes itself, so the app needs no
+  message handling. Send the tokens from `LiveUpdatesFcm.tokens()` to your
+  server and push through FCM (`apns.live_activity_token`) or APNs directly.
 
 ## Usage
 
@@ -99,7 +99,7 @@ Send a data message (no `notification` block) with high priority:
 | --- | --- |
 | `live_updates_event` | `start`, `update` or `end` |
 | `live_updates_id` | Your id; later messages with the same id update the same notification |
-| `live_updates_content` | JSON string with `title`, `body`, `progress`, `iconName`, `route` and Android options |
+| `live_updates_content` | JSON string with the keys of `LiveUpdateContent` (`title`, `body`, `progress`, `timerEnd`, `actions`, ...) and Android options |
 | `live_updates_dismiss_after` | Optional, seconds to keep the final content on `end` |
 
 `packages/live_updates/tool/send_push.dart` in the repository sends these

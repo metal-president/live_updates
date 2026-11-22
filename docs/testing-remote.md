@@ -114,7 +114,7 @@ Notifications). It cannot be enabled from Xcode.
    ```bash
    dart run tool/send_push.dart apns-broadcast --sandbox ... \
      --channel <channel id> --event update \
-     --content '{"title":"FC Tokyo 2 - 1 Kashima","body":"78 min"}'
+     --content '{"title":"Home 2 - 1 Away","body":"78 min"}'
    ```
 
 4. List or delete channels with `apns-channel --action list` and

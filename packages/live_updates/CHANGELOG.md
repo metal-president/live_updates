@@ -1,3 +1,9 @@
+## Unreleased
+
+- Docs: clearer platform table (Live Activity push tokens, buttons, images,
+  remote updates, broadcasts), requirements, `end(dismissAfter:)` on Android,
+  and complete push-to-start keys.
+
 ## 0.0.5
 
 - `LiveUpdate.key`: the key from `startOrUpdate`, a push-to-start

@@ -1,3 +1,7 @@
+## Unreleased
+
+- Docs: clearer iOS description and content keys.
+
 ## 0.0.5
 
 - `LiveUpdatesToken.key`: activity tokens carry the update's key, so a server

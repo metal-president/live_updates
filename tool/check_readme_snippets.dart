@@ -97,11 +97,10 @@ void main() {
           .map((l) => l.length >= indent ? l.substring(indent) : l.trimLeft())
           .join('\n');
       i = end;
-      if (language != 'dart') continue;
-      if (skipNext) {
-        skipNext = false;
-        continue;
-      }
+      // The skip marker applies to the next block, whatever its language.
+      final skip = skipNext;
+      skipNext = false;
+      if (language != 'dart' || skip) continue;
       final name = '${package}_line${start + 1}.dart';
       File('${out.path}/$name').writeAsStringSync(_wrap(code, readme, start));
       count++;
@@ -118,9 +117,15 @@ String _wrap(String code, String readme, int line) {
   final header =
       '$imports\n$_imports$_stubsImport// $readme, line ${line + 1}\n';
   if (_isLibrary.hasMatch(body)) return '$header\n$body\n';
-  if (_namedArgument.hasMatch(body.trimLeft())) {
+  final firstCode = body
+      .split('\n')
+      .map((l) => l.trimLeft())
+      .firstWhere((l) => l.isNotEmpty && !l.startsWith('//'), orElse: () => '');
+  if (_namedArgument.hasMatch(firstCode)) {
+    final hasTitle = RegExp(r'^\s*title\s*:', multiLine: true).hasMatch(body);
+    final title = hasTitle ? '' : "title: '',";
     return "$header\nFuture<void> snippet() async {\n"
-        "  LiveUpdateContent(title: '',\n$body\n  );\n}\n";
+        "  LiveUpdateContent($title\n$body\n  );\n}\n";
   }
   return '$header\nFuture<void> snippet() async {\n$body\n}\n';
 }

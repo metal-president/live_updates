@@ -7,9 +7,10 @@ iOS **Live Activities** and Android **Live Update** notifications with one Dart 
 - **iOS 17.2+:** Lock Screen and Dynamic Island, with five built-in layouts
   (standard, timer, metrics, stepper, journey) and a SwiftUI widget you
   generate with one command and can customize.
-- **Android:** a Live Update with a status bar chip on Android 16 QPR1 and
-  later, rendered with `ProgressStyle`, and an ongoing notification with a
-  progress bar on older versions.
+- **Android:** a notification rendered with `ProgressStyle` on Android 16
+  and later, promoted by the system to a Live Update with a status bar chip
+  on Android 16 QPR1 and later, and an ongoing notification with a progress
+  bar on older versions.
 - **Remote updates:** start, update and end from your server (APNs on iOS, a
   data message on Android; optional FCM helper:
   [`live_updates_fcm`](https://pub.dev/packages/live_updates_fcm)).
@@ -452,8 +453,9 @@ LiveUpdateContent(
 ### Android 17 metrics and semantic colors
 
 On Android 17 a Live Update with `metrics` (see [Layouts](#layouts)) shows
-them with `MetricStyle` instead of the progress bar. `criticalMetric` picks
-the one that may appear in the status bar chip.
+them with `MetricStyle` instead of the progress bar. Timers and stopwatches
+are counted by the system, so they keep running between updates.
+`criticalMetric` picks the one that may appear in the status bar chip.
 
 While metrics are set, Android 17 does not show the body text (its metric
 template has no room for it), so put anything users must read in the title or

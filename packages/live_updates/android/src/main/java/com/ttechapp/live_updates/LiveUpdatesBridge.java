@@ -34,7 +34,7 @@ import org.json.JSONObject;
  * <p>Content is exchanged as the same JSON used on iOS ({@code title, body,
  * progress, iconName, route, image, actions}) plus Android options: {@code
  * channelId, channelName, shortCriticalText, colorArgb, whenEpochMillis,
- * showChronometer, requestPromotion, metrics, criticalMetric,
+ * showChronometer, androidMode, metrics, criticalMetric,
  * bodySemanticStyle, progressSemanticStyle, progressSegments, progressPoints,
  * progressTrackerIcon, timeoutAfterMillis, androidAlert} and the timer
  * ({@code timerStart} or {@code timerEnd}, seconds since 1970). On Android 16+ progress uses
@@ -686,8 +686,9 @@ public final class LiveUpdatesBridge {
 
     boolean hasProgress = content.has("progress") && !content.isNull("progress");
     int progress = hasProgress ? (int) Math.round(content.optDouble("progress") * 100) : 0;
-    if (Build.VERSION.SDK_INT >= 36) {
-      requestPromotedOngoing(b, content.optBoolean("requestPromotion", true));
+    String mode = androidMode(content);
+    if (Build.VERSION.SDK_INT >= 36 && !"classic".equals(mode)) {
+      requestPromotedOngoing(b, "liveUpdate".equals(mode));
       String chip = optString(content, "shortCriticalText");
       if (chip != null) b.setShortCriticalText(chip);
       boolean metrics =
@@ -700,6 +701,18 @@ public final class LiveUpdatesBridge {
       b.setProgress(100, progress, false);
     }
     return b;
+  }
+
+  /**
+   * {@code liveUpdate} (default), {@code ongoing} or {@code classic}. Payloads
+   * from before {@code androidMode} existed may send {@code requestPromotion:
+   * false}, which means {@code ongoing}.
+   */
+  private static String androidMode(JSONObject content) {
+    String mode = optString(content, "androidMode");
+    if ("ongoing".equals(mode) || "classic".equals(mode)) return mode;
+    if (mode == null && !content.optBoolean("requestPromotion", true)) return "ongoing";
+    return "liveUpdate";
   }
 
   /** At most one requested alert per update in this interval (remote payloads included). */

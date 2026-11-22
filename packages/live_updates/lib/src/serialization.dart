@@ -50,7 +50,8 @@ extension LiveUpdateContentJson on LiveUpdateContent {
       'colorArgb': ?a.color?.toARGB32(),
       'whenEpochMillis': ?a.when?.millisecondsSinceEpoch,
       'showChronometer': a.showChronometer,
-      if (!a.requestPromotion) 'requestPromotion': false,
+      if (a.mode != AndroidLiveUpdateMode.liveUpdate)
+        'androidMode': a.mode.name,
       if (a.metrics.isNotEmpty)
         'metrics': [for (final m in a.metrics) m.toJson()],
       'criticalMetric': ?a.criticalMetric,

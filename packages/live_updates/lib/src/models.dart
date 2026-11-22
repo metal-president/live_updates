@@ -459,7 +459,7 @@ final class AndroidLiveUpdateOptions {
     this.color,
     this.when,
     this.showChronometer = false,
-    this.requestPromotion = true,
+    this.mode = AndroidLiveUpdateMode.liveUpdate,
     this.metrics = const [],
     this.criticalMetric,
     this.bodySemanticStyle,
@@ -491,14 +491,15 @@ final class AndroidLiveUpdateOptions {
   /// Show a running chronometer based on [when] instead of a timestamp.
   final bool showChronometer;
 
-  /// Ask Android to promote the notification to a Live Update.
+  /// How the notification is shown on Android 16 and later (older versions
+  /// always show a regular ongoing notification with a progress bar).
   ///
-  /// Android reserves Live Updates for ongoing, user-initiated,
-  /// time-sensitive activities such as navigation, calls, rides or food
-  /// delivery, and not for ads, promotions, chat messages or reminders. Set
-  /// this to `false` for anything else; the update then stays a regular
-  /// ongoing notification.
-  final bool requestPromotion;
+  /// Android reserves Live Updates ([AndroidLiveUpdateMode.liveUpdate]) for
+  /// ongoing, user-initiated, time-sensitive activities such as navigation,
+  /// calls, rides or food delivery, and not for ads, promotions, chat
+  /// messages or reminders. Use [AndroidLiveUpdateMode.ongoing] or
+  /// [AndroidLiveUpdateMode.classic] for anything else.
+  final AndroidLiveUpdateMode mode;
 
   /// Values such as a distance, a speed or a countdown, shown with Android
   /// 17's `MetricStyle` instead of the progress bar. Up to three are used.
@@ -563,7 +564,7 @@ final class AndroidLiveUpdateOptions {
       other.color == color &&
       other.when == when &&
       other.showChronometer == showChronometer &&
-      other.requestPromotion == requestPromotion &&
+      other.mode == mode &&
       listEquals(other.metrics, metrics) &&
       other.criticalMetric == criticalMetric &&
       other.bodySemanticStyle == bodySemanticStyle &&
@@ -582,7 +583,7 @@ final class AndroidLiveUpdateOptions {
     color,
     when,
     showChronometer,
-    requestPromotion,
+    mode,
     Object.hashAll(metrics),
     criticalMetric,
     bodySemanticStyle,
@@ -649,6 +650,27 @@ final class AndroidProgressPoint {
 
   @override
   int get hashCode => Object.hash(position, color, semanticStyle);
+}
+
+/// How an Android notification is shown ([AndroidLiveUpdateOptions.mode]).
+///
+/// New values may be added in minor releases.
+enum AndroidLiveUpdateMode {
+  /// Android 16+ styles (`ProgressStyle` with segments and points, Android
+  /// 17 `MetricStyle`) and a request to promote the notification to a Live
+  /// Update (status bar chip, top of the shade). Only for activities that fit
+  /// Android's Live Update guidance.
+  liveUpdate,
+
+  /// The same Android 16+ styles, without asking for promotion: a regular
+  /// ongoing notification.
+  ongoing,
+
+  /// A regular ongoing notification with the standard progress bar on every
+  /// Android version, as on Android 15 and earlier. Progress segments and
+  /// points, metrics, semantic colors and `shortCriticalText` are not used,
+  /// and the body is always shown.
+  classic,
 }
 
 /// Meaning of a color in an Android 17 Live Update. Android chooses the

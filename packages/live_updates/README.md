@@ -120,6 +120,10 @@ ios: const IosLiveUpdateOptions(
 ),
 ```
 
+Colors work the same way: `IosLiveUpdateOptions(tint: ..., backgroundColor:
+...)` sets the accent (progress, buttons, timer, Dynamic Island keyline) and
+the Lock Screen background, like `AndroidLiveUpdateOptions.color` on Android.
+
 Content that is missing (such as `progress` without a progress) falls back to
 the default, and text is left out when the island is limited in width (iOS 27
 landscape). These options need a layout that uses `LiveUpdatesCompactTrailing`
@@ -436,7 +440,8 @@ Send pushes with `apns-push-type: liveactivity` and topic
 `<bundle id>.push-type.liveactivity`. The `content-state` uses the same keys as
 `LiveUpdateContent` (`title` is required): `title`, `body`, `progress`,
 `iconName`, `route`, `actions`, `extra`, `timerStart` / `timerEnd`
-(seconds since 1970) and the island options `compactTrailing` / `minimal`.
+(seconds since 1970), the island options `compactTrailing` / `minimal` and the
+colors `tintArgb` / `backgroundArgb` (ARGB integers).
 For push-to-start, set `"attributes-type": "LiveUpdatesAttributes"`,
 `"attributes": {"key": "<your id>"}` (or `{}` without a key) and an `alert`.
 [docs/server-fcm.md](https://github.com/metal-president/live_updates/blob/main/docs/server-fcm.md)

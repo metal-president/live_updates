@@ -80,7 +80,10 @@ class _ExamplePageState extends State<ExamplePage> {
     // Counted by the system: no update needed every second.
     timer: LiveUpdateTimer.countdown(_eta),
     // The compact Dynamic Island shows the countdown instead of the progress.
-    ios: const IosLiveUpdateOptions(compactTrailing: IosIslandContent.timer),
+    ios: const IosLiveUpdateOptions(
+      compactTrailing: IosIslandContent.timer,
+      tint: Color(0xFF8C9EFF), // accent for progress, buttons and the timer
+    ),
     image: const LiveUpdateImage.asset('assets/parcel.png', maxDimension: 128),
     actions: const [
       LiveUpdateAction(

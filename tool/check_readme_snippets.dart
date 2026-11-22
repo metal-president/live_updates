@@ -68,6 +68,11 @@ final _isLibrary = RegExp(
 );
 
 void main() {
+  final missing = _readmes.where((r) => !File(r).existsSync()).toList();
+  if (missing.isNotEmpty) {
+    stderr.writeln('Run from the repository root (missing: $missing).');
+    exit(1);
+  }
   final out = Directory(_outDir);
   if (out.existsSync()) out.deleteSync(recursive: true);
   out.createSync(recursive: true);

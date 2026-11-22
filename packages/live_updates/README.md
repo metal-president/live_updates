@@ -3,6 +3,7 @@
 iOS **Live Activities** and Android **Live Update** notifications with one Dart API.
 
 - One API to start, update and end a live update: title, body, progress, a system-counted timer, an image, buttons and a tap route.
+- Five built-in iOS layouts (standard, timer, metrics, stepper, journey), chosen per update; Android shows the same content as progress stages, metrics or text.
 - iOS 17.2+: ActivityKit Live Activities on the Lock Screen and in the Dynamic Island, with a ready-made SwiftUI widget you generate and customize.
 - Android: ongoing notifications that Android 16 renders with `ProgressStyle` and, on builds that support promoted notifications (Android 16 QPR1 and later), promotes to Live Updates with a status bar chip. Older Android versions show a regular ongoing notification with a progress bar.
 - Remote updates: iOS push-to-start and per-activity push tokens as streams; Android updates from a received payload (FCM glue lives in [`live_updates_fcm`](https://pub.dev/packages/live_updates_fcm)).
@@ -26,7 +27,9 @@ Screenshots of the example app in this repository.
 | Start / update / end | Live Activity | Live Update (when promoted) | Ongoing notification | no-op |
 | Progress | ✓ | `ProgressStyle` (segments, points) | progress bar | |
 | Timer (countdown, stopwatch) | ✓ | chronometer | chronometer | |
-| Metrics, semantic colors | – | Android 17+ | – | |
+| Metrics | `metrics` layout | Android 17 `MetricStyle`, else text | text | |
+| Steps, journey | `stepper`, `journey` layouts | progress segments and points, text | progress bar, text | |
+| Semantic colors | – | Android 17+ | – | |
 | Buttons (`actions`) | ✓ | ✓ | ✓ | |
 | Image | ✓ | large icon | large icon | |
 | Tap route (`onTap`) | ✓ | ✓ | ✓ | |

@@ -32,9 +32,9 @@ import org.json.JSONObject;
  * Java surface over Android notifications, consumed from Dart through JNIgen.
  *
  * <p>Content is exchanged as the same JSON used on iOS ({@code title, body,
- * progress, iconName, route, image, actions}) plus Android options: {@code
- * channelId, channelName, shortCriticalText, colorArgb, whenEpochMillis,
- * showChronometer, androidMode, metrics, criticalMetric,
+ * progress, iconName, route, image, actions, metrics, criticalMetric, steps,
+ * journey}) plus Android options: {@code channelId, channelName,
+ * shortCriticalText, colorArgb, whenEpochMillis, showChronometer, androidMode,
  * bodySemanticStyle, progressSemanticStyle, progressSegments, progressPoints,
  * progressTrackerIcon, timeoutAfterMillis, androidAlert} and the timer
  * ({@code timerStart} or {@code timerEnd}, seconds since 1970). On Android 16+ progress uses

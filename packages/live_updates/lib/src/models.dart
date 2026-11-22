@@ -940,7 +940,7 @@ final class LiveUpdateMetric {
   /// Maximum digits after the decimal point of [LiveUpdateMetricKind.decimal].
   final int? fractionDigits;
 
-  /// Semantic color of the value on a promoted Live Update.
+  /// Semantic color of the value on a promoted Android 17 Live Update.
   final LiveUpdateSemanticStyle? semanticStyle;
 
   @override

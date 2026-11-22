@@ -337,15 +337,13 @@ final class IosLiveUpdateOptions {
   /// and the Dynamic Island keyline. `null` keeps the system colors. The
   /// Android counterpart is [AndroidLiveUpdateOptions.color].
   ///
-  /// Pass a `CupertinoDynamicColor` (for example
-  /// `CupertinoDynamicColor.withBrightness(color: ..., darkColor: ...)`) to
-  /// use a different color in dark mode. While the Always-On display dims the
-  /// Lock Screen, the system colors are used.
+  /// The system draws Live Activities on a dark background in both light and
+  /// dark mode, so pick a color that reads well on dark. While the Always-On
+  /// display dims the Lock Screen, the system colors are used.
   final Color? color;
 
   /// Background of the Lock Screen presentation. `null` keeps the system
-  /// background. Like [color], a `CupertinoDynamicColor` gives dark mode its
-  /// own background; keep the text readable in both modes.
+  /// (dark) background. Keep the text, which is light, readable on it.
   final Color? backgroundColor;
 
   @override

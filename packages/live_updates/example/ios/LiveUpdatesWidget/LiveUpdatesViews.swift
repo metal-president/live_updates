@@ -12,10 +12,9 @@ import WidgetKit
 struct LiveUpdatesLockScreen: View {
   let state: LiveUpdatesAttributes.ContentState
   let activityID: String
-  @Environment(\.colorScheme) private var colorScheme
   @Environment(\.isLuminanceReduced) private var luminanceReduced
   private var palette: LiveUpdatesPalette {
-    LiveUpdatesPalette(state, colorScheme, luminanceReduced: luminanceReduced)
+    LiveUpdatesPalette(state, luminanceReduced: luminanceReduced)
   }
 
   var body: some View {
@@ -50,10 +49,9 @@ struct LiveUpdatesLockScreen: View {
 /// Expanded Dynamic Island, trailing region: the timer, else the progress.
 struct LiveUpdatesExpandedTrailing: View {
   let state: LiveUpdatesAttributes.ContentState
-  @Environment(\.colorScheme) private var colorScheme
   @Environment(\.isLuminanceReduced) private var luminanceReduced
   private var palette: LiveUpdatesPalette {
-    LiveUpdatesPalette(state, colorScheme, luminanceReduced: luminanceReduced)
+    LiveUpdatesPalette(state, luminanceReduced: luminanceReduced)
   }
 
   var body: some View {
@@ -72,10 +70,9 @@ struct LiveUpdatesExpandedTrailing: View {
 struct LiveUpdatesExpandedBottom: View {
   let state: LiveUpdatesAttributes.ContentState
   let activityID: String
-  @Environment(\.colorScheme) private var colorScheme
   @Environment(\.isLuminanceReduced) private var luminanceReduced
   private var palette: LiveUpdatesPalette {
-    LiveUpdatesPalette(state, colorScheme, luminanceReduced: luminanceReduced)
+    LiveUpdatesPalette(state, luminanceReduced: luminanceReduced)
   }
 
   var body: some View {
@@ -98,10 +95,9 @@ struct LiveUpdatesExpandedBottom: View {
 /// island is limited in width (iOS 27 landscape).
 struct LiveUpdatesCompactTrailing: View {
   let state: LiveUpdatesAttributes.ContentState
-  @Environment(\.colorScheme) private var colorScheme
   @Environment(\.isLuminanceReduced) private var luminanceReduced
   private var palette: LiveUpdatesPalette {
-    LiveUpdatesPalette(state, colorScheme, luminanceReduced: luminanceReduced)
+    LiveUpdatesPalette(state, luminanceReduced: luminanceReduced)
   }
 
   var body: some View {
@@ -119,10 +115,9 @@ struct LiveUpdatesCompactTrailing: View {
 /// progress, else the icon.
 struct LiveUpdatesMinimal: View {
   let state: LiveUpdatesAttributes.ContentState
-  @Environment(\.colorScheme) private var colorScheme
   @Environment(\.isLuminanceReduced) private var luminanceReduced
   private var palette: LiveUpdatesPalette {
-    LiveUpdatesPalette(state, colorScheme, luminanceReduced: luminanceReduced)
+    LiveUpdatesPalette(state, luminanceReduced: luminanceReduced)
   }
 
   var body: some View {
@@ -135,25 +130,15 @@ struct LiveUpdatesMinimal: View {
   }
 }
 
-/// `IosLiveUpdateOptions.color` and `backgroundColor` for the current
-/// appearance: the dark variant of a `CupertinoDynamicColor` in dark mode,
-/// and system colors while the Always-On display dims the Lock Screen.
+/// `IosLiveUpdateOptions.color` and `backgroundColor`, or system colors while
+/// the Always-On display dims the Lock Screen.
 struct LiveUpdatesPalette {
   let tint: Color?
   let background: Color?
 
-  init(
-    _ state: LiveUpdatesAttributes.ContentState, _ scheme: ColorScheme, luminanceReduced: Bool
-  ) {
-    let dark = scheme == .dark
-    if luminanceReduced {
-      tint = nil
-      background = nil
-    } else {
-      tint = Self.color(dark ? state.tintDarkArgb ?? state.tintArgb : state.tintArgb)
-      background = Self.color(
-        dark ? state.backgroundDarkArgb ?? state.backgroundArgb : state.backgroundArgb)
-    }
+  init(_ state: LiveUpdatesAttributes.ContentState, luminanceReduced: Bool) {
+    tint = luminanceReduced ? nil : Self.color(state.tintArgb)
+    background = luminanceReduced ? nil : Self.color(state.backgroundArgb)
   }
 
   static func color(_ argb: Int?) -> Color? {
@@ -328,10 +313,8 @@ extension LiveUpdatesAttributes.ContentState {
   var liveUpdatesTimerStart: Date? { Self.liveUpdatesDate(timerStart) }
   var liveUpdatesHasTimer: Bool { liveUpdatesTimerEnd != nil || liveUpdatesTimerStart != nil }
 
-  /// `IosLiveUpdateOptions.color` in the Dynamic Island (always dark).
-  var liveUpdatesKeylineTint: Color? {
-    LiveUpdatesPalette.color(tintDarkArgb ?? tintArgb)
-  }
+  /// `IosLiveUpdateOptions.color` for the Dynamic Island keyline.
+  var liveUpdatesKeylineTint: Color? { LiveUpdatesPalette.color(tintArgb) }
 
   /// Text for "title", "body" or "extra:<key>".
   func liveUpdatesText(_ content: String) -> String? {

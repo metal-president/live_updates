@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:cupertino_ui/cupertino_ui.dart' show CupertinoDynamicColor;
 import 'package:live_updates/live_updates.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -83,11 +82,8 @@ class _ExamplePageState extends State<ExamplePage> {
     // The compact Dynamic Island shows the countdown instead of the progress.
     ios: const IosLiveUpdateOptions(
       compactTrailing: IosIslandContent.timer,
-      // Accent for progress, buttons and the timer, darker in light mode.
-      color: CupertinoDynamicColor.withBrightness(
-        color: Color(0xFF3949AB),
-        darkColor: Color(0xFF8C9EFF),
-      ),
+      // Accent for progress, buttons and the timer (shown on a dark card).
+      color: Color(0xFF8C9EFF),
     ),
     image: const LiveUpdateImage.asset('assets/parcel.png', maxDimension: 128),
     actions: const [

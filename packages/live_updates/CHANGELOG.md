@@ -1,11 +1,9 @@
 ## Unreleased
 
 - `IosLiveUpdateOptions.color` and `backgroundColor`: accent and Lock Screen
-  background of the generated widget. A `CupertinoDynamicColor` gives dark
-  mode its own color, and the Always-On display uses system colors
-  (content-state keys `tintArgb` / `backgroundArgb` and `...DarkArgb`). Run
-  `create_widget` to update `LiveUpdatesViews.swift`. New dependency:
-  `cupertino_ui` (flutter.dev).
+  background of the generated widget (content-state keys `tintArgb` /
+  `backgroundArgb`); the Always-On display uses system colors. Run
+  `create_widget` to update `LiveUpdatesViews.swift`.
 
 ## 0.0.6
 

@@ -2,7 +2,6 @@ import 'dart:convert';
 
 import 'dart:ui';
 
-import 'package:cupertino_ui/cupertino_ui.dart' show CupertinoDynamicColor;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:live_updates/live_updates.dart';
 import 'package:live_updates/src/serialization.dart';
@@ -232,25 +231,5 @@ void main() {
     expect(json['tintArgb'], 0xFF3949AB);
     expect(json['backgroundArgb'], 0xCC000000);
     expect(json.containsKey('colorArgb'), isFalse);
-  });
-
-  test('dynamic colors send a dark variant', () {
-    final json = const LiveUpdateContent(
-      title: 't',
-      ios: IosLiveUpdateOptions(
-        color: CupertinoDynamicColor.withBrightness(
-          color: Color(0xFF3949AB),
-          darkColor: Color(0xFF8C9EFF),
-        ),
-        backgroundColor: CupertinoDynamicColor.withBrightness(
-          color: Color(0xFFFFFFFF),
-          darkColor: Color(0xFFFFFFFF),
-        ),
-      ),
-    ).toJson();
-    expect(json['tintArgb'], 0xFF3949AB);
-    expect(json['tintDarkArgb'], 0xFF8C9EFF);
-    expect(json['backgroundArgb'], 0xFFFFFFFF);
-    expect(json.containsKey('backgroundDarkArgb'), isFalse);
   });
 }

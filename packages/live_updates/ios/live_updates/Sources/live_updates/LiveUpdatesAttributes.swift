@@ -27,14 +27,10 @@ public struct LiveUpdatesAttributes: ActivityAttributes {
     public var compactTrailing: String?
     /// What the minimal Dynamic Island shows (`IosLiveUpdateOptions.minimal`).
     public var minimal: String?
-    /// Accent color as ARGB (`IosLiveUpdateOptions.color`), and its dark
-    /// mode variant.
+    /// Accent color as ARGB (`IosLiveUpdateOptions.color`).
     public var tintArgb: Int?
-    public var tintDarkArgb: Int?
-    /// Lock Screen background as ARGB (`IosLiveUpdateOptions.backgroundColor`),
-    /// and its dark mode variant.
+    /// Lock Screen background as ARGB (`IosLiveUpdateOptions.backgroundColor`).
     public var backgroundArgb: Int?
-    public var backgroundDarkArgb: Int?
 
     public init(
       title: String, body: String? = nil, progress: Double? = nil,
@@ -42,8 +38,7 @@ public struct LiveUpdatesAttributes: ActivityAttributes {
       actions: [LiveUpdatesAction] = [], extra: [String: String] = [:],
       timerStart: Double? = nil, timerEnd: Double? = nil,
       compactTrailing: String? = nil, minimal: String? = nil,
-      tintArgb: Int? = nil, tintDarkArgb: Int? = nil,
-      backgroundArgb: Int? = nil, backgroundDarkArgb: Int? = nil
+      tintArgb: Int? = nil, backgroundArgb: Int? = nil
     ) {
       self.title = title
       self.body = body
@@ -58,9 +53,7 @@ public struct LiveUpdatesAttributes: ActivityAttributes {
       self.compactTrailing = compactTrailing
       self.minimal = minimal
       self.tintArgb = tintArgb
-      self.tintDarkArgb = tintDarkArgb
       self.backgroundArgb = backgroundArgb
-      self.backgroundDarkArgb = backgroundDarkArgb
     }
 
     // Lenient decoding so APNs `content-state` may omit optional keys.
@@ -79,9 +72,7 @@ public struct LiveUpdatesAttributes: ActivityAttributes {
       compactTrailing = try c.decodeIfPresent(String.self, forKey: .compactTrailing)
       minimal = try c.decodeIfPresent(String.self, forKey: .minimal)
       tintArgb = try c.decodeIfPresent(Int.self, forKey: .tintArgb)
-      tintDarkArgb = try c.decodeIfPresent(Int.self, forKey: .tintDarkArgb)
       backgroundArgb = try c.decodeIfPresent(Int.self, forKey: .backgroundArgb)
-      backgroundDarkArgb = try c.decodeIfPresent(Int.self, forKey: .backgroundDarkArgb)
     }
   }
 

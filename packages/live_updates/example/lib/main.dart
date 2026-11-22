@@ -40,6 +40,7 @@ class _ExamplePageState extends State<ExamplePage> {
   DateTime _eta = DateTime.now();
   bool _push = false;
   IosLiveUpdateLayout _layout = IosLiveUpdateLayout.standard;
+  AndroidLiveUpdateMode _mode = AndroidLiveUpdateMode.liveUpdate;
 
   static const _layouts = {
     'standard': IosLiveUpdateLayout.standard,
@@ -88,32 +89,40 @@ class _ExamplePageState extends State<ExamplePage> {
     route: '/orders/1234',
     // Counted by the system: no update needed every second.
     timer: LiveUpdateTimer.countdown(_eta),
-    // Data for the metrics, stepper and journey layouts. Android uses it
-    // too: metrics (Android 17), stages as progress segments, text.
+    // Data for the metrics, stepper and journey layouts, sent only with the
+    // layout that shows it so each one can be compared. Android shows the
+    // same data its own way: metrics (Android 17), stages as progress
+    // segments, text.
     metrics: [
-      LiveUpdateMetric.timer('Arrives in', _eta),
-      LiveUpdateMetric.decimal(
-        'Distance',
-        (1 - _progress) * 4,
-        unit: 'km',
-        semanticStyle: _progress >= 1
-            ? LiveUpdateSemanticStyle.safe
-            : LiveUpdateSemanticStyle.info,
-      ),
+      if (_layout == IosLiveUpdateLayout.metrics) ...[
+        LiveUpdateMetric.timer('Arrives in', _eta),
+        LiveUpdateMetric.decimal(
+          'Distance',
+          (1 - _progress) * 4,
+          unit: 'km',
+          semanticStyle: _progress >= 1
+              ? LiveUpdateSemanticStyle.safe
+              : LiveUpdateSemanticStyle.info,
+        ),
+      ],
     ],
-    steps: LiveUpdateSteps(const [
-      'Ordered',
-      'Preparing',
-      'On the way',
-      'Delivered',
-    ], current: (_progress * 3).round()),
-    journey: LiveUpdateJourney(
-      from: 'Shop',
-      to: 'Home',
-      toDetail:
-          '${_eta.hour.toString().padLeft(2, '0')}:'
-          '${_eta.minute.toString().padLeft(2, '0')}',
-    ),
+    steps: _layout == IosLiveUpdateLayout.stepper
+        ? LiveUpdateSteps(const [
+            'Ordered',
+            'Preparing',
+            'On the way',
+            'Delivered',
+          ], current: (_progress * 3).round())
+        : null,
+    journey: _layout == IosLiveUpdateLayout.journey
+        ? LiveUpdateJourney(
+            from: 'Shop',
+            to: 'Home',
+            toDetail:
+                '${_eta.hour.toString().padLeft(2, '0')}:'
+                '${_eta.minute.toString().padLeft(2, '0')}',
+          )
+        : null,
     ios: IosLiveUpdateOptions(
       layout: _layout,
       // The compact Dynamic Island shows the countdown instead of the progress.
@@ -138,6 +147,7 @@ class _ExamplePageState extends State<ExamplePage> {
       ),
     ],
     android: AndroidLiveUpdateOptions(
+      mode: _mode,
       shortCriticalText: 'ETA',
       // Gone after 2 hours even if the app never ends it.
       timeoutAfter: const Duration(hours: 2),
@@ -213,7 +223,7 @@ class _ExamplePageState extends State<ExamplePage> {
           ],
         ),
         ListTile(
-          title: const Text('iOS layout (applies on Start / Update)'),
+          title: const Text('Layout (applies on Start / Update)'),
           trailing: DropdownButton<IosLiveUpdateLayout>(
             value: _layout,
             items: [
@@ -221,6 +231,17 @@ class _ExamplePageState extends State<ExamplePage> {
                 DropdownMenuItem(value: value, child: Text(key)),
             ],
             onChanged: (v) => setState(() => _layout = v ?? _layout),
+          ),
+        ),
+        ListTile(
+          title: const Text('Android display mode'),
+          trailing: DropdownButton<AndroidLiveUpdateMode>(
+            value: _mode,
+            items: [
+              for (final m in AndroidLiveUpdateMode.values)
+                DropdownMenuItem(value: m, child: Text(m.name)),
+            ],
+            onChanged: (v) => setState(() => _mode = v ?? _mode),
           ),
         ),
         SwitchListTile(

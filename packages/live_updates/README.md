@@ -366,6 +366,24 @@ LiveUpdateContent(
 | `stepper` | stages as dots, the current one highlighted | `steps` | Android 16+ progress segments and points; "2/4 Preparing" in the text |
 | `journey` | from and to with the progress between them | `journey`, `progress` | "Shop → Home" in the text |
 
+The same content on each platform (the example app; iOS 27 Lock Screen,
+Android 17 notification shade):
+
+| Layout | iOS | Android Live Update | Android ongoing notification |
+| --- | --- | --- | --- |
+| `standard` | <img src="https://raw.githubusercontent.com/metal-president/live_updates/main/docs/screenshots/layouts/ios_standard.png" alt="iOS standard layout" width="260"> | <img src="https://raw.githubusercontent.com/metal-president/live_updates/main/docs/screenshots/layouts/android_live_update_standard.png" alt="Android Live Update with standard data" width="260"> | <img src="https://raw.githubusercontent.com/metal-president/live_updates/main/docs/screenshots/layouts/android_classic_standard.png" alt="Android ongoing notification with standard data" width="260"> |
+| `timer` | <img src="https://raw.githubusercontent.com/metal-president/live_updates/main/docs/screenshots/layouts/ios_timer.png" alt="iOS timer layout" width="260"> | <img src="https://raw.githubusercontent.com/metal-president/live_updates/main/docs/screenshots/layouts/android_live_update_timer.png" alt="Android Live Update with timer data" width="260"> | <img src="https://raw.githubusercontent.com/metal-president/live_updates/main/docs/screenshots/layouts/android_classic_timer.png" alt="Android ongoing notification with timer data" width="260"> |
+| `metrics` | <img src="https://raw.githubusercontent.com/metal-president/live_updates/main/docs/screenshots/layouts/ios_metrics.png" alt="iOS metrics layout" width="260"> | <img src="https://raw.githubusercontent.com/metal-president/live_updates/main/docs/screenshots/layouts/android_live_update_metrics.png" alt="Android Live Update with metrics data" width="260"> | <img src="https://raw.githubusercontent.com/metal-president/live_updates/main/docs/screenshots/layouts/android_classic_metrics.png" alt="Android ongoing notification with metrics data" width="260"> |
+| `stepper` | <img src="https://raw.githubusercontent.com/metal-president/live_updates/main/docs/screenshots/layouts/ios_stepper.png" alt="iOS stepper layout" width="260"> | <img src="https://raw.githubusercontent.com/metal-president/live_updates/main/docs/screenshots/layouts/android_live_update_stepper.png" alt="Android Live Update with stepper data" width="260"> | <img src="https://raw.githubusercontent.com/metal-president/live_updates/main/docs/screenshots/layouts/android_classic_stepper.png" alt="Android ongoing notification with stepper data" width="260"> |
+| `journey` | <img src="https://raw.githubusercontent.com/metal-president/live_updates/main/docs/screenshots/layouts/ios_journey.png" alt="iOS journey layout" width="260"> | <img src="https://raw.githubusercontent.com/metal-president/live_updates/main/docs/screenshots/layouts/android_live_update_journey.png" alt="Android Live Update with journey data" width="260"> | <img src="https://raw.githubusercontent.com/metal-president/live_updates/main/docs/screenshots/layouts/android_classic_journey.png" alt="Android ongoing notification with journey data" width="260"> |
+
+Android has no layout setting; it shows the data that the content carries.
+The Live Update column is `AndroidLiveUpdateMode.liveUpdate` on Android 16 and
+later (`ongoing` looks the same without being promoted); metrics use
+`MetricStyle` only on Android 17. The ongoing notification column is
+`AndroidLiveUpdateMode.classic`, which is also what Android 15 and earlier
+show.
+
 A layout whose data is missing falls back to `standard`. The expanded Dynamic
 Island shows the metrics, steps or journey of the chosen layout in place of
 the body (there is no room for both), and buttons stay at the bottom of every

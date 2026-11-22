@@ -126,7 +126,7 @@ public final class LiveUpdatesBridge {
     return c != null && manager(c).areNotificationsEnabled();
   }
 
-  /** Whether this device shows Live Updates (Android 16+ promoted notifications). */
+  /** Whether this app may post promoted notifications (Live Updates; the user can turn it off). */
   public static boolean canPostPromotedNotifications() {
     Context c = context;
     if (c == null || Build.VERSION.SDK_INT < 36) return false;
@@ -256,9 +256,9 @@ public final class LiveUpdatesBridge {
   }
 
   /**
-   * Calls {@code listener} with button presses. Presses made while no Dart
-   * listener was attached (including while the app was not running) are
-   * persisted and delivered first, in order.
+   * Calls {@code listener} with presses of {@code updateIds} ({@code null}:
+   * all) while the app is in the foreground, starting with queued ones in
+   * order. Other presses stay queued for the background handler.
    */
   public static void observeActions(
       @NonNull ActionListener listener, long engineId, @Nullable String[] updateIds) {
@@ -706,7 +706,8 @@ public final class LiveUpdatesBridge {
 
   /**
    * Calls {@code listener} with lifecycle events: {@code started} (new live
-   * update, local or remote), {@code ended} (ended by the app or a payload)
+   * update, local or remote), {@code ended} (ended by the app, a payload or a
+   * timeout)
    * and {@code dismissed} (swiped away by the user).
    */
   public static void observeEvents(@NonNull EventListener listener, long engineId) {

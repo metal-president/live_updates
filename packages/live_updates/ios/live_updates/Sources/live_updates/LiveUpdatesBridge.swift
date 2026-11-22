@@ -5,9 +5,10 @@ import UIKit
 /// Objective-C surface over ActivityKit, consumed from Dart through FFIgen.
 ///
 /// Content is exchanged as JSON strings to keep the bridged surface small:
-/// `{"title", "body", "progress", "iconName", "route", "image", "actions",
-///   "extra", "staleDate" (epoch seconds), "relevanceScore",
-///   "enablePushUpdates", "alert": {"title", "body", "sound"}}`.
+/// the keys of `LiveUpdatesAttributes.ContentState` (written by the Dart
+/// `LiveUpdateContentJson`) plus "staleDate" (epoch seconds),
+/// "relevanceScore", "enablePushUpdates", "broadcastChannelId" and
+/// "alert": {"title", "body", "sound"}.
 ///
 /// Mutable state is only touched on the main thread: Dart calls these methods
 /// on the platform (main) thread, and Tasks hop to the main actor before

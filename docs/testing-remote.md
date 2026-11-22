@@ -180,7 +180,8 @@ Notifications). It cannot be enabled from Xcode.
      promotion off per app in system settings. Android 16 builds without
      promoted notification support show `ProgressStyle` without the chip.
    - Android 15 or lower: a regular ongoing notification with a progress bar.
-   - Android 17: metrics and semantic colors replace the progress bar
+   - Android 17: metrics replace the progress bar, and semantic colors tint
+     the body, progress and metrics
      (`type` is `integer`, `decimal`, `text`, `timer`, `stopwatch`,
      `pausedTimer` or `pausedStopwatch`; timers take epoch milliseconds,
      paused ones a duration in milliseconds):

@@ -68,13 +68,43 @@ jobs:
         env:
           UDID: ${{ steps.sim.outputs.udid }}
         run: |
-          run() { perl -e 'alarm shift; exec @ARGV' 1200 flutter test integration_test -d "$UDID"; }
-          if run; then exit 0; fi
+          mkdir -p "$RUNNER_TEMP/ios-logs"
+          # Verbose output goes to a file (uploaded on failure); the end of it
+          # is printed after each attempt.
+          run() {
+            local log="$RUNNER_TEMP/ios-logs/flutter-attempt-$1.log" status=0
+            perl -e 'alarm shift; exec @ARGV' 1200 \
+              flutter test integration_test -d "$UDID" -v > "$log" 2>&1 || status=$?
+            tail -n 60 "$log"
+            echo "Attempt $1 exited with $status"
+            return $status
+          }
+          if run 1; then exit 0; fi
           echo "::warning::First attempt failed or timed out; retrying on a rebooted simulator."
           xcrun simctl shutdown "$UDID" || true
           xcrun simctl boot "$UDID"
           xcrun simctl bootstatus "$UDID" -b
-          run
+          run 2
+      - name: Collect simulator logs
+        if: failure()
+        env:
+          UDID: ${{ steps.sim.outputs.udid }}
+        run: |
+          out="$RUNNER_TEMP/ios-logs"
+          mkdir -p "$out"
+          xcrun simctl spawn "$UDID" log show --last 90m --style compact \
+            --predicate 'process == "Runner" OR process == "LiveUpdatesWidgetExtension" OR subsystem BEGINSWITH "com.apple.runningboard" OR subsystem BEGINSWITH "com.apple.FrontBoard"' \
+            > "$out/simulator.log" 2>&1 || true
+          cp ~/Library/Logs/DiagnosticReports/*Runner* "$out/" 2>/dev/null || true
+          xcrun simctl listapps "$UDID" > "$out/apps.txt" 2>&1 || true
+          ls -la "$out"
+      - name: Upload simulator logs
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ios-logs-${{ matrix.runner }}
+          path: ${{ runner.temp }}/ios-logs
+          retention-days: 7
 
   integration-android:
     runs-on: ubuntu-latest

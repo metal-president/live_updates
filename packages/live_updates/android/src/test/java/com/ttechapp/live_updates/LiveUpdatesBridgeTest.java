@@ -596,4 +596,32 @@ public class LiveUpdatesBridgeTest {
     LiveUpdatesBridge.takeQueuedActions();
     assertEquals(before + 2, LiveUpdatesBridge.takeCount);
   }
+
+  @Test
+  public void regularNotificationsShowTheDetailAsASecondLine() throws Exception {
+    String id =
+        LiveUpdatesBridge.start(
+            "{\"title\":\"Order\",\"body\":\"On the way\",\"progress\":0.5,"
+                + "\"androidMode\":\"classic\",\"journey\":{\"from\":\"Shop\",\"to\":\"Home\"}}");
+    Notification n = shown(id);
+    // Not in the header, where it would be cut off.
+    assertEquals(null, n.extras.getCharSequence(Notification.EXTRA_SUB_TEXT));
+    assertEquals("On the way", n.extras.getCharSequence(Notification.EXTRA_TEXT).toString());
+    assertEquals(
+        "On the way\nShop \u2192 Home",
+        n.extras.getCharSequence(Notification.EXTRA_BIG_TEXT).toString());
+    assertEquals(50, n.extras.getInt(Notification.EXTRA_PROGRESS));
+  }
+
+  @Test
+  public void liveUpdatesWithoutProgressKeepTheSubText() throws Exception {
+    // Android 16+ (not classic): unchanged, the detail stays the sub text.
+    String id =
+        LiveUpdatesBridge.start(
+            "{\"title\":\"Trip\",\"body\":\"On time\",\"journey\":{\"from\":\"A\",\"to\":\"B\"}}");
+    Notification n = shown(id);
+    assertEquals("A \u2192 B", n.extras.getCharSequence(Notification.EXTRA_SUB_TEXT).toString());
+    assertEquals(null, n.extras.getCharSequence(Notification.EXTRA_BIG_TEXT));
+  }
+
 }

@@ -378,8 +378,8 @@ Android 17 notification shade):
 | `journey` | <img src="https://raw.githubusercontent.com/metal-president/live_updates/main/docs/screenshots/layouts/ios_journey.png" alt="iOS journey layout" width="260"> | <img src="https://raw.githubusercontent.com/metal-president/live_updates/main/docs/screenshots/layouts/android_live_update_journey.png" alt="Android Live Update with journey data" width="260"> | <img src="https://raw.githubusercontent.com/metal-president/live_updates/main/docs/screenshots/layouts/android_classic_journey.png" alt="Android ongoing notification with journey data" width="260"> |
 
 Android has no layout setting; it shows the data that the content carries.
-The Live Update column is `AndroidLiveUpdateMode.liveUpdate` on Android 16 and
-later (`ongoing` looks the same without being promoted); metrics use
+The Live Update column is `AndroidLiveUpdateMode.liveUpdate` on builds that
+support promoted notifications (Android 16 QPR1 and later); metrics use
 `MetricStyle` only on Android 17. The ongoing notification column is
 `AndroidLiveUpdateMode.classic`, which is also what Android 15 and earlier
 show.

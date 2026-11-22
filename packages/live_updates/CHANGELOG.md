@@ -1,5 +1,10 @@
 ## Unreleased
 
+- **Breaking:** `AndroidLiveUpdateOptions.requestPromotion` is replaced by
+  `mode` (`AndroidLiveUpdateMode.liveUpdate`, `ongoing`, `classic`).
+  `requestPromotion: false` becomes `mode: AndroidLiveUpdateMode.ongoing`;
+  `classic` shows the same notification as Android 15 and earlier on every
+  version. Remote payloads with `requestPromotion: false` still work.
 - `IosLiveUpdateOptions.color`, `backgroundColor` and `foregroundColor`:
   accent, Lock Screen background and text of the generated widget
   (content-state keys `tintArgb` / `backgroundArgb` / `foregroundArgb`); the

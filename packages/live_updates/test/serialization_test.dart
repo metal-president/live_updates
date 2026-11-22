@@ -75,14 +75,14 @@ void main() {
     );
   });
 
-  test('promotion opt-out is encoded', () {
-    expect(
-      const LiveUpdateContent(
-        title: 'T',
-        android: AndroidLiveUpdateOptions(requestPromotion: false),
-      ).toJson()['requestPromotion'],
-      isFalse,
-    );
+  test('android mode is encoded unless it is the default', () {
+    Object? mode(AndroidLiveUpdateMode m) => LiveUpdateContent(
+      title: 'T',
+      android: AndroidLiveUpdateOptions(mode: m),
+    ).toJson()['androidMode'];
+    expect(mode(AndroidLiveUpdateMode.liveUpdate), isNull);
+    expect(mode(AndroidLiveUpdateMode.ongoing), 'ongoing');
+    expect(mode(AndroidLiveUpdateMode.classic), 'classic');
   });
 
   test('android metrics and semantic styles', () {

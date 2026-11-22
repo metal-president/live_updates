@@ -261,4 +261,33 @@ public class LiveUpdatesBridgeTest {
     assertEquals("remote-8", LiveUpdatesBridge.keyForId("remote-8"));
     assertEquals(null, LiveUpdatesBridge.keyForId("missing"));
   }
+
+  @Test
+  public void classicModeUsesThePlainProgressBar() throws Exception {
+    String id =
+        LiveUpdatesBridge.start(
+            "{\"title\":\"A\",\"progress\":0.5,\"androidMode\":\"classic\","
+                + "\"progressSegments\":[{\"length\":1}]}");
+    Notification n = shown(id);
+    assertEquals(null, n.extras.getString(Notification.EXTRA_TEMPLATE));
+    assertEquals(100, n.extras.getInt(Notification.EXTRA_PROGRESS_MAX));
+    assertEquals(50, n.extras.getInt(Notification.EXTRA_PROGRESS));
+    assertFalse(n.extras.getBoolean("android.requestPromotedOngoing"));
+  }
+
+  @Test
+  public void modesControlPromotion() throws Exception {
+    String live = LiveUpdatesBridge.start("{\"title\":\"A\",\"progress\":0.5}");
+    assertTrue(shown(live).extras.getBoolean("android.requestPromotedOngoing"));
+    String ongoing =
+        LiveUpdatesBridge.start("{\"title\":\"A\",\"progress\":0.5,\"androidMode\":\"ongoing\"}");
+    assertFalse(shown(ongoing).extras.getBoolean("android.requestPromotedOngoing"));
+    assertEquals(
+        "android.app.Notification$ProgressStyle",
+        shown(ongoing).extras.getString(Notification.EXTRA_TEMPLATE));
+    // Payloads from before androidMode existed.
+    String old =
+        LiveUpdatesBridge.start("{\"title\":\"A\",\"progress\":0.5,\"requestPromotion\":false}");
+    assertFalse(shown(old).extras.getBoolean("android.requestPromotedOngoing"));
+  }
 }

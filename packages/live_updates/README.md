@@ -157,8 +157,9 @@ Interface Guidelines for Live Activities and Android's
   ride, a food order, navigation, a call or a sports score.
 - Do not use them for ads, promotions, chat messages or reminders.
 - Do not start them for something the user did not ask for. On Android set
-  `AndroidLiveUpdateOptions(requestPromotion: false)` for anything that is not
-  a Live Update; it then stays a regular notification.
+  `AndroidLiveUpdateOptions(mode: AndroidLiveUpdateMode.ongoing)` (or
+  `classic`) for anything that is not a Live Update; it then stays a regular
+  notification.
 - Do not bring back an update the user dismissed. On Android `update` fails
   for a dismissed update, and remote `update` payloads for it are ignored.
 - Keep `shortCriticalText` short (Android suggests at most 7 characters) and
@@ -323,6 +324,23 @@ LiveUpdateContent(
 
 On iOS a countdown stops at zero; Android keeps counting below zero, so update
 or end the live update when the time is up.
+
+### Android display modes
+
+`AndroidLiveUpdateOptions.mode` chooses how Android 16 and later show the
+update (older versions always show a regular ongoing notification with a
+progress bar):
+
+| Mode | Android 16+ look | Promoted to a Live Update |
+| --- | --- | --- |
+| `liveUpdate` (default) | `ProgressStyle` / Android 17 `MetricStyle` | requested |
+| `ongoing` | `ProgressStyle` / Android 17 `MetricStyle` | no |
+| `classic` | the same as Android 15 and earlier | no |
+
+Use `liveUpdate` only for activities that fit Android's Live Update guidance,
+`ongoing` for other activities that benefit from the richer progress, and
+`classic` for the same look on every version (the body is always shown;
+segments, points, metrics and semantic colors are not used).
 
 ### Android progress stages, timeout and alerts
 

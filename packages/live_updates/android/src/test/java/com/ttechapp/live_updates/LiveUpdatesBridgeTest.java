@@ -467,7 +467,7 @@ public class LiveUpdatesBridgeTest {
   public void journeyAndMetricsAreShownAsText() throws Exception {
     String id =
         LiveUpdatesBridge.start(
-            "{\"title\":\"Trip\",\"body\":\"On time\",\"progress\":0.5,\"journey\":{\"from\":\"A\",\"to\":\"B\"},"
+            "{\"title\":\"Trip\",\"body\":\"On time\",\"journey\":{\"from\":\"A\",\"to\":\"B\"},"
                 + "\"metrics\":[{\"label\":\"Home\",\"type\":\"integer\",\"value\":2},"
                 + "{\"label\":\"Dist\",\"type\":\"decimal\",\"value\":4.25,\"unit\":\"km\"},"
                 + "{\"label\":\"ETA\",\"type\":\"timer\",\"value\":1}]}");
@@ -614,13 +614,14 @@ public class LiveUpdatesBridgeTest {
   }
 
   @Test
-  public void withoutAProgressStyleTheDetailIsASecondLineToo() throws Exception {
+  public void liveUpdatesWithoutProgressKeepTheSubText() throws Exception {
+    // Android 16+ (not classic): unchanged, the detail stays the sub text.
     String id =
         LiveUpdatesBridge.start(
             "{\"title\":\"Trip\",\"body\":\"On time\",\"journey\":{\"from\":\"A\",\"to\":\"B\"}}");
     Notification n = shown(id);
-    assertEquals(null, n.extras.getCharSequence(Notification.EXTRA_SUB_TEXT));
-    assertEquals(
-        "On time\nA \u2192 B", n.extras.getCharSequence(Notification.EXTRA_BIG_TEXT).toString());
+    assertEquals("A \u2192 B", n.extras.getCharSequence(Notification.EXTRA_SUB_TEXT).toString());
+    assertEquals(null, n.extras.getCharSequence(Notification.EXTRA_BIG_TEXT));
   }
+
 }

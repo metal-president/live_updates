@@ -946,18 +946,19 @@ public final class LiveUpdatesBridge {
                 : (double) currentStep / (stepCount - 1);
         b.setStyle(progressStyle(c, content, fraction));
       }
-      // ProgressStyle and MetricStyle show the sub text as a line of its own.
-      styled = metrics || hasProgress || stepCount >= 2;
+      // Android 16+ Live Updates keep the sub text as before (ProgressStyle and
+      // MetricStyle show it as a line of its own).
+      styled = true;
     } else if (hasProgress) {
       b.setProgress(100, progress, false);
     } else if (stepCount >= 2) {
       b.setProgress(stepCount - 1, currentStep, false);
     }
     // Steps, journey and (unless MetricStyle shows them) metrics as text: the
-    // body line when there is no body. Otherwise the sub text, which the
-    // Android 16+ styles show as a line of its own; the regular template
-    // squeezes it into the header, so there it becomes a second line of the
-    // expanded notification instead.
+    // body line when there is no body. Otherwise the sub text on Android 16+
+    // (liveUpdate, ongoing); the regular notification (classic, Android 15 and
+    // earlier) squeezes the sub text into the header, so there it becomes a
+    // second line of the expanded notification instead.
     String detail = detailText(content, !metrics);
     if (detail != null) {
       if (body == null) {

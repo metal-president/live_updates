@@ -25,7 +25,10 @@ final class LiveUpdate {
       _platform.update(id, content);
 
   /// Ends the update. On iOS [dismissAfter] keeps it on the Lock Screen for
-  /// that long; `Duration.zero` removes it immediately.
+  /// that long; `Duration.zero` removes it immediately. On Android the
+  /// notification is removed at once unless [finalContent] is given: then
+  /// that content stays as a regular notification for [dismissAfter]
+  /// (Android 8.0+; until dismissed when [dismissAfter] is `null`).
   Future<void> end({LiveUpdateContent? finalContent, Duration? dismissAfter}) =>
       _platform.end(id, finalContent: finalContent, dismissAfter: dismissAfter);
 

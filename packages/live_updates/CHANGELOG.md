@@ -1,4 +1,4 @@
-## Unreleased
+## 0.0.6
 
 - Docs: clearer platform table (Live Activity push tokens, buttons, images,
   remote updates, broadcasts), requirements, `end(dismissAfter:)` on Android,

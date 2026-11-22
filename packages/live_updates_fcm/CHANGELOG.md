@@ -1,6 +1,7 @@
-## Unreleased
+## 0.0.6
 
 - Docs: clearer iOS description and content keys.
+- Requires live_updates 0.0.6.
 
 ## 0.0.5
 

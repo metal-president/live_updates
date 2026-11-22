@@ -131,7 +131,9 @@ class KeyedPlatform extends NoopLiveUpdatesPlatform {
   Future<String?> idForKey(String key) async => ids[key];
 
   @override
-  Stream<(String, String)> get actions => actionsController.stream;
+  Stream<(String, String)> actions({String? updateId}) => actionsController
+      .stream
+      .where((e) => updateId == null || e.$1 == updateId);
 }
 
 void keyedTests() {

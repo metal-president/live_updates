@@ -70,7 +70,8 @@ final class LiveUpdateContent {
   /// Values such as a score, a distance or a countdown (up to three are
   /// used). iOS shows them with [IosLiveUpdateLayout.metrics]; Android 17
   /// shows them with `MetricStyle` instead of the progress bar (and without
-  /// the body), older versions add them to the text.
+  /// the body), older versions add the number and text metrics to the text
+  /// (use [timer] for a countdown there).
   ///
   /// Keep labels short: Android recommends 10 characters or fewer.
   final List<LiveUpdateMetric> metrics;
@@ -364,7 +365,8 @@ final class LiveUpdateImage {
       filePath = null,
       url = null;
 
-  /// An image downloaded over HTTP(S) when the update is posted.
+  /// An image downloaded over HTTPS when the update is posted (redirects
+  /// must stay on HTTPS).
   const LiveUpdateImage.network(Uri this.url, {this.maxDimension = 256})
     : assetName = null,
       filePath = null,
@@ -684,7 +686,9 @@ final class AndroidLiveUpdateOptions {
   final String? progressTrackerIcon;
 
   /// Removes the notification after this time (at least one minute, counted
-  /// from the latest post) even if the app is not running, so a forgotten update does not stay on screen.
+  /// from the latest post) even if the app is not running, so a forgotten
+  /// update does not stay on screen. A timed-out update reports
+  /// [LiveUpdateState.ended], and its key can be started again.
   /// Android 8+; on iOS use [IosLiveUpdateOptions.staleDate] and end the
   /// activity.
   final Duration? timeoutAfter;

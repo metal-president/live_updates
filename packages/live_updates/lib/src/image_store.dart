@@ -39,7 +39,13 @@ class ImageStore {
     } else {
       directory.createSync(recursive: true);
       final png = await _scaleToPng(source, image.maxDimension);
-      await file.writeAsBytes(png, flush: true);
+      // Written under a temporary name and renamed, so native code never
+      // reads a partly written file (two stores of one image may overlap).
+      final temp = File(
+        '${file.path}.${DateTime.now().microsecondsSinceEpoch}.tmp',
+      );
+      await temp.writeAsBytes(png, flush: true);
+      await temp.rename(file.path);
     }
     _cleanUp(keep: name);
     return name;
@@ -58,9 +64,21 @@ class ImageStore {
     }
     final client = HttpClient()..connectionTimeout = downloadTimeout;
     try {
-      final request = await client.getUrl(url).timeout(downloadTimeout);
-      request.maxRedirects = 3;
-      final response = await request.close().timeout(downloadTimeout);
+      var target = url;
+      HttpClientResponse response;
+      // Redirects are followed here, so every hop must be https as well.
+      for (var redirects = 0; ; redirects++) {
+        final request = await client.getUrl(target).timeout(downloadTimeout);
+        request.followRedirects = false;
+        response = await request.close().timeout(downloadTimeout);
+        final location = response.headers.value(HttpHeaders.locationHeader);
+        if (!response.isRedirect || location == null) break;
+        await response.drain<void>();
+        target = target.resolve(location);
+        if (redirects >= 3 || target.scheme != 'https') {
+          throw LiveUpdateException('Image redirect not allowed: $target');
+        }
+      }
       if (response.statusCode != HttpStatus.ok) {
         throw LiveUpdateException(
           'Image download failed (${response.statusCode}): $url',

@@ -6,6 +6,7 @@ import 'package:objective_c/objective_c.dart' as objc;
 import '../ios/bindings.g.dart';
 import '../models.dart';
 import 'buffered_broadcast.dart';
+import 'observed_broadcast.dart';
 import 'content_encoder.dart';
 import 'latest_value_stream.dart';
 import 'live_updates_platform.dart';
@@ -34,15 +35,26 @@ class IosLiveUpdatesPlatform extends LiveUpdatesPlatform with ContentEncoder {
       ),
     ),
   );
-  late final _actions = BufferedBroadcast<(String, String)>(
-    (add) => LiveUpdatesBridge.observeActions(
+  late final _actions = ObservedBroadcast<(String, String)>(
+    keyOf: (e) => e.$1,
+    attach: (add, keys) => LiveUpdatesBridge.observeActions(
       ObjCBlock_ffiVoid_NSString.listener((e) {
         final s = e.toDartString();
         final i = s.indexOf('\n');
         add((s.substring(0, i), s.substring(i + 1)));
       }),
+      activityIds: _nsList(keys),
+    ),
+    setFilter: (keys) => LiveUpdatesBridge.setActionFilter(_nsList(keys)),
+    detach: LiveUpdatesBridge.unobserveActions,
+    requeue: (events) => LiveUpdatesBridge.requeueActions(
+      _nsList({for (final (u, a) in events) '$u\n$a'})!,
     ),
   );
+
+  static objc.NSArray? _nsList(Set<String>? values) => values == null
+      ? null
+      : objc.NSArray.of([for (final v in values) v.toNSString()]);
   final _pushTokens = <String, LatestValueStream<LiveUpdatePushToken>>{};
   final _events = StreamController<(String, String)>.broadcast();
   bool _eventsObserved = false;
@@ -124,7 +136,8 @@ class IosLiveUpdatesPlatform extends LiveUpdatesPlatform with ContentEncoder {
       LiveUpdatesBridge.keyForId(_ns(id))?.toDartString();
 
   @override
-  Stream<(String, String)> get actions => _actions.stream;
+  Stream<(String, String)> actions({String? updateId}) =>
+      _actions.stream(updateId);
 
   @override
   Future<void> setBackgroundActionHandler(int dispatcher, int handler) async =>

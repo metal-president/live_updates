@@ -41,8 +41,13 @@ final class LiveUpdate {
       .cast<LiveUpdateState>();
 
   /// Presses of this update's buttons ([LiveUpdateContent.actions]).
+  ///
+  /// While this is listened to, this update's presses go to the app instead
+  /// of the background action handler. Presses of other updates go to
+  /// [LiveUpdates.onAction] if it is listened to, else to the background
+  /// handler.
   Stream<String> get actions =>
-      _platform.actions.where((e) => e.$1 == id).map((e) => e.$2);
+      _platform.actions(updateId: id).map((e) => e.$2);
 
   /// Per-activity APNs push tokens (iOS only, empty elsewhere). A new
   /// listener first receives the current token, if one is known. Requires
@@ -176,7 +181,7 @@ abstract final class LiveUpdates {
 
   /// Button presses on any live update, including presses made while the
   /// app was not running once Dart listens again.
-  static Stream<LiveUpdateActionEvent> get onAction => _platform.actions.map(
+  static Stream<LiveUpdateActionEvent> get onAction => _platform.actions().map(
     (e) => LiveUpdateActionEvent(updateId: e.$1, actionId: e.$2),
   );
 
@@ -187,8 +192,10 @@ abstract final class LiveUpdates {
   ///
   /// [handler] must be a top-level or static function annotated with
   /// `@pragma('vm:entry-point')`. It has a few seconds to finish (the system
-  /// limits background work). It also runs while the app is open if nothing
-  /// listens to [onAction].
+  /// limits background work). It also runs while the app is open for presses
+  /// that no [onAction] (or that update's [LiveUpdate.actions]) listener
+  /// takes, and for an open-app press that no listener takes within a few
+  /// seconds of the launch.
   ///
   /// Buttons can be pressed on the Lock Screen, so the handler may run
   /// without the device being unlocked. Make destructive actions require an
@@ -208,7 +215,8 @@ abstract final class LiveUpdates {
   ) => registerBackgroundActionHandler(handler);
 
   /// Currently running live updates started by this app, including ones
-  /// started remotely with a push-to-start token.
+  /// started remotely with a push-to-start token. Ended and dismissed ones
+  /// are not included.
   static Future<List<LiveUpdate>> active() async => [
     for (final id in await _platform.activeIds())
       LiveUpdate._(id, await _platform.keyForId(id)),

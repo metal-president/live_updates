@@ -47,6 +47,52 @@ jobs:
       - run: flutter build apk --debug
         working-directory: packages/live_updates/example
 
+  ios-unit-test:
+    runs-on: macos-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version-file: .fvmrc
+          cache: true
+      - run: xcodebuild -version
+      # Generates the Flutter build settings the Xcode project needs.
+      - run: flutter build ios --simulator --debug
+        working-directory: packages/live_updates/example
+      - name: Boot an iPhone simulator
+        id: sim
+        run: |
+          # Newest iPhone on a plain iOS runtime (no device-specific ones).
+          udid=$(xcrun simctl list devices available --json | python3 -c '
+          import json, sys
+          best = None
+          for runtime, items in json.load(sys.stdin)["devices"].items():
+              if ".iOS-" not in runtime:
+                  continue
+              parts = runtime.split(".iOS-")[1].split("-")
+              if not all(p.isdigit() for p in parts):
+                  continue
+              version = tuple(int(p) for p in parts)
+              for d in items:
+                  if d["name"].startswith("iPhone") and "Duo" not in d["name"]:
+                      if best is None or version > best[0]:
+                          best = (version, d["udid"])
+          print(best[1])
+          ')
+          xcrun simctl boot "$udid"
+          xcrun simctl bootstatus "$udid" -b
+          echo "udid=$udid" >> "$GITHUB_OUTPUT"
+      # Swift tests of the plugin (RunnerTests): content-state decoding,
+      # button press routing and URL checks.
+      - run: >
+          xcodebuild test -workspace Runner.xcworkspace -scheme Runner
+          -destination "id=${{ steps.sim.outputs.udid }}"
+          -only-testing:RunnerTests -parallel-testing-enabled NO
+        working-directory: packages/live_updates/example/ios
+
   android-unit-test:
     runs-on: ubuntu-latest
     steps:

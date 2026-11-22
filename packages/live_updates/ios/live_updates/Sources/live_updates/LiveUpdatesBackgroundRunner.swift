@@ -54,11 +54,11 @@ public final class LiveUpdatesBackgroundRunner: NSObject {
     timeoutWork = nil
     engine?.destroyContext()
     engine = nil
-    if mayRestart, LiveUpdatesBridge.hasQueuedBackgroundActions,
-      LiveUpdatesBridge.startBackgroundHandler().boolValue
-    {
-      return
-    }
+    // Releases the intents of this run (a late press's intent too: its press
+    // runs in the new engine with the time the app has left).
     NotificationCenter.default.post(name: doneNotification, object: nil)
+    if mayRestart, LiveUpdatesBridge.hasQueuedBackgroundActions {
+      _ = LiveUpdatesBridge.startBackgroundHandler()
+    }
   }
 }

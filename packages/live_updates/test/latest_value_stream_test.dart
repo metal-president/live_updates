@@ -27,6 +27,16 @@ void main() {
     expect(starts, 1);
   });
 
+  test('ignores a value that arrives after close', () async {
+    late void Function(int) add;
+    final s = LatestValueStream<int>((a) => add = a);
+    final done = s.stream.toList();
+    add(1);
+    await s.close();
+    add(2); // on its way when the stream was closed
+    expect(await done, [1]);
+  });
+
   test('push tokens do not print their value', () {
     expect(
       const LiveUpdatePushToken('abcdef').toString(),

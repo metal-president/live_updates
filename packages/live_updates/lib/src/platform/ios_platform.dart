@@ -36,17 +36,25 @@ class IosLiveUpdatesPlatform extends LiveUpdatesPlatform with ContentEncoder {
     ),
   );
   late final _actions = ObservedBroadcast<(String, String)>(
-    attach: (add) => LiveUpdatesBridge.observeActions(
+    keyOf: (e) => e.$1,
+    attach: (add, keys) => LiveUpdatesBridge.observeActions(
       ObjCBlock_ffiVoid_NSString.listener((e) {
         final s = e.toDartString();
         final i = s.indexOf('\n');
         add((s.substring(0, i), s.substring(i + 1)));
       }),
+      activityIds: _nsList(keys),
     ),
-    detach: (unhandled) => LiveUpdatesBridge.unobserveActions(
-      objc.NSArray.of([for (final (u, a) in unhandled) '$u\n$a'.toNSString()]),
+    setFilter: (keys) => LiveUpdatesBridge.setActionFilter(_nsList(keys)),
+    detach: LiveUpdatesBridge.unobserveActions,
+    requeue: (events) => LiveUpdatesBridge.requeueActions(
+      _nsList({for (final (u, a) in events) '$u\n$a'})!,
     ),
   );
+
+  static objc.NSArray? _nsList(Set<String>? values) => values == null
+      ? null
+      : objc.NSArray.of([for (final v in values) v.toNSString()]);
   final _pushTokens = <String, LatestValueStream<LiveUpdatePushToken>>{};
   final _events = StreamController<(String, String)>.broadcast();
   bool _eventsObserved = false;
@@ -129,7 +137,7 @@ class IosLiveUpdatesPlatform extends LiveUpdatesPlatform with ContentEncoder {
 
   @override
   Stream<(String, String)> actions({String? updateId}) =>
-      _actions.stream(updateId == null ? null : (e) => e.$1 == updateId);
+      _actions.stream(updateId);
 
   @override
   Future<void> setBackgroundActionHandler(int dispatcher, int handler) async =>

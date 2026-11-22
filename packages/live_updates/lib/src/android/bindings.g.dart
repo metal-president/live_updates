@@ -997,7 +997,7 @@ extension type LiveUpdatesBridge._(jni$_.JObject _$this)
 
   static final _id_observeActions = _class.staticMethodId(
     r'observeActions',
-    r'(Lcom/ttechapp/live_updates/LiveUpdatesBridge$ActionListener;J)V',
+    r'(Lcom/ttechapp/live_updates/LiveUpdatesBridge$ActionListener;J[Ljava/lang/String;)V',
   );
 
   static final _observeActions =
@@ -1006,7 +1006,13 @@ extension type LiveUpdatesBridge._(jni$_.JObject _$this)
               jni$_.JThrowablePtr Function(
                 jni$_.Pointer<jni$_.Void>,
                 jni$_.JMethodIDPtr,
-                jni$_.VarArgs<(jni$_.Pointer<jni$_.Void>, jni$_.Int64)>,
+                jni$_.VarArgs<
+                  (
+                    jni$_.Pointer<jni$_.Void>,
+                    jni$_.Int64,
+                    jni$_.Pointer<jni$_.Void>,
+                  )
+                >,
               )
             >
           >('globalEnv_CallStaticVoidMethod')
@@ -1016,10 +1022,11 @@ extension type LiveUpdatesBridge._(jni$_.JObject _$this)
               jni$_.JMethodIDPtr,
               jni$_.Pointer<jni$_.Void>,
               core$_.int,
+              jni$_.Pointer<jni$_.Void>,
             )
           >();
 
-  /// from: `static public void observeActions(com.ttechapp.live_updates.LiveUpdatesBridge$ActionListener listener, long engineId)`
+  /// from: `static public void observeActions(com.ttechapp.live_updates.LiveUpdatesBridge$ActionListener listener, long engineId, java.lang.String[] updateIds)`
   ///
   /// Calls {@code listener} with button presses. Presses made while no Dart
   /// listener was attached (including while the app was not running) are
@@ -1027,23 +1034,26 @@ extension type LiveUpdatesBridge._(jni$_.JObject _$this)
   static void observeActions(
     LiveUpdatesBridge$ActionListener listener,
     core$_.int engineId,
+    jni$_.JArray<jni$_.JString?>? updateIds,
   ) {
     final _$$classRef = _class.reference;
     final _$listener = listener.reference;
+    final _$updateIds = updateIds?.reference ?? jni$_.jNullReference;
     _observeActions(
       _$$classRef.pointer,
       _id_observeActions.pointer,
       _$listener.pointer,
       engineId,
+      _$updateIds.pointer,
     ).check();
   }
 
-  static final _id_unobserveActions = _class.staticMethodId(
-    r'unobserveActions',
+  static final _id_setActionFilter = _class.staticMethodId(
+    r'setActionFilter',
     r'(J[Ljava/lang/String;)V',
   );
 
-  static final _unobserveActions =
+  static final _setActionFilter =
       jni$_.ProtectedJniExtensions.lookup<
             jni$_.NativeFunction<
               jni$_.JThrowablePtr Function(
@@ -1062,23 +1072,94 @@ extension type LiveUpdatesBridge._(jni$_.JObject _$this)
             )
           >();
 
-  /// from: `static public void unobserveActions(long engineId, java.lang.String[] unhandled)`
+  /// from: `static public void setActionFilter(long engineId, java.lang.String[] updateIds)`
   ///
-  /// Stops delivering presses to Dart (nothing listens any more): later presses
-  /// are queued and run by the background handler. {@code unhandled} presses
-  /// ({@code "<update id>\n<action id>"}) that no Dart listener took are
-  /// queued again the same way.
-  static void unobserveActions(
+  /// Limits the presses Dart takes to those of {@code updateIds} ({@code null}: all).
+  static void setActionFilter(
     core$_.int engineId,
-    jni$_.JArray<jni$_.JString?> unhandled,
+    jni$_.JArray<jni$_.JString?>? updateIds,
   ) {
     final _$$classRef = _class.reference;
-    final _$unhandled = unhandled.reference;
+    final _$updateIds = updateIds?.reference ?? jni$_.jNullReference;
+    _setActionFilter(
+      _$$classRef.pointer,
+      _id_setActionFilter.pointer,
+      engineId,
+      _$updateIds.pointer,
+    ).check();
+  }
+
+  static final _id_requeueActions = _class.staticMethodId(
+    r'requeueActions',
+    r'([Ljava/lang/String;)V',
+  );
+
+  static final _requeueActions =
+      jni$_.ProtectedJniExtensions.lookup<
+            jni$_.NativeFunction<
+              jni$_.JThrowablePtr Function(
+                jni$_.Pointer<jni$_.Void>,
+                jni$_.JMethodIDPtr,
+                jni$_.VarArgs<(jni$_.Pointer<jni$_.Void>,)>,
+              )
+            >
+          >('globalEnv_CallStaticVoidMethod')
+          .asFunction<
+            jni$_.JThrowablePtr Function(
+              jni$_.Pointer<jni$_.Void>,
+              jni$_.JMethodIDPtr,
+              jni$_.Pointer<jni$_.Void>,
+            )
+          >();
+
+  /// from: `static public void requeueActions(java.lang.String[] presses)`
+  ///
+  /// Queues presses again that reached Dart but no listener took (it stopped
+  /// listening in the meantime), for a listener that takes them or the
+  /// background handler.
+  static void requeueActions(jni$_.JArray<jni$_.JString?> presses) {
+    final _$$classRef = _class.reference;
+    final _$presses = presses.reference;
+    _requeueActions(
+      _$$classRef.pointer,
+      _id_requeueActions.pointer,
+      _$presses.pointer,
+    ).check();
+  }
+
+  static final _id_unobserveActions = _class.staticMethodId(
+    r'unobserveActions',
+    r'(J)V',
+  );
+
+  static final _unobserveActions =
+      jni$_.ProtectedJniExtensions.lookup<
+            jni$_.NativeFunction<
+              jni$_.JThrowablePtr Function(
+                jni$_.Pointer<jni$_.Void>,
+                jni$_.JMethodIDPtr,
+                jni$_.VarArgs<(jni$_.Int64,)>,
+              )
+            >
+          >('globalEnv_CallStaticVoidMethod')
+          .asFunction<
+            jni$_.JThrowablePtr Function(
+              jni$_.Pointer<jni$_.Void>,
+              jni$_.JMethodIDPtr,
+              core$_.int,
+            )
+          >();
+
+  /// from: `static public void unobserveActions(long engineId)`
+  ///
+  /// Stops delivering presses to Dart (nothing listens any more): queued and
+  /// later presses are run by the background handler.
+  static void unobserveActions(core$_.int engineId) {
+    final _$$classRef = _class.reference;
     _unobserveActions(
       _$$classRef.pointer,
       _id_unobserveActions.pointer,
       engineId,
-      _$unhandled.pointer,
     ).check();
   }
 

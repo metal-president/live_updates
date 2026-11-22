@@ -34,7 +34,8 @@ class AndroidLiveUpdatesPlatform extends LiveUpdatesPlatform
     ),
   );
   late final _actions = ObservedBroadcast<(String, String)>(
-    attach: (add) => LiveUpdatesBridge.observeActions(
+    keyOf: (e) => e.$1,
+    attach: (add, keys) => LiveUpdatesBridge.observeActions(
       LiveUpdatesBridge$ActionListener.implement(
         $LiveUpdatesBridge$ActionListener(
           onAction: (updateId, actionId) => add((
@@ -45,12 +46,19 @@ class AndroidLiveUpdatesPlatform extends LiveUpdatesPlatform
         ),
       ),
       _engineId,
+      _jList(keys),
     ),
-    detach: (unhandled) => LiveUpdatesBridge.unobserveActions(
-      _engineId,
-      JArray.of(JString.type, [for (final (u, a) in unhandled) _j('$u\n$a')]),
+    setFilter: (keys) =>
+        LiveUpdatesBridge.setActionFilter(_engineId, _jList(keys)),
+    detach: () => LiveUpdatesBridge.unobserveActions(_engineId),
+    requeue: (events) => LiveUpdatesBridge.requeueActions(
+      _jList({for (final (u, a) in events) '$u\n$a'})!,
     ),
   );
+
+  static JArray<JString?>? _jList(Set<String>? values) => values == null
+      ? null
+      : JArray.of(JString.type, [for (final v in values) _j(v)]);
 
   /// Identifies this isolate's engine, so the plugin drops its listeners
   /// when the engine goes away.
@@ -129,7 +137,7 @@ class AndroidLiveUpdatesPlatform extends LiveUpdatesPlatform
 
   @override
   Stream<(String, String)> actions({String? updateId}) =>
-      _actions.stream(updateId == null ? null : (e) => e.$1 == updateId);
+      _actions.stream(updateId);
 
   @override
   Future<void> setBackgroundActionHandler(int dispatcher, int handler) async =>

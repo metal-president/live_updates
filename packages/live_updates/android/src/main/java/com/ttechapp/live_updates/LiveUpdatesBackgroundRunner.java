@@ -95,11 +95,10 @@ final class LiveUpdatesBackgroundRunner {
     FlutterEngine e = engine;
     engine = null;
     if (e != null) e.destroy();
-    if (mayRestart && LiveUpdatesBridge.hasQueuedBackgroundActions()) {
-      startEngine();
-      if (engine != null) return;
-    }
+    // Releases the receivers of this run (a late press's receiver too: its
+    // press runs in the new engine while the process is still alive).
     for (BroadcastReceiver.PendingResult r : pending) r.finish();
     pending.clear();
+    if (mayRestart && LiveUpdatesBridge.hasQueuedBackgroundActions()) startEngine();
   }
 }

@@ -273,16 +273,21 @@ extension type LiveUpdatesBridge._(objc.ObjCObject object$)
     return LiveUpdatesBridge.fromPointer($ret, retain: false, release: true);
   }
 
-  /// Calls <code>handler</code> with <code>"<activity id>\n<action id>"</code> for every button
-  /// press, including presses queued while Dart was not listening.
+  /// Calls <code>handler</code> with <code>"<activity id>\n<action id>"</code> for presses of
+  /// <code>activityIds</code> (<code>nil</code>: all), including
+  /// presses queued while Dart was not listening; other presses stay queued
+  /// for the background handler.
   static void observeActions(
-    objc.ObjCBlock<ffi.Void Function(objc.NSString)> handler,
-  ) {
+    objc.ObjCBlock<ffi.Void Function(objc.NSString)> handler, {
+    objc.NSArray? activityIds,
+  }) {
     final _$$ref = handler.ref;
-    _objc_msgSend_f167m6(
+    final _$$ref$1 = activityIds?.ref;
+    _objc_msgSend_1f7ydyk(
       _class_LiveUpdatesBridge,
-      _sel_observeActions_,
+      _sel_observeActions_activityIds_,
       _$$ref.pointer,
+      _$$ref$1?.pointer ?? ffi.nullptr,
     );
   }
 
@@ -337,6 +342,28 @@ extension type LiveUpdatesBridge._(objc.ObjCObject object$)
       _class_LiveUpdatesBridge,
       _sel_observeTaps_,
       _$$ref.pointer,
+    );
+  }
+
+  /// Queues presses again that reached Dart but no listener took (it
+  /// stopped listening in the meantime), for a listener that takes them or
+  /// the background handler.
+  static void requeueActions(objc.NSArray presses) {
+    final _$$ref = presses.ref;
+    _objc_msgSend_xtuoz7(
+      _class_LiveUpdatesBridge,
+      _sel_requeueActions_,
+      _$$ref.pointer,
+    );
+  }
+
+  /// Limits the presses Dart takes to those of <code>activityIds</code> (<code>nil</code>: all).
+  static void setActionFilter(objc.NSArray? activityIds) {
+    final _$$ref = activityIds?.ref;
+    _objc_msgSend_xtuoz7(
+      _class_LiveUpdatesBridge,
+      _sel_setActionFilter_,
+      _$$ref?.pointer ?? ffi.nullptr,
     );
   }
 
@@ -406,17 +433,10 @@ extension type LiveUpdatesBridge._(objc.ObjCObject object$)
     return objc.NSArray.fromPointer($ret, retain: true, release: true);
   }
 
-  /// Stops delivering presses to Dart (nothing listens any more): later
-  /// presses are queued and run by the background handler. <code>unhandled</code>
-  /// presses (<code>"<activity id>\n<action id>"</code>) that no Dart listener took are
-  /// queued again the same way.
-  static void unobserveActions(objc.NSArray unhandled) {
-    final _$$ref = unhandled.ref;
-    _objc_msgSend_xtuoz7(
-      _class_LiveUpdatesBridge,
-      _sel_unobserveActions_,
-      _$$ref.pointer,
-    );
+  /// Stops delivering presses to Dart (nothing listens any more): queued and
+  /// later presses are run by the background handler.
+  static void unobserveActions() {
+    _objc_msgSend_1pl9qdv(_class_LiveUpdatesBridge, _sel_unobserveActions);
   }
 
   /// Stops delivering taps to Dart; later routes wait for the next listener.
@@ -1441,6 +1461,25 @@ final _objc_msgSend_1cwp428 = objc.msgSendPointer
         ffi.Pointer<objc.NSZone>,
       )
     >();
+final _objc_msgSend_1f7ydyk = objc.msgSendPointer
+    .cast<
+      ffi.NativeFunction<
+        ffi.Void Function(
+          ffi.Pointer<objc.ObjCObjectImpl>,
+          ffi.Pointer<objc.ObjCSelector>,
+          ffi.Pointer<objc.ObjCBlockImpl>,
+          ffi.Pointer<objc.ObjCObjectImpl>,
+        )
+      >
+    >()
+    .asFunction<
+      void Function(
+        ffi.Pointer<objc.ObjCObjectImpl>,
+        ffi.Pointer<objc.ObjCSelector>,
+        ffi.Pointer<objc.ObjCBlockImpl>,
+        ffi.Pointer<objc.ObjCObjectImpl>,
+      )
+    >();
 final _objc_msgSend_1lhpu4m = objc.msgSendPointer
     .cast<
       ffi.NativeFunction<
@@ -1623,7 +1662,9 @@ late final _sel_isKindOfClass_ = objc.registerName("isKindOfClass:");
 late final _sel_isSupported = objc.registerName("isSupported");
 late final _sel_keyForId_ = objc.registerName("keyForId:");
 late final _sel_new = objc.registerName("new");
-late final _sel_observeActions_ = objc.registerName("observeActions:");
+late final _sel_observeActions_activityIds_ = objc.registerName(
+  "observeActions:activityIds:",
+);
 late final _sel_observeActivities_ = objc.registerName("observeActivities:");
 late final _sel_observePushToStartTokens_ = objc.registerName(
   "observePushToStartTokens:",
@@ -1632,6 +1673,8 @@ late final _sel_observePushTokens_handler_ = objc.registerName(
   "observePushTokens:handler:",
 );
 late final _sel_observeTaps_ = objc.registerName("observeTaps:");
+late final _sel_requeueActions_ = objc.registerName("requeueActions:");
+late final _sel_setActionFilter_ = objc.registerName("setActionFilter:");
 late final _sel_setBackgroundActionHandler_handler_ = objc.registerName(
   "setBackgroundActionHandler:handler:",
 );
@@ -1640,7 +1683,7 @@ late final _sel_startOrUpdate_json_completion_ = objc.registerName(
 );
 late final _sel_start_error_ = objc.registerName("start:error:");
 late final _sel_takeQueuedActions = objc.registerName("takeQueuedActions");
-late final _sel_unobserveActions_ = objc.registerName("unobserveActions:");
+late final _sel_unobserveActions = objc.registerName("unobserveActions");
 late final _sel_unobserveTaps = objc.registerName("unobserveTaps");
 late final _sel_update_json_completion_ = objc.registerName(
   "update:json:completion:",

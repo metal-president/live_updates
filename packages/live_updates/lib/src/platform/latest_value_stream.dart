@@ -37,6 +37,8 @@ class LatestValueStream<T> {
   }
 
   void _add(T value) {
+    // A value already on its way when the stream was closed.
+    if (_controller.isClosed) return;
     _latest = value;
     _hasLatest = true;
     _controller.add(value);

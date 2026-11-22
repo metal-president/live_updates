@@ -152,7 +152,7 @@ public class LiveUpdatesBridgeTest {
   @Test
   public void listenersOfADetachedEngineAreDropped() {
     List<String> got = new ArrayList<>();
-    LiveUpdatesBridge.observeActions((update, action) -> got.add(update + ":" + action), 1);
+    LiveUpdatesBridge.observeActions((update, action) -> got.add(update + ":" + action), 1, null);
     LiveUpdatesBridge.engineDetached(2); // another engine: still listening
     LiveUpdatesBridge.emitAction(app, "u1", "a");
     assertEquals(Arrays.asList("u1:a"), got);
@@ -165,13 +165,99 @@ public class LiveUpdatesBridgeTest {
   @Test
   public void unobservedPressesAreQueuedAgain() {
     List<String> got = new ArrayList<>();
-    LiveUpdatesBridge.observeActions((update, action) -> got.add(update + ":" + action), 1);
-    LiveUpdatesBridge.unobserveActions(1, new String[] {"u3\nlater"});
+    LiveUpdatesBridge.observeActions((update, action) -> got.add(update + ":" + action), 1, null);
+    LiveUpdatesBridge.unobserveActions(1);
+    LiveUpdatesBridge.requeueActions(new String[] {"u3\nlater"});
     LiveUpdatesBridge.emitAction(app, "u3", "next");
     assertTrue(got.isEmpty());
     assertEquals(
         Arrays.asList("u3\nlater", "u3\nnext"),
         Arrays.asList(LiveUpdatesBridge.takeQueuedActions()));
+  }
+
+  @Test
+  public void aPerUpdateListenerLeavesOtherPressesQueued() {
+    LiveUpdatesBridge.emitAction(app, "a", "queued");
+    LiveUpdatesBridge.emitAction(app, "b", "queued");
+    List<String> got = new ArrayList<>();
+    LiveUpdatesBridge.observeActions(
+        (update, action) -> got.add(update + ":" + action), 1, new String[] {"a"});
+    LiveUpdatesBridge.emitAction(app, "a", "live");
+    LiveUpdatesBridge.emitAction(app, "b", "live");
+    assertEquals(Arrays.asList("a:queued", "a:live"), got);
+    // B's presses stay in the persistent queue, for the background handler.
+    assertEquals(
+        Arrays.asList("b\nqueued", "b\nlive"),
+        Arrays.asList(LiveUpdatesBridge.takeQueuedActions()));
+  }
+
+  @Test
+  public void wideningTheFilterHandsOverQueuedPresses() {
+    List<String> got = new ArrayList<>();
+    LiveUpdatesBridge.observeActions(
+        (update, action) -> got.add(update + ":" + action), 1, new String[] {"a"});
+    LiveUpdatesBridge.emitAction(app, "b", "x");
+    assertTrue(got.isEmpty());
+    LiveUpdatesBridge.setActionFilter(1, null);
+    assertEquals(Arrays.asList("b:x"), got);
+    // Another engine cannot change this engine's filter.
+    LiveUpdatesBridge.setActionFilter(2, new String[] {"a"});
+    LiveUpdatesBridge.emitAction(app, "c", "y");
+    assertEquals("c:y", got.get(1));
+  }
+
+  @Test
+  public void backgroundHandlerDoesNotTakeWhatTheAppListensFor() {
+    List<String> got = new ArrayList<>();
+    LiveUpdatesBridge.emitAction(app, "b", "x");
+    LiveUpdatesBridge.observeActions(
+        (update, action) -> got.add(update + ":" + action), 1, new String[] {"a"});
+    assertEquals(Arrays.asList("b\nx"), Arrays.asList(LiveUpdatesBridge.takeQueuedActions()));
+    assertTrue(got.isEmpty());
+  }
+
+  @Test
+  public void localEndDoesNotBringBackADismissedUpdate() throws Exception {
+    String id = LiveUpdatesBridge.startOrUpdate("order-d", "{\"title\":\"A\"}");
+    manager.cancel(LiveUpdatesBridge.TAG_PREFIX + id, LiveUpdatesBridge.NOTIFICATION_ID);
+    LiveUpdatesBridge.markDismissed(app, id);
+    LiveUpdatesBridge.end(id, "{\"title\":\"Delivered\"}", -1);
+    assertEquals(null, shown(id));
+  }
+
+  @Test
+  public void updateToABlockedChannelDoesNotThrow() throws Exception {
+    // The user turned the channel off: the system never lists the posts.
+    manager.createNotificationChannel(
+        new android.app.NotificationChannel(
+            "off", "Off", NotificationManager.IMPORTANCE_NONE));
+    LiveUpdatesBridge.update("never-listed", "{\"title\":\"A\",\"channelId\":\"off\"}");
+  }
+
+  @Test
+  public void intentsFromRecentsAreNotDeliveredAgain() throws Exception {
+    String id = LiveUpdatesBridge.start("{\"title\":\"A\",\"route\":\"/orders/2\"}");
+    Intent tap = new Intent(shadowOf(shown(id).contentIntent).getSavedIntent());
+    tap.addFlags(Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY);
+    List<String> routes = new ArrayList<>();
+    LiveUpdatesBridge.observeTaps(routes::add, 1);
+    LiveUpdatesBridge.handleIntent(tap);
+    assertTrue(routes.isEmpty());
+  }
+
+  @Test
+  public void everyWaitingPermissionRequestCompletes() {
+    shadowOf(app).denyPermissions(android.Manifest.permission.POST_NOTIFICATIONS);
+    LiveUpdatesBridge.activity =
+        org.robolectric.Robolectric.buildActivity(android.app.Activity.class).setup().get();
+    List<Boolean> results = new ArrayList<>();
+    LiveUpdatesBridge.requestPermission(results::add);
+    LiveUpdatesBridge.requestPermission(results::add);
+    assertTrue(results.isEmpty());
+    // The activity goes away without a result: both callers still complete.
+    LiveUpdatesBridge.permissionPromptGone();
+    assertEquals(Arrays.asList(false, false), results);
+    LiveUpdatesBridge.activity = null;
   }
 
   @Test
@@ -220,7 +306,7 @@ public class LiveUpdatesBridgeTest {
     LiveUpdatesBridge.emitAction(app, "u1", "cancel");
     LiveUpdatesBridge.emitAction(app, "u1", "details");
     List<String> got = new ArrayList<>();
-    LiveUpdatesBridge.observeActions((update, action) -> got.add(update + ":" + action), 1);
+    LiveUpdatesBridge.observeActions((update, action) -> got.add(update + ":" + action), 1, null);
     assertEquals(Arrays.asList("u1:cancel", "u1:details"), got);
     LiveUpdatesBridge.emitAction(app, "u2", "cancel");
     assertEquals("u2:cancel", got.get(2));

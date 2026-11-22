@@ -19,6 +19,7 @@ import androidx.annotation.Keep;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -94,6 +95,11 @@ public final class LiveUpdatesBridge {
   private static final List<String> pendingRoutes = new ArrayList<>();
   @Nullable private static volatile ActionListener actionListener;
   private static long actionEngine;
+  /**
+   * Updates whose presses Dart takes; {@code null} for all ({@code onAction}).
+   * Other presses stay queued for the background handler.
+   */
+  @Nullable private static Set<String> actionFilter;
   private static final Object actionLock = new Object();
 
   private static final String PREFS = "com.ttechapp.live_updates";
@@ -169,6 +175,31 @@ public final class LiveUpdatesBridge {
     for (ResultListener l : listeners) l.onResult(granted);
   }
 
+  /** Whether the user turned off the channel the content posts to. */
+  private static boolean channelBlocked(Context c, String json) {
+    if (Build.VERSION.SDK_INT < 26) return false;
+    String channelId = DEFAULT_CHANNEL;
+    try {
+      channelId = new JSONObject(json).optString("channelId", DEFAULT_CHANNEL);
+    } catch (JSONException e) {
+      // Reported by post().
+    }
+    NotificationChannel channel = manager(c).getNotificationChannel(channelId);
+    return channel != null && channel.getImportance() == NotificationManager.IMPORTANCE_NONE;
+  }
+
+  /** Completes waiting permission requests with the current state. */
+  static void permissionPromptGone() {
+    Context c = context;
+    boolean granted =
+        c != null
+            && (Build.VERSION.SDK_INT < 33
+                || c.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
+                    == PackageManager.PERMISSION_GRANTED)
+            && manager(c).areNotificationsEnabled();
+    permissionResult(granted);
+  }
+
   /** Posts a new live update and returns its id. */
   @NonNull
   public static String start(@NonNull String json) throws JSONException {
@@ -229,34 +260,87 @@ public final class LiveUpdatesBridge {
    * listener was attached (including while the app was not running) are
    * persisted and delivered first, in order.
    */
-  public static void observeActions(@NonNull ActionListener listener, long engineId) {
+  public static void observeActions(
+      @NonNull ActionListener listener, long engineId, @Nullable String[] updateIds) {
     synchronized (actionLock) {
-      Context c = context;
-      if (c != null) {
-        for (String[] a : takePendingActions(c)) listener.onAction(a[0], a[1]);
-      }
       actionListener = listener;
       actionEngine = engineId;
+      actionFilter =
+          updateIds == null ? null : new java.util.HashSet<>(Arrays.asList(updateIds));
+      drainActions();
     }
+    runQueuedInBackground();
+  }
+
+  /** Limits the presses Dart takes to those of {@code updateIds} ({@code null}: all). */
+  public static void setActionFilter(long engineId, @Nullable String[] updateIds) {
+    synchronized (actionLock) {
+      if (actionEngine != engineId) return;
+      actionFilter =
+          updateIds == null ? null : new java.util.HashSet<>(Arrays.asList(updateIds));
+      drainActions();
+    }
+    runQueuedInBackground();
   }
 
   /**
-   * Stops delivering presses to Dart (nothing listens any more): later presses
-   * are queued and run by the background handler. {@code unhandled} presses
-   * ({@code "<update id>\n<action id>"}) that no Dart listener took are
-   * queued again the same way.
+   * Queues presses again that reached Dart but no listener took (it stopped
+   * listening in the meantime), for a listener that takes them or the
+   * background handler.
    */
-  public static void unobserveActions(long engineId, @NonNull String[] unhandled) {
+  public static void requeueActions(@NonNull String[] presses) {
+    Context c = context;
+    if (c == null) return;
+    synchronized (actionLock) {
+      List<String[]> pending = readPendingActions(c);
+      for (String press : presses) {
+        int i = press.indexOf('\n');
+        if (i > 0) pending.add(new String[] {press.substring(0, i), press.substring(i + 1)});
+      }
+      writePendingActions(c, pending);
+      drainActions();
+    }
+    runQueuedInBackground();
+  }
+
+  /** Whether the Dart listener takes presses of {@code updateId}; under actionLock. */
+  private static boolean dartTakes(String updateId) {
+    if (actionListener == null) return false;
+    Set<String> filter = actionFilter;
+    return filter == null || filter.contains(updateId);
+  }
+
+  /** Hands Dart the queued presses it takes; the rest stay queued. Under actionLock. */
+  private static void drainActions() {
+    ActionListener listener = actionListener;
+    Context c = context;
+    if (listener == null || c == null) return;
+    List<String[]> keep = new ArrayList<>();
+    List<String[]> take = new ArrayList<>();
+    for (String[] a : takePendingActions(c)) (dartTakes(a[0]) ? take : keep).add(a);
+    writePendingActions(c, keep);
+    for (String[] a : take) listener.onAction(a[0], a[1]);
+  }
+
+  /** Runs the background handler for queued presses no Dart listener takes. */
+  static void runQueuedInBackground() {
+    Context c = context;
+    if (c == null || !hasQueuedBackgroundActions()) return;
+    long dispatcher = prefs(c).getLong(PREF_BG_DISPATCHER, 0);
+    if (dispatcher != 0) LiveUpdatesBackgroundRunner.run(c, dispatcher, null);
+  }
+
+  /**
+   * Stops delivering presses to Dart (nothing listens any more): queued and
+   * later presses are run by the background handler.
+   */
+  public static void unobserveActions(long engineId) {
     synchronized (actionLock) {
       if (actionEngine != engineId) return;
       actionListener = null;
+      actionFilter = null;
     }
-    Context c = context;
-    if (c == null) return;
-    for (String press : unhandled) {
-      int i = press.indexOf('\n');
-      if (i > 0) emitAction(c, press.substring(0, i), press.substring(i + 1), null, true);
-    }
+    runQueuedInBackground();
   }
 
   static void emitAction(Context c, String updateId, String actionId) {
@@ -285,7 +369,7 @@ public final class LiveUpdatesBridge {
     long dispatcher;
     synchronized (actionLock) {
       ActionListener listener = actionListener;
-      if (listener != null) {
+      if (listener != null && dartTakes(updateId)) {
         listener.onAction(updateId, actionId);
         if (result != null) result.finish();
         return;
@@ -326,17 +410,24 @@ public final class LiveUpdatesBridge {
     if (c == null) return new String[0];
     List<String> out = new ArrayList<>();
     synchronized (actionLock) {
-      for (String[] a : takePendingActions(c)) out.add(a[0] + "\n" + a[1]);
+      // Presses a Dart listener of the app takes are left to it.
+      List<String[]> keep = new ArrayList<>();
+      for (String[] a : takePendingActions(c)) {
+        if (dartTakes(a[0])) keep.add(a);
+        else out.add(a[0] + "\n" + a[1]);
+      }
+      writePendingActions(c, keep);
     }
     return out.toArray(new String[0]);
   }
 
-  /** Whether presses wait for the background handler (no Dart listener). */
+  /** Whether presses wait for the background handler (no Dart listener takes them). */
   static boolean hasQueuedBackgroundActions() {
     Context c = context;
     if (c == null) return false;
     synchronized (actionLock) {
-      return actionListener == null && readArray(prefs(c), PREF_PENDING_ACTIONS).length() > 0;
+      for (String[] a : readPendingActions(c)) if (!dartTakes(a[0])) return true;
+      return false;
     }
   }
 
@@ -346,9 +437,22 @@ public final class LiveUpdatesBridge {
   }
 
   private static List<String[]> takePendingActions(Context c) {
-    SharedPreferences prefs = prefs(c);
-    org.json.JSONArray pending = readArray(prefs, PREF_PENDING_ACTIONS);
-    prefs.edit().remove(PREF_PENDING_ACTIONS).apply();
+    List<String[]> out = readPendingActions(c);
+    prefs(c).edit().remove(PREF_PENDING_ACTIONS).apply();
+    return out;
+  }
+
+  private static void writePendingActions(Context c, List<String[]> presses) {
+    org.json.JSONArray a = new org.json.JSONArray();
+    for (String[] p : presses) a.put(new org.json.JSONArray().put(p[0]).put(p[1]));
+    SharedPreferences.Editor e = prefs(c).edit();
+    // commit (not apply): the headless engine reads it right away.
+    if (a.length() == 0) e.remove(PREF_PENDING_ACTIONS).commit();
+    else e.putString(PREF_PENDING_ACTIONS, a.toString()).commit();
+  }
+
+  private static List<String[]> readPendingActions(Context c) {
+    org.json.JSONArray pending = readArray(prefs(c), PREF_PENDING_ACTIONS);
     List<String[]> out = new ArrayList<>();
     for (int i = 0; i < pending.length(); i++) {
       org.json.JSONArray a = pending.optJSONArray(i);
@@ -446,7 +550,7 @@ public final class LiveUpdatesBridge {
     }
     // When notifications are blocked nothing is ever shown; posting is a
     // harmless no-op then, matching start().
-    if (!isShown(id) && manager(c).areNotificationsEnabled()) {
+    if (!isShown(id) && manager(c).areNotificationsEnabled() && !channelBlocked(c, json)) {
       throw new IllegalStateException("Unknown live update " + id);
     }
     post(id, new JSONObject(json));
@@ -459,7 +563,10 @@ public final class LiveUpdatesBridge {
   /** Removes the live update {@code id}, optionally showing final content for a while. */
   public static void end(@NonNull String id, @Nullable String json, double dismissAfterSeconds)
       throws JSONException {
-    end(id, json, dismissAfterSeconds, false, true);
+    // Never bring back an update the user dismissed (it already reported
+    // dismissed).
+    boolean dismissed = isDismissed(requireContext(), id);
+    end(id, dismissed ? null : json, dismissAfterSeconds, false, !dismissed);
   }
 
   private static void end(
@@ -649,7 +756,15 @@ public final class LiveUpdatesBridge {
     if (data != null && INTENT_SCHEME.equals(data.getScheme())) intent.setData(null);
     // Open-app presses: the app is coming to the foreground, so its onAction
     // listener handles them (no background engine).
-    if (actionId != null && updateId != null) emitAction(c, updateId, actionId, null, false);
+    // Recreated from Recents: the original launch intent comes back; it was
+    // handled when it first arrived.
+    if ((intent.getFlags() & Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY) != 0) return;
+    if (actionId != null && updateId != null) {
+      emitAction(c, updateId, actionId, null, false);
+      // If no onAction listener takes it soon, the background handler runs it.
+      new android.os.Handler(android.os.Looper.getMainLooper())
+          .postDelayed(LiveUpdatesBridge::runQueuedInBackground, OPEN_APP_GRACE_MS);
+    }
     if (route == null) return;
     RouteListener listener;
     synchronized (actionLock) {
@@ -903,6 +1018,9 @@ public final class LiveUpdatesBridge {
     if (mode == null && !content.optBoolean("requestPromotion", true)) return "ongoing";
     return "liveUpdate";
   }
+
+  /** Time an app opened by a button gets to start listening to {@code onAction}. */
+  private static final long OPEN_APP_GRACE_MS = 5_000;
 
   /** At most one requested alert per update in this interval (remote payloads included). */
   private static final long MIN_ALERT_INTERVAL_MS = 10_000;

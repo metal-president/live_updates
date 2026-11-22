@@ -42,10 +42,10 @@ final class LiveUpdate {
 
   /// Presses of this update's buttons ([LiveUpdateContent.actions]).
   ///
-  /// While any action stream (this or [LiveUpdates.onAction]) is listened
-  /// to, presses go to the app instead of the background action handler.
-  /// Presses of other updates are kept for [LiveUpdates.onAction], or for the
-  /// background handler once nothing listens.
+  /// While this is listened to, this update's presses go to the app instead
+  /// of the background action handler. Presses of other updates go to
+  /// [LiveUpdates.onAction] if it is listened to, else to the background
+  /// handler.
   Stream<String> get actions =>
       _platform.actions(updateId: id).map((e) => e.$2);
 
@@ -192,8 +192,10 @@ abstract final class LiveUpdates {
   ///
   /// [handler] must be a top-level or static function annotated with
   /// `@pragma('vm:entry-point')`. It has a few seconds to finish (the system
-  /// limits background work). It also runs while the app is open if nothing
-  /// listens to [onAction].
+  /// limits background work). It also runs while the app is open for presses
+  /// that no [onAction] (or that update's [LiveUpdate.actions]) listener
+  /// takes, and for an open-app press that no listener takes within a few
+  /// seconds of the launch.
   ///
   /// Buttons can be pressed on the Lock Screen, so the handler may run
   /// without the device being unlocked. Make destructive actions require an

@@ -10,7 +10,9 @@ extension LiveUpdateContentJson on LiveUpdateContent {
   Map<String, Object?> toJson() => {
     'title': title,
     'body': ?body,
-    'progress': ?progress,
+    // NaN or infinite (such as 0 / 0) would break the JSON; out of range is
+    // clamped.
+    if (progress case final p? when p.isFinite) 'progress': p.clamp(0, 1),
     'iconName': ?iconName,
     'route': ?route,
     // Seconds since 1970, as the widget reads them.

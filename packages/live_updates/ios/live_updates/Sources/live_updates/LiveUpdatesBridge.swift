@@ -70,9 +70,10 @@ public final class LiveUpdatesBridge: NSObject {
     Task { @MainActor in
       do {
         let payload = try Payload.decode(json)
-        if let activity = Activity<LiveUpdatesAttributes>.activities.first(where: {
-          $0.attributes.key == key
-        }) {
+        let withKey = Activity<LiveUpdatesAttributes>.activities.filter { $0.attributes.key == key }
+        if let activity = withKey.first(where: {
+          $0.activityState == .active || $0.activityState == .stale
+        }) ?? withKey.first {
           if activity.activityState == .active || activity.activityState == .stale {
             await activity.update(payload.content, alertConfiguration: payload.alertConfiguration)
           }
@@ -236,27 +237,61 @@ public final class LiveUpdatesBridge: NSObject {
   /// press that launched the app in the background is not lost).
   static let pendingActionsKey = "live_updates.pendingActions"
   private static var actionHandler: ((String) -> Void)?
+  /// Activities whose presses Dart takes; `nil` for all (`onAction`). Other
+  /// presses stay queued for the background handler.
+  private static var actionFilter: Set<String>?
 
-  /// Calls `handler` with `"<activity id>\n<action id>"` for every button
-  /// press, including presses queued while Dart was not listening.
-  @objc public static func observeActions(_ handler: @escaping (String) -> Void) {
+  /// Calls `handler` with `"<activity id>\n<action id>"` for presses of
+  /// `activityIds` (`nil`: all), including
+  /// presses queued while Dart was not listening; other presses stay queued
+  /// for the background handler.
+  @objc public static func observeActions(
+    _ handler: @escaping (String) -> Void, activityIds: [String]?
+  ) {
     onMain {
       actionHandler = handler
+      actionFilter = activityIds.map(Set.init)
       drainActions()
+      if hasQueuedBackgroundActions { _ = startBackgroundHandler() }
     }
   }
 
-  /// Stops delivering presses to Dart (nothing listens any more): later
-  /// presses are queued and run by the background handler. `unhandled`
-  /// presses (`"<activity id>\n<action id>"`) that no Dart listener took are
-  /// queued again the same way.
-  @objc public static func unobserveActions(_ unhandled: [String]) {
+  /// Limits the presses Dart takes to those of `activityIds` (`nil`: all).
+  @objc public static func setActionFilter(_ activityIds: [String]?) {
+    onMain {
+      actionFilter = activityIds.map(Set.init)
+      drainActions()
+      if hasQueuedBackgroundActions { _ = startBackgroundHandler() }
+    }
+  }
+
+  /// Queues presses again that reached Dart but no listener took (it
+  /// stopped listening in the meantime), for a listener that takes them or
+  /// the background handler.
+  @objc public static func requeueActions(_ presses: [String]) {
+    onMain {
+      let defaults = UserDefaults.standard
+      defaults.set(
+        (defaults.stringArray(forKey: pendingActionsKey) ?? []) + presses,
+        forKey: pendingActionsKey)
+      drainActions()
+      if hasQueuedBackgroundActions { _ = startBackgroundHandler() }
+    }
+  }
+
+  private static func dartTakes(_ press: String) -> Bool {
+    guard actionHandler != nil else { return false }
+    guard let filter = actionFilter else { return true }
+    return filter.contains(String(press.prefix { $0 != "\n" }))
+  }
+
+  /// Stops delivering presses to Dart (nothing listens any more): queued and
+  /// later presses are run by the background handler.
+  @objc public static func unobserveActions() {
     onMain {
       actionHandler = nil
-      for press in unhandled {
-        let parts = press.split(separator: "\n", maxSplits: 1).map(String.init)
-        if parts.count == 2 { queueAction(parts[0], actionId: parts[1], startBackground: true) }
-      }
+      actionFilter = nil
+      if hasQueuedBackgroundActions { _ = startBackgroundHandler() }
     }
   }
 
@@ -267,16 +302,18 @@ public final class LiveUpdatesBridge: NSObject {
 
   /// Whether presses wait for the background handler (no Dart listener).
   static var hasQueuedBackgroundActions: Bool {
-    actionHandler == nil
-      && !(UserDefaults.standard.stringArray(forKey: pendingActionsKey) ?? []).isEmpty
+    (UserDefaults.standard.stringArray(forKey: pendingActionsKey) ?? []).contains { !dartTakes($0) }
   }
 
+  /// Hands Dart the queued presses it takes; the rest stay queued.
   static func drainActions() {
     guard let handler = actionHandler else { return }
     let defaults = UserDefaults.standard
     let pending = defaults.stringArray(forKey: pendingActionsKey) ?? []
-    defaults.removeObject(forKey: pendingActionsKey)
-    pending.forEach(handler)
+    let taken = pending.filter(dartTakes)
+    guard !taken.isEmpty else { return }
+    defaults.set(pending.filter { !dartTakes($0) }, forKey: pendingActionsKey)
+    taken.forEach(handler)
   }
 
   /// Queues a button press and delivers it if Dart listens. Called on the
@@ -305,12 +342,20 @@ public final class LiveUpdatesBridge: NSObject {
     var pending = defaults.stringArray(forKey: pendingActionsKey) ?? []
     pending.append("\(activityId)\n\(actionId)")
     defaults.set(pending, forKey: pendingActionsKey)
-    if actionHandler != nil || !startBackground {
-      drainActions()
+    drainActions()
+    if !startBackground {
+      // Open-app press: the app's onAction listener should take it. If none
+      // does soon after launch, the background handler runs it instead.
+      DispatchQueue.main.asyncAfter(deadline: .now() + openAppGrace) {
+        if hasQueuedBackgroundActions { _ = startBackgroundHandler() }
+      }
       return false
     }
-    return startBackgroundHandler()
+    return hasQueuedBackgroundActions ? startBackgroundHandler() : false
   }
+
+  /// Time an app opened by a button gets to start listening to `onAction`.
+  private static let openAppGrace: TimeInterval = 5
 
   // MARK: - Background action handler
 
@@ -334,8 +379,9 @@ public final class LiveUpdatesBridge: NSObject {
     guard Thread.isMainThread else { return DispatchQueue.main.sync { takeQueuedActions() } }
     let defaults = UserDefaults.standard
     let pending = defaults.stringArray(forKey: pendingActionsKey) ?? []
-    defaults.removeObject(forKey: pendingActionsKey)
-    return pending
+    // Presses a Dart listener of the app takes are left to it.
+    defaults.set(pending.filter(dartTakes), forKey: pendingActionsKey)
+    return pending.filter { !dartTakes($0) }
   }
 
   /// Called by the background engine when the handler finished.

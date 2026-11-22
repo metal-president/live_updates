@@ -38,6 +38,12 @@ class LiveUpdatesPlugin :
     }
 
     override fun onDetachedFromActivity() {
+        detach()
+        // The activity is gone: a prompt that was showing gets no result.
+        LiveUpdatesBridge.permissionPromptGone()
+    }
+
+    private fun detach() {
         binding?.removeOnNewIntentListener(this)
         binding?.removeRequestPermissionsResultListener(this)
         binding = null
@@ -47,7 +53,8 @@ class LiveUpdatesPlugin :
     override fun onReattachedToActivityForConfigChanges(binding: ActivityPluginBinding) =
         onAttachedToActivity(binding)
 
-    override fun onDetachedFromActivityForConfigChanges() = onDetachedFromActivity()
+    // The prompt survives a configuration change; its result still arrives.
+    override fun onDetachedFromActivityForConfigChanges() = detach()
 
     override fun onNewIntent(intent: Intent): Boolean {
         LiveUpdatesBridge.handleIntent(intent)

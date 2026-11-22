@@ -219,4 +219,17 @@ void main() {
       isNot(contains('compactTrailing')),
     );
   });
+
+  test('ios colors', () {
+    final json = const LiveUpdateContent(
+      title: 't',
+      ios: IosLiveUpdateOptions(
+        tint: Color(0xFF3949AB),
+        backgroundColor: Color(0xCC000000),
+      ),
+    ).toJson();
+    expect(json['tintArgb'], 0xFF3949AB);
+    expect(json['backgroundArgb'], 0xCC000000);
+    expect(json.containsKey('colorArgb'), isFalse);
+  });
 }

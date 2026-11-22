@@ -23,6 +23,7 @@ struct LiveUpdatesLockScreen: View {
             if state.liveUpdatesHasTimer {
               Spacer()
               LiveUpdatesTimerText(state: state).font(.headline)
+                .foregroundStyle(state.liveUpdatesTint ?? .primary)
             }
           }
           if let body = state.body {
@@ -35,6 +36,9 @@ struct LiveUpdatesLockScreen: View {
       }
       LiveUpdatesActionButtons(actions: state.actions, activityID: activityID)
     }
+    .tint(state.liveUpdatesTint)
+    .activityBackgroundTint(state.liveUpdatesBackground)
+    .activitySystemActionForegroundColor(state.liveUpdatesTint)
   }
 }
 
@@ -43,11 +47,14 @@ struct LiveUpdatesExpandedTrailing: View {
   let state: LiveUpdatesAttributes.ContentState
 
   var body: some View {
-    if state.liveUpdatesHasTimer {
-      LiveUpdatesTimerText(state: state).font(.headline)
-    } else if let progress = state.progress {
-      Text(progress, format: .percent.precision(.fractionLength(0))).font(.headline)
+    Group {
+      if state.liveUpdatesHasTimer {
+        LiveUpdatesTimerText(state: state).font(.headline)
+      } else if let progress = state.progress {
+        Text(progress, format: .percent.precision(.fractionLength(0))).font(.headline)
+      }
     }
+    .foregroundStyle(state.liveUpdatesTint ?? .primary)
   }
 }
 
@@ -66,6 +73,7 @@ struct LiveUpdatesExpandedBottom: View {
       }
       LiveUpdatesActionButtons(actions: state.actions, activityID: activityID)
     }
+    .tint(state.liveUpdatesTint)
   }
 }
 
@@ -79,7 +87,10 @@ struct LiveUpdatesCompactTrailing: View {
   var body: some View {
     LiveUpdatesIslandItem(
       state: state,
-      content: state.liveUpdatesPick(state.compactTrailing, fallback: ["progress", "timer", "title"]))
+      content: state.liveUpdatesPick(state.compactTrailing, fallback: ["progress", "timer", "title"])
+    )
+    .tint(state.liveUpdatesTint)
+    .foregroundStyle(state.liveUpdatesTint ?? .primary)
   }
 }
 
@@ -92,7 +103,10 @@ struct LiveUpdatesMinimal: View {
   var body: some View {
     LiveUpdatesIslandItem(
       state: state,
-      content: state.liveUpdatesPick(state.minimal, fallback: ["progress", "icon"]))
+      content: state.liveUpdatesPick(state.minimal, fallback: ["progress", "icon"])
+    )
+    .tint(state.liveUpdatesTint)
+    .foregroundStyle(state.liveUpdatesTint ?? .primary)
   }
 }
 
@@ -260,6 +274,18 @@ extension LiveUpdatesAttributes.ContentState {
   var liveUpdatesTimerEnd: Date? { Self.liveUpdatesDate(timerEnd) }
   var liveUpdatesTimerStart: Date? { Self.liveUpdatesDate(timerStart) }
   var liveUpdatesHasTimer: Bool { liveUpdatesTimerEnd != nil || liveUpdatesTimerStart != nil }
+
+  /// `IosLiveUpdateOptions.tint`, or `nil` for the system default.
+  var liveUpdatesTint: Color? { Self.liveUpdatesColor(tintArgb) }
+
+  /// `IosLiveUpdateOptions.backgroundColor`, or `nil` for the system default.
+  var liveUpdatesBackground: Color? { Self.liveUpdatesColor(backgroundArgb) }
+
+  private static func liveUpdatesColor(_ argb: Int?) -> Color? {
+    guard let argb, argb >= 0, argb <= 0xFFFF_FFFF else { return nil }
+    func channel(_ shift: Int) -> Double { Double((argb >> shift) & 0xFF) / 255 }
+    return Color(.sRGB, red: channel(16), green: channel(8), blue: channel(0), opacity: channel(24))
+  }
 
   /// Text for "title", "body" or "extra:<key>".
   func liveUpdatesText(_ content: String) -> String? {

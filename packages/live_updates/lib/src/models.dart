@@ -305,6 +305,8 @@ final class IosLiveUpdateOptions {
     this.extra = const {},
     this.compactTrailing,
     this.minimal,
+    this.tint,
+    this.backgroundColor,
   });
 
   /// When the system marks the activity as stale.
@@ -331,6 +333,16 @@ final class IosLiveUpdateOptions {
   /// the icon.
   final IosIslandContent? minimal;
 
+  /// Accent color of the generated widget: progress bars, buttons, the timer
+  /// and the Dynamic Island keyline. `null` keeps the system colors. The
+  /// Android counterpart is [AndroidLiveUpdateOptions.color].
+  final Color? tint;
+
+  /// Background of the Lock Screen presentation. `null` keeps the system
+  /// background. Choose one that keeps the text readable in light and dark
+  /// mode.
+  final Color? backgroundColor;
+
   @override
   bool operator ==(Object other) =>
       other is IosLiveUpdateOptions &&
@@ -339,7 +351,9 @@ final class IosLiveUpdateOptions {
       other.alert == alert &&
       mapEquals(other.extra, extra) &&
       other.compactTrailing == compactTrailing &&
-      other.minimal == minimal;
+      other.minimal == minimal &&
+      other.tint == tint &&
+      other.backgroundColor == backgroundColor;
 
   @override
   int get hashCode => Object.hash(
@@ -349,6 +363,8 @@ final class IosLiveUpdateOptions {
     Object.hashAllUnordered(extra.entries.map((e) => (e.key, e.value))),
     compactTrailing,
     minimal,
+    tint,
+    backgroundColor,
   );
 }
 

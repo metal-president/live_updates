@@ -1,3 +1,9 @@
+## Unreleased
+
+- `IosLiveUpdateOptions.tint` and `backgroundColor`: accent and Lock Screen
+  background of the generated widget (content-state keys `tintArgb` /
+  `backgroundArgb`). Run `create_widget` to update `LiveUpdatesViews.swift`.
+
 ## 0.0.6
 
 - Docs: clearer platform table (Live Activity push tokens, buttons, images,

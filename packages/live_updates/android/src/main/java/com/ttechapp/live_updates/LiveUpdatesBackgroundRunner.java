@@ -26,9 +26,12 @@ final class LiveUpdatesBackgroundRunner {
   @Nullable private static FlutterEngine engine;
   private static final List<BroadcastReceiver.PendingResult> pending = new ArrayList<>();
   private static final Handler main = new Handler(Looper.getMainLooper());
-  private static final Runnable timeout = LiveUpdatesBackgroundRunner::finish;
+  private static final Runnable timeout = LiveUpdatesBackgroundRunner::timedOut;
 
   private LiveUpdatesBackgroundRunner() {}
+
+  @Nullable private static Context appContext;
+  private static long dispatcher;
 
   /** Starts the engine (once) on the main thread; [result] is finished when done. */
   static void run(Context context, long dispatcherHandle, @Nullable BroadcastReceiver.PendingResult result) {
@@ -37,43 +40,66 @@ final class LiveUpdatesBackgroundRunner {
         () -> {
           if (result != null) pending.add(result);
           if (engine != null) return; // Already running: it drains the queue.
-          // Start the deadline first: initialization can take a while.
-          main.removeCallbacks(timeout);
-          main.postDelayed(timeout, TIMEOUT_MS);
-          try {
-            // Loads the Flutter native library, needed for the callback lookup.
-            FlutterLoader loader = FlutterInjector.instance().flutterLoader();
-            loader.startInitialization(app);
-            loader.ensureInitializationComplete(app, null);
-            FlutterCallbackInformation info =
-                FlutterCallbackInformation.lookupCallbackInformation(dispatcherHandle);
-            if (info == null) {
-              Log.w(TAG, "Background action handler is not available; was the app updated?");
-              finish();
-              return;
-            }
-            engine = new FlutterEngine(app);
-            engine
-                .getDartExecutor()
-                .executeDartCallback(
-                    new DartExecutor.DartCallback(app.getAssets(), loader.findAppBundlePath(), info));
-          } catch (Throwable e) {
-            Log.e(TAG, "Could not start the background action handler", e);
-            finish();
-          }
+          appContext = app;
+          dispatcher = dispatcherHandle;
+          startEngine();
         });
   }
 
-  /** Called from Dart when the handler finished, or on timeout. */
+  /** On the main thread, with no engine running. */
+  private static void startEngine() {
+    Context app = appContext;
+    if (app == null) return;
+    // Start the deadline first: initialization can take a while.
+    main.removeCallbacks(timeout);
+    main.postDelayed(timeout, TIMEOUT_MS);
+    try {
+      // Loads the Flutter native library, needed for the callback lookup.
+      FlutterLoader loader = FlutterInjector.instance().flutterLoader();
+      loader.startInitialization(app);
+      loader.ensureInitializationComplete(app, null);
+      FlutterCallbackInformation info =
+          FlutterCallbackInformation.lookupCallbackInformation(dispatcher);
+      if (info == null) {
+        Log.w(TAG, "Background action handler is not available; was the app updated?");
+        stop(false);
+        return;
+      }
+      engine = new FlutterEngine(app);
+      engine
+          .getDartExecutor()
+          .executeDartCallback(
+              new DartExecutor.DartCallback(app.getAssets(), loader.findAppBundlePath(), info));
+    } catch (Throwable e) {
+      Log.e(TAG, "Could not start the background action handler", e);
+      stop(false);
+    }
+  }
+
+  /** Called from Dart when the handler finished. */
   static void finish() {
-    main.post(
-        () -> {
-          main.removeCallbacks(timeout);
-          FlutterEngine e = engine;
-          engine = null;
-          if (e != null) e.destroy();
-          for (BroadcastReceiver.PendingResult r : pending) r.finish();
-          pending.clear();
-        });
+    main.post(() -> stop(true));
+  }
+
+  private static void timedOut() {
+    stop(false);
+  }
+
+  /**
+   * Shuts the engine down. A press queued after the handler took the last one
+   * (it saw an engine and did not start another) gets a new run, unless the
+   * run timed out.
+   */
+  private static void stop(boolean mayRestart) {
+    main.removeCallbacks(timeout);
+    FlutterEngine e = engine;
+    engine = null;
+    if (e != null) e.destroy();
+    if (mayRestart && LiveUpdatesBridge.hasQueuedBackgroundActions()) {
+      startEngine();
+      if (engine != null) return;
+    }
+    for (BroadcastReceiver.PendingResult r : pending) r.finish();
+    pending.clear();
   }
 }

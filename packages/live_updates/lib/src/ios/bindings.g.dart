@@ -133,7 +133,7 @@ extension type LiveUpdatesBridge._(objc.ObjCObject object$)
           _class_LiveUpdatesBridge,
         );
 
-  /// Ids of the activities currently known to the system.
+  /// Ids of the activities that are running (not ended or dismissed).
   static objc.NSArray activeIds() {
     final $ret = _objc_msgSend_151sglz(
       _class_LiveUpdatesBridge,
@@ -404,6 +404,24 @@ extension type LiveUpdatesBridge._(objc.ObjCObject object$)
       _sel_takeQueuedActions,
     );
     return objc.NSArray.fromPointer($ret, retain: true, release: true);
+  }
+
+  /// Stops delivering presses to Dart (nothing listens any more): later
+  /// presses are queued and run by the background handler. <code>unhandled</code>
+  /// presses (<code>"<activity id>\n<action id>"</code>) that no Dart listener took are
+  /// queued again the same way.
+  static void unobserveActions(objc.NSArray unhandled) {
+    final _$$ref = unhandled.ref;
+    _objc_msgSend_xtuoz7(
+      _class_LiveUpdatesBridge,
+      _sel_unobserveActions_,
+      _$$ref.pointer,
+    );
+  }
+
+  /// Stops delivering taps to Dart; later routes wait for the next listener.
+  static void unobserveTaps() {
+    _objc_msgSend_1pl9qdv(_class_LiveUpdatesBridge, _sel_unobserveTaps);
   }
 
   /// Updates the activity with <code>id</code>. <code>completion</code> receives an error message
@@ -1563,6 +1581,23 @@ final _objc_msgSend_pysgoz = objc.msgSendPointer
         ffi.Pointer<objc.ObjCSelector>,
       )
     >();
+final _objc_msgSend_xtuoz7 = objc.msgSendPointer
+    .cast<
+      ffi.NativeFunction<
+        ffi.Void Function(
+          ffi.Pointer<objc.ObjCObjectImpl>,
+          ffi.Pointer<objc.ObjCSelector>,
+          ffi.Pointer<objc.ObjCObjectImpl>,
+        )
+      >
+    >()
+    .asFunction<
+      void Function(
+        ffi.Pointer<objc.ObjCObjectImpl>,
+        ffi.Pointer<objc.ObjCSelector>,
+        ffi.Pointer<objc.ObjCObjectImpl>,
+      )
+    >();
 late final _sel_activeIds = objc.registerName("activeIds");
 late final _sel_alloc = objc.registerName("alloc");
 late final _sel_allocWithZone_ = objc.registerName("allocWithZone:");
@@ -1605,6 +1640,8 @@ late final _sel_startOrUpdate_json_completion_ = objc.registerName(
 );
 late final _sel_start_error_ = objc.registerName("start:error:");
 late final _sel_takeQueuedActions = objc.registerName("takeQueuedActions");
+late final _sel_unobserveActions_ = objc.registerName("unobserveActions:");
+late final _sel_unobserveTaps = objc.registerName("unobserveTaps");
 late final _sel_update_json_completion_ = objc.registerName(
   "update:json:completion:",
 );

@@ -44,8 +44,10 @@ abstract class LiveUpdatesPlatform {
   /// Key of the live update [id], or `null` when it was started without one.
   Future<String?> keyForId(String id) async => null;
 
-  /// Button presses as `(update id, action id)`.
-  Stream<(String, String)> get actions;
+  /// Button presses as `(update id, action id)`, of update [updateId] only
+  /// when given. Presses go to the app only while one of these streams is
+  /// listened to; otherwise the background action handler runs.
+  Stream<(String, String)> actions({String? updateId});
 
   /// Stores the callback handles used to run [LiveUpdates.setBackgroundActionHandler]'s
   /// handler in a headless engine.
@@ -119,7 +121,7 @@ class NoopLiveUpdatesPlatform extends LiveUpdatesPlatform {
   Future<String?> idForKey(String key) async => null;
 
   @override
-  Stream<(String, String)> get actions => const Stream.empty();
+  Stream<(String, String)> actions({String? updateId}) => const Stream.empty();
 
   @override
   Future<void> update(String id, LiveUpdateContent content) async {}

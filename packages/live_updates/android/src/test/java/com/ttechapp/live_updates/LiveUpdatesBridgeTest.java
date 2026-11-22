@@ -50,7 +50,7 @@ public class LiveUpdatesBridgeTest {
 
   @After
   public void tearDown() {
-    LiveUpdatesBridge.engineDetached();
+    LiveUpdatesBridge.engineDetached(1);
   }
 
   private static boolean remote(String event, String id, String content) throws Exception {
@@ -131,7 +131,7 @@ public class LiveUpdatesBridgeTest {
     String id = LiveUpdatesBridge.start("{\"title\":\"A\",\"route\":\"/orders/1\"}");
     Intent tap = shadowOf(shown(id).contentIntent).getSavedIntent();
     List<String> routes = new ArrayList<>();
-    LiveUpdatesBridge.observeTaps(routes::add);
+    LiveUpdatesBridge.observeTaps(routes::add, 1);
 
     Intent forged = new Intent().putExtra(LiveUpdatesBridge.EXTRA_ROUTE, "/evil");
     LiveUpdatesBridge.handleIntent(forged);
@@ -142,8 +142,77 @@ public class LiveUpdatesBridgeTest {
     LiveUpdatesBridge.handleIntent(wrongToken);
     assertTrue(routes.isEmpty());
 
-    LiveUpdatesBridge.handleIntent(new Intent(tap));
+    Intent launch = new Intent(tap);
+    LiveUpdatesBridge.handleIntent(launch);
     assertEquals(Arrays.asList("/orders/1"), routes);
+    // The internal data URI must not reach Flutter as a deep link.
+    assertEquals(null, launch.getData());
+  }
+
+  @Test
+  public void listenersOfADetachedEngineAreDropped() {
+    List<String> got = new ArrayList<>();
+    LiveUpdatesBridge.observeActions((update, action) -> got.add(update + ":" + action), 1);
+    LiveUpdatesBridge.engineDetached(2); // another engine: still listening
+    LiveUpdatesBridge.emitAction(app, "u1", "a");
+    assertEquals(Arrays.asList("u1:a"), got);
+    LiveUpdatesBridge.engineDetached(1);
+    LiveUpdatesBridge.emitAction(app, "u1", "b");
+    assertEquals(1, got.size());
+    assertEquals(Arrays.asList("u1\nb"), Arrays.asList(LiveUpdatesBridge.takeQueuedActions()));
+  }
+
+  @Test
+  public void unobservedPressesAreQueuedAgain() {
+    List<String> got = new ArrayList<>();
+    LiveUpdatesBridge.observeActions((update, action) -> got.add(update + ":" + action), 1);
+    LiveUpdatesBridge.unobserveActions(1, new String[] {"u3\nlater"});
+    LiveUpdatesBridge.emitAction(app, "u3", "next");
+    assertTrue(got.isEmpty());
+    assertEquals(
+        Arrays.asList("u3\nlater", "u3\nnext"),
+        Arrays.asList(LiveUpdatesBridge.takeQueuedActions()));
+  }
+
+  @Test
+  public void remoteEndDoesNotBringBackADismissedUpdate() throws Exception {
+    remote("start", "r5", "{\"title\":\"A\"}");
+    manager.cancel(LiveUpdatesBridge.TAG_PREFIX + "r5", LiveUpdatesBridge.NOTIFICATION_ID);
+    LiveUpdatesBridge.markDismissed(app, "r5");
+    remote("end", "r5", "{\"title\":\"Delivered\",\"channelId\":\"promo\"}");
+    assertEquals(null, shown("r5"));
+    assertEquals(null, manager.getNotificationChannel("promo"));
+  }
+
+  @Test
+  public void remoteEndKeepsFinalContentWithoutDismissTime() throws Exception {
+    remote("start", "r6", "{\"title\":\"A\"}");
+    remote("end", "r6", "{\"title\":\"Delivered\"}");
+    assertEquals("Delivered", shown("r6").extras.getString(Notification.EXTRA_TITLE));
+  }
+
+  @Test
+  public void timeoutIsNotADismissal() throws Exception {
+    LiveUpdatesBridge.startOrUpdate("order-t", "{\"title\":\"A\",\"timeoutAfterMillis\":60000}");
+    Intent delete = shadowOf(shown("order-t").deleteIntent).getSavedIntent();
+    long deadline = delete.getLongExtra("com.ttechapp.live_updates.DEADLINE", 0);
+    assertTrue(deadline > System.currentTimeMillis());
+    // As if the system removed it at the deadline.
+    manager.cancel(LiveUpdatesBridge.TAG_PREFIX + "order-t", LiveUpdatesBridge.NOTIFICATION_ID);
+    delete.putExtra("com.ttechapp.live_updates.DEADLINE", System.currentTimeMillis());
+    new LiveUpdatesDismissReceiver().onReceive(app, delete);
+    LiveUpdatesBridge.startOrUpdate("order-t", "{\"title\":\"B\"}");
+    assertEquals("B", shown("order-t").extras.getString(Notification.EXTRA_TITLE));
+  }
+
+  @Test
+  public void swipeIsADismissal() throws Exception {
+    LiveUpdatesBridge.startOrUpdate("order-s", "{\"title\":\"A\",\"timeoutAfterMillis\":600000}");
+    Intent delete = shadowOf(shown("order-s").deleteIntent).getSavedIntent();
+    manager.cancel(LiveUpdatesBridge.TAG_PREFIX + "order-s", LiveUpdatesBridge.NOTIFICATION_ID);
+    new LiveUpdatesDismissReceiver().onReceive(app, delete);
+    LiveUpdatesBridge.startOrUpdate("order-s", "{\"title\":\"B\"}");
+    assertEquals(null, shown("order-s"));
   }
 
   @Test
@@ -151,7 +220,7 @@ public class LiveUpdatesBridgeTest {
     LiveUpdatesBridge.emitAction(app, "u1", "cancel");
     LiveUpdatesBridge.emitAction(app, "u1", "details");
     List<String> got = new ArrayList<>();
-    LiveUpdatesBridge.observeActions((update, action) -> got.add(update + ":" + action));
+    LiveUpdatesBridge.observeActions((update, action) -> got.add(update + ":" + action), 1);
     assertEquals(Arrays.asList("u1:cancel", "u1:details"), got);
     LiveUpdatesBridge.emitAction(app, "u2", "cancel");
     assertEquals("u2:cancel", got.get(2));

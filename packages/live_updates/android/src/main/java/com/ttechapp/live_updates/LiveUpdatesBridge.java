@@ -82,14 +82,19 @@ public final class LiveUpdatesBridge {
 
   @Nullable static Context context;
   @Nullable static Activity activity;
+  // Listeners belong to the Dart isolate of one engine (by engine id) and are
+  // dropped when that engine detaches, so nothing is sent to a dead isolate.
   @Nullable private static RouteListener routeListener;
+  private static long routeEngine;
   @Nullable private static EventListener eventListener;
+  private static long eventEngine;
   private static final Set<String> known = new LinkedHashSet<>();
-  @Nullable static ResultListener permissionListener;
+  /** Callers waiting for the permission prompt that is showing. */
+  private static final List<ResultListener> permissionListeners = new ArrayList<>();
   private static final List<String> pendingRoutes = new ArrayList<>();
   @Nullable private static volatile ActionListener actionListener;
+  private static long actionEngine;
   private static final Object actionLock = new Object();
-  private static int attachedEngines = 0;
 
   private static final String PREFS = "com.ttechapp.live_updates";
   private static final String PREF_PENDING_ACTIONS = "pendingActions";
@@ -143,11 +148,25 @@ public final class LiveUpdatesBridge {
       listener.onResult(false);
       return;
     }
-    permissionListener = listener;
+    synchronized (permissionListeners) {
+      permissionListeners.add(listener);
+      // A prompt is already showing: this caller gets its result too.
+      if (permissionListeners.size() > 1) return;
+    }
     a.runOnUiThread(
         () ->
             a.requestPermissions(
                 new String[] {Manifest.permission.POST_NOTIFICATIONS}, PERMISSION_REQUEST_CODE));
+  }
+
+  /** Completes every waiting {@link #requestPermission} call. */
+  static void permissionResult(boolean granted) {
+    List<ResultListener> listeners;
+    synchronized (permissionListeners) {
+      listeners = new ArrayList<>(permissionListeners);
+      permissionListeners.clear();
+    }
+    for (ResultListener l : listeners) l.onResult(granted);
   }
 
   /** Posts a new live update and returns its id. */
@@ -210,13 +229,33 @@ public final class LiveUpdatesBridge {
    * listener was attached (including while the app was not running) are
    * persisted and delivered first, in order.
    */
-  public static void observeActions(@NonNull ActionListener listener) {
+  public static void observeActions(@NonNull ActionListener listener, long engineId) {
     synchronized (actionLock) {
       Context c = context;
       if (c != null) {
         for (String[] a : takePendingActions(c)) listener.onAction(a[0], a[1]);
       }
       actionListener = listener;
+      actionEngine = engineId;
+    }
+  }
+
+  /**
+   * Stops delivering presses to Dart (nothing listens any more): later presses
+   * are queued and run by the background handler. {@code unhandled} presses
+   * ({@code "<update id>\n<action id>"}) that no Dart listener took are
+   * queued again the same way.
+   */
+  public static void unobserveActions(long engineId, @NonNull String[] unhandled) {
+    synchronized (actionLock) {
+      if (actionEngine != engineId) return;
+      actionListener = null;
+    }
+    Context c = context;
+    if (c == null) return;
+    for (String press : unhandled) {
+      int i = press.indexOf('\n');
+      if (i > 0) emitAction(c, press.substring(0, i), press.substring(i + 1), null, true);
     }
   }
 
@@ -292,6 +331,15 @@ public final class LiveUpdatesBridge {
     return out.toArray(new String[0]);
   }
 
+  /** Whether presses wait for the background handler (no Dart listener). */
+  static boolean hasQueuedBackgroundActions() {
+    Context c = context;
+    if (c == null) return false;
+    synchronized (actionLock) {
+      return actionListener == null && readArray(prefs(c), PREF_PENDING_ACTIONS).length() > 0;
+    }
+  }
+
   /** Called by the background engine when the handler finished. */
   public static void backgroundActionsDone() {
     LiveUpdatesBackgroundRunner.finish();
@@ -312,20 +360,14 @@ public final class LiveUpdatesBridge {
   /** Called by the plugin when an engine attaches or detaches. */
   static void engineAttached(Context c) {
     context = c.getApplicationContext();
-    synchronized (actionLock) {
-      attachedEngines++;
-    }
   }
 
-  static void engineDetached() {
+  static void engineDetached(long engineId) {
+    // The listeners of this engine's isolate are gone: queue from now on.
     synchronized (actionLock) {
-      attachedEngines = Math.max(0, attachedEngines - 1);
-      if (attachedEngines == 0) {
-        // The listeners belong to isolates that are gone: queue from now on.
-        actionListener = null;
-        routeListener = null;
-        eventListener = null;
-      }
+      if (actionEngine == engineId) actionListener = null;
+      if (routeEngine == engineId) routeListener = null;
+      if (eventEngine == engineId) eventListener = null;
     }
   }
 
@@ -417,19 +459,26 @@ public final class LiveUpdatesBridge {
   /** Removes the live update {@code id}, optionally showing final content for a while. */
   public static void end(@NonNull String id, @Nullable String json, double dismissAfterSeconds)
       throws JSONException {
+    end(id, json, dismissAfterSeconds, false, true);
+  }
+
+  private static void end(
+      String id, @Nullable String json, double dismissAfterSeconds, boolean remote, boolean emit)
+      throws JSONException {
     Context c = requireContext();
     synchronized (recentlyPosted) {
       recentlyPosted.remove(id);
       recentlyEnded.put(id, SystemClock.uptimeMillis());
     }
-    emit("ended", id);
+    if (emit) emit("ended", id);
     synchronized (keyedIds) {
       keyedIds.remove(id);
     }
     clearDismissed(c, id);
     if (json != null && dismissAfterSeconds != 0) {
       JSONObject content = new JSONObject(json);
-      Notification.Builder builder = builder(c, content).setOngoing(false).setAutoCancel(true);
+      Notification.Builder builder =
+          builder(c, content, remote).setOngoing(false).setAutoCancel(true);
       if (dismissAfterSeconds > 0 && Build.VERSION.SDK_INT >= 26)
         builder.setTimeoutAfter((long) (dismissAfterSeconds * 1000));
       requestPromotedOngoing(builder, false);
@@ -500,8 +549,22 @@ public final class LiveUpdatesBridge {
         }
         return true;
       case "end":
-        end(id, content, data.optDouble("live_updates_dismiss_after", 0));
-        return true;
+        {
+          // Final content only for an update that is shown: never bring back
+          // one the user dismissed. Without a dismiss time it stays, as with
+          // LiveUpdate.end(finalContent:).
+          Context c = requireContext();
+          boolean visible = isShown(id) && !isDismissed(c, id);
+          end(
+              id,
+              visible ? content : null,
+              data.has("live_updates_dismiss_after")
+                  ? data.optDouble("live_updates_dismiss_after", 0)
+                  : -1,
+              true,
+              visible);
+          return true;
+        }
       default:
         return false;
     }
@@ -512,8 +575,19 @@ public final class LiveUpdatesBridge {
    * update, local or remote), {@code ended} (ended by the app or a payload)
    * and {@code dismissed} (swiped away by the user).
    */
-  public static void observeEvents(@NonNull EventListener listener) {
-    eventListener = listener;
+  public static void observeEvents(@NonNull EventListener listener, long engineId) {
+    synchronized (actionLock) {
+      eventListener = listener;
+      eventEngine = engineId;
+    }
+  }
+
+  /** Called by the dismiss receiver when a timeout removed the update. */
+  static void timedOut(Context c, String id) {
+    synchronized (keyedIds) {
+      keyedIds.remove(id);
+    }
+    emit("ended", id);
   }
 
   /** Removes every live update of this app. */
@@ -532,11 +606,22 @@ public final class LiveUpdatesBridge {
   }
 
   /** Calls {@code listener} with every tap route, including one that launched the app. */
-  public static void observeTaps(@NonNull RouteListener listener) {
-    routeListener = listener;
-    List<String> pending = new ArrayList<>(pendingRoutes);
-    pendingRoutes.clear();
+  public static void observeTaps(@NonNull RouteListener listener, long engineId) {
+    List<String> pending;
+    synchronized (actionLock) {
+      routeListener = listener;
+      routeEngine = engineId;
+      pending = new ArrayList<>(pendingRoutes);
+      pendingRoutes.clear();
+    }
     for (String route : pending) listener.onRoute(route);
+  }
+
+  /** Stops delivering taps to Dart; later routes wait for the next listener. */
+  public static void unobserveTaps(long engineId) {
+    synchronized (actionLock) {
+      if (routeEngine == engineId) routeListener = null;
+    }
   }
 
   /** Called by the plugin for launch and new intents. */
@@ -558,16 +643,20 @@ public final class LiveUpdatesBridge {
     intent.removeExtra(EXTRA_UPDATE_ID);
     intent.removeExtra(EXTRA_ROUTE);
     if (!intentToken(c).equals(token)) return; // Not from our notifications.
+    // The data URI only keeps the PendingIntents apart; clear it before
+    // Flutter reads it as a deep link (plugins see the intent first).
+    Uri data = intent.getData();
+    if (data != null && INTENT_SCHEME.equals(data.getScheme())) intent.setData(null);
     // Open-app presses: the app is coming to the foreground, so its onAction
     // listener handles them (no background engine).
     if (actionId != null && updateId != null) emitAction(c, updateId, actionId, null, false);
     if (route == null) return;
-    RouteListener listener = routeListener;
-    if (listener != null) {
-      listener.onRoute(route);
-    } else {
-      pendingRoutes.add(route);
+    RouteListener listener;
+    synchronized (actionLock) {
+      listener = routeListener;
+      if (listener == null) pendingRoutes.add(route);
     }
+    if (listener != null) listener.onRoute(route);
   }
 
   private static void post(String id, JSONObject content) {
@@ -600,7 +689,14 @@ public final class LiveUpdatesBridge {
     if (isNew) emit("started", id);
     Notification.Builder b = builder(c, content, remote);
     if (content.optBoolean("androidAlert", false) && !mayAlert(id)) b.setOnlyAlertOnce(true);
-    b.setDeleteIntent(LiveUpdatesDismissReceiver.intent(c, id));
+    // The system sends the delete intent for timeouts too; the deadline lets
+    // the receiver tell them from a swipe.
+    long timeout = content.optLong("timeoutAfterMillis", 0);
+    long deadline =
+        timeout > 0 && Build.VERSION.SDK_INT >= 26
+            ? System.currentTimeMillis() + Math.max(timeout, MIN_TIMEOUT_MS)
+            : 0;
+    b.setDeleteIntent(LiveUpdatesDismissReceiver.intent(c, id, deadline));
     // update() keeps the marker of the shown notification.
     if (keyed || keyForId(id) != null) {
       android.os.Bundle extras = new android.os.Bundle();
@@ -789,7 +885,11 @@ public final class LiveUpdatesBridge {
   }
 
   private static String clip(String text) {
-    return text.length() <= MAX_DETAIL_TEXT ? text : text.substring(0, MAX_DETAIL_TEXT);
+    if (text.length() <= MAX_DETAIL_TEXT) return text;
+    int end = MAX_DETAIL_TEXT;
+    // Do not split a surrogate pair.
+    if (Character.isHighSurrogate(text.charAt(end - 1))) end--;
+    return text.substring(0, end);
   }
 
   /**
@@ -965,9 +1065,11 @@ public final class LiveUpdatesBridge {
    * Makes each PendingIntent distinct by its data URI (request codes from
    * hashes can collide and FLAG_UPDATE_CURRENT would overwrite extras).
    */
+  private static final String INTENT_SCHEME = "liveupdates";
+
   static Uri intentUri(String kind, String a, String b) {
     return new Uri.Builder()
-        .scheme("liveupdates")
+        .scheme(INTENT_SCHEME)
         .authority(kind)
         .appendQueryParameter("a", a)
         .appendQueryParameter("b", b)

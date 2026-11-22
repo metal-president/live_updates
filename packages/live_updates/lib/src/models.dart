@@ -684,7 +684,9 @@ final class AndroidLiveUpdateOptions {
   final String? progressTrackerIcon;
 
   /// Removes the notification after this time (at least one minute, counted
-  /// from the latest post) even if the app is not running, so a forgotten update does not stay on screen.
+  /// from the latest post) even if the app is not running, so a forgotten
+  /// update does not stay on screen. A timed-out update reports
+  /// [LiveUpdateState.ended], and its key can be started again.
   /// Android 8+; on iOS use [IosLiveUpdateOptions.staleDate] and end the
   /// activity.
   final Duration? timeoutAfter;

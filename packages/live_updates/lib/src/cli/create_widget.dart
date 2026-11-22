@@ -30,6 +30,11 @@ Future<int> createWidget(List<String> args) async {
   var force = false;
   String? appGroup = 'auto';
   for (var i = 0; i < args.length; i++) {
+    if (const {'--name', '--ios-dir', '--app-group'}.contains(args[i]) &&
+        i + 1 >= args.length) {
+      stderr.write('${args[i]} needs a value\n\n$_usage');
+      return 64;
+    }
     switch (args[i]) {
       case '--name':
         name = args[++i];

@@ -544,7 +544,7 @@ Deliver a data message and pass it to `LiveUpdates.handleRemotePayload`:
 | `live_updates_event` | `start`, `update` or `end` |
 | `live_updates_id` | Your id for the update (used by later messages) |
 | `live_updates_content` | Content as a JSON string, same keys as above |
-| `live_updates_dismiss_after` | Optional, seconds to keep final content on `end` |
+| `live_updates_dismiss_after` | Optional, seconds to keep final content on `end` (without it, it stays until dismissed) |
 
 With Firebase, [`live_updates_fcm`](https://pub.dev/packages/live_updates_fcm)
 does this for you.

@@ -49,9 +49,10 @@ public final class LiveUpdatesBridge: NSObject {
         domain: "live_updates", code: 1,
         userInfo: [
           NSLocalizedDescriptionKey:
-            "\(error.localizedDescription) Push updates and broadcast channels "
-            + "require the Push Notifications capability (aps-environment entitlement) on the "
-            + "Runner target; channels also need Broadcast Capability for the App ID."
+            "\(error.localizedDescription) (If the error is about push or entitlements: push "
+            + "updates and broadcast channels require the Push Notifications capability "
+            + "(aps-environment entitlement) on the Runner target; channels also need Broadcast "
+            + "Capability for the App ID.)"
         ])
     }
   }
@@ -110,6 +111,9 @@ public final class LiveUpdatesBridge: NSObject {
       do {
         let payload = try Payload.decode(json)
         guard let activity = find(id) else { return completion("Unknown activity \(id)") }
+        guard activity.activityState == .active || activity.activityState == .stale else {
+          return completion("The live update \(id) has ended")
+        }
         await activity.update(payload.content, alertConfiguration: payload.alertConfiguration)
         completion(nil)
       } catch {
@@ -148,9 +152,11 @@ public final class LiveUpdatesBridge: NSObject {
     LiveUpdatesImages.directory?.path
   }
 
-  /// Ids of the activities currently known to the system.
+  /// Ids of the activities that are running (not ended or dismissed).
   @objc public static func activeIds() -> [String] {
-    Activity<LiveUpdatesAttributes>.activities.map(\.id)
+    Activity<LiveUpdatesAttributes>.activities
+      .filter { $0.activityState == .active || $0.activityState == .stale }
+      .map(\.id)
   }
 
   /// Calls `handler` with every push token (hex) of the activity `id`.
@@ -201,7 +207,8 @@ public final class LiveUpdatesBridge: NSObject {
       stateTasks[activity.id] = Task {
         for await state in activity.activityStateUpdates {
           handler("\(name(of: state)):\(activity.id)")
-          if state == .ended || state == .dismissed { break }
+          // An ended activity stays listed until it is dismissed.
+          if state == .dismissed { break }
         }
       }
     }
@@ -233,8 +240,35 @@ public final class LiveUpdatesBridge: NSObject {
   /// Calls `handler` with `"<activity id>\n<action id>"` for every button
   /// press, including presses queued while Dart was not listening.
   @objc public static func observeActions(_ handler: @escaping (String) -> Void) {
-    actionHandler = handler
-    drainActions()
+    onMain {
+      actionHandler = handler
+      drainActions()
+    }
+  }
+
+  /// Stops delivering presses to Dart (nothing listens any more): later
+  /// presses are queued and run by the background handler. `unhandled`
+  /// presses (`"<activity id>\n<action id>"`) that no Dart listener took are
+  /// queued again the same way.
+  @objc public static func unobserveActions(_ unhandled: [String]) {
+    onMain {
+      actionHandler = nil
+      for press in unhandled {
+        let parts = press.split(separator: "\n", maxSplits: 1).map(String.init)
+        if parts.count == 2 { queueAction(parts[0], actionId: parts[1], startBackground: true) }
+      }
+    }
+  }
+
+  /// Runs `work` on the main thread, where the queue and handlers live.
+  private static func onMain(_ work: @escaping () -> Void) {
+    if Thread.isMainThread { work() } else { DispatchQueue.main.async(execute: work) }
+  }
+
+  /// Whether presses wait for the background handler (no Dart listener).
+  static var hasQueuedBackgroundActions: Bool {
+    actionHandler == nil
+      && !(UserDefaults.standard.stringArray(forKey: pendingActionsKey) ?? []).isEmpty
   }
 
   static func drainActions() {
@@ -312,7 +346,7 @@ public final class LiveUpdatesBridge: NSObject {
     _ = runner.perform(NSSelectorFromString("finish"))
   }
 
-  private static func startBackgroundHandler() -> NSNumber {
+  static func startBackgroundHandler() -> NSNumber {
     let dispatcher = Int64(UserDefaults.standard.integer(forKey: dispatcherKey))
     guard dispatcher != 0,
       let runner = NSClassFromString("LiveUpdatesBackgroundRunner") as AnyObject?,
@@ -329,10 +363,17 @@ public final class LiveUpdatesBridge: NSObject {
   /// Calls `handler` with the route of every tap, including a tap that
   /// launched the app before Dart subscribed.
   @objc public static func observeTaps(_ handler: @escaping (String) -> Void) {
-    tapHandler = handler
-    let pending = pendingRoutes
-    pendingRoutes.removeAll()
-    pending.forEach(handler)
+    onMain {
+      tapHandler = handler
+      let pending = pendingRoutes
+      pendingRoutes.removeAll()
+      pending.forEach(handler)
+    }
+  }
+
+  /// Stops delivering taps to Dart; later routes wait for the next listener.
+  @objc public static func unobserveTaps() {
+    onMain { tapHandler = nil }
   }
 
   private static func find(_ id: String) -> Activity<LiveUpdatesAttributes>? {

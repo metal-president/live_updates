@@ -25,6 +25,23 @@
   (content-state keys `tintArgb` / `backgroundArgb` / `foregroundArgb`); the
   Always-On display uses system colors. Run
   `create_widget` to update `LiveUpdatesViews.swift`.
+- Fixes:
+  - Button presses go to the background handler again once no action stream
+    is listened to; `LiveUpdate.actions` no longer drops presses of other
+    updates; a press that arrives as the background handler finishes is run.
+  - Android: listeners of an engine that went away (with another engine,
+    such as FCM's, still attached) no longer swallow presses and taps; a
+    tap no longer passes the plugin's internal URI to Flutter as a deep link;
+    an update removed by `timeoutAfter` reports `ended` and its key can be
+    started again; a remote `end` no longer brings back a dismissed update,
+    and keeps final content when `live_updates_dismiss_after` is missing;
+    concurrent `requestPermission` calls all complete.
+  - iOS: a tap that launches an app without scenes is delivered once; taps
+    keep working when the background handler started first; `active()`
+    leaves out ended activities, `update` on an ended one throws, and
+    `states` reports `dismissed` after `ended`.
+  - Network images: redirects must stay on https; image files are written
+    atomically. `create_widget` reports a missing option value.
 
 ## 0.0.6
 

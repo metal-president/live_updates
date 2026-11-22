@@ -79,7 +79,9 @@ JSON encoded once more.
 
 - `live_updates_event`: `start`, `update` or `end`. `live_updates_id` is the key.
 - `end` may carry final content and `live_updates_dismiss_after` (seconds,
-  as a string like every FCM data value).
+  as a string like every FCM data value). Without it the final content stays
+  until the user dismisses it. Final content is shown only for an update that
+  is still shown; an `end` for one the user dismissed just ends it.
 - An `update` for an update that is not shown (ended, or dismissed by the
   user) is ignored; send `start` to show it again.
 

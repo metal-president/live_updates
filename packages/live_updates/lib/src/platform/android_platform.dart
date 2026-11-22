@@ -1,11 +1,14 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'dart:ui' show PlatformDispatcher;
+
 import 'package:jni/jni.dart';
 
 import '../android/bindings.g.dart';
 import '../models.dart';
 import 'buffered_broadcast.dart';
+import 'observed_broadcast.dart';
 import 'content_encoder.dart';
 import 'live_updates_platform.dart';
 
@@ -27,10 +30,11 @@ class AndroidLiveUpdatesPlatform extends LiveUpdatesPlatform
           onRoute$async: true,
         ),
       ),
+      _engineId,
     ),
   );
-  late final _actions = BufferedBroadcast<(String, String)>(
-    (add) => LiveUpdatesBridge.observeActions(
+  late final _actions = ObservedBroadcast<(String, String)>(
+    attach: (add) => LiveUpdatesBridge.observeActions(
       LiveUpdatesBridge$ActionListener.implement(
         $LiveUpdatesBridge$ActionListener(
           onAction: (updateId, actionId) => add((
@@ -40,8 +44,17 @@ class AndroidLiveUpdatesPlatform extends LiveUpdatesPlatform
           onAction$async: true,
         ),
       ),
+      _engineId,
+    ),
+    detach: (unhandled) => LiveUpdatesBridge.unobserveActions(
+      _engineId,
+      JArray.of(JString.type, [for (final (u, a) in unhandled) _j('$u\n$a')]),
     ),
   );
+
+  /// Identifies this isolate's engine, so the plugin drops its listeners
+  /// when the engine goes away.
+  static int get _engineId => PlatformDispatcher.instance.engineId ?? 0;
   final _events = StreamController<(String, String)>.broadcast();
   bool _eventsObserved = false;
 
@@ -115,7 +128,8 @@ class AndroidLiveUpdatesPlatform extends LiveUpdatesPlatform
       LiveUpdatesBridge.keyForId(_j(id))?.toDartString(releaseOriginal: true);
 
   @override
-  Stream<(String, String)> get actions => _actions.stream;
+  Stream<(String, String)> actions({String? updateId}) =>
+      _actions.stream(updateId == null ? null : (e) => e.$1 == updateId);
 
   @override
   Future<void> setBackgroundActionHandler(int dispatcher, int handler) async =>
@@ -197,6 +211,7 @@ class AndroidLiveUpdatesPlatform extends LiveUpdatesPlatform
             onEvent$async: true,
           ),
         ),
+        _engineId,
       );
     }
     return _events.stream;

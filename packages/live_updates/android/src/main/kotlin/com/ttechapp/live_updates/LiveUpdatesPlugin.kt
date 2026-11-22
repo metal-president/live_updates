@@ -26,7 +26,7 @@ class LiveUpdatesPlugin :
     }
 
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
-        LiveUpdatesBridge.engineDetached()
+        LiveUpdatesBridge.engineDetached(binding.engineId)
     }
 
     override fun onAttachedToActivity(binding: ActivityPluginBinding) {
@@ -60,9 +60,7 @@ class LiveUpdatesPlugin :
         grantResults: IntArray,
     ): Boolean {
         if (requestCode != LiveUpdatesBridge.PERMISSION_REQUEST_CODE) return false
-        val listener = LiveUpdatesBridge.permissionListener ?: return true
-        LiveUpdatesBridge.permissionListener = null
-        listener.onResult(
+        LiveUpdatesBridge.permissionResult(
             grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED,
         )
         return true

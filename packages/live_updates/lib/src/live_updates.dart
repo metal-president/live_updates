@@ -41,8 +41,13 @@ final class LiveUpdate {
       .cast<LiveUpdateState>();
 
   /// Presses of this update's buttons ([LiveUpdateContent.actions]).
+  ///
+  /// While any action stream (this or [LiveUpdates.onAction]) is listened
+  /// to, presses go to the app instead of the background action handler.
+  /// Presses of other updates are kept for [LiveUpdates.onAction], or for the
+  /// background handler once nothing listens.
   Stream<String> get actions =>
-      _platform.actions.where((e) => e.$1 == id).map((e) => e.$2);
+      _platform.actions(updateId: id).map((e) => e.$2);
 
   /// Per-activity APNs push tokens (iOS only, empty elsewhere). A new
   /// listener first receives the current token, if one is known. Requires
@@ -176,7 +181,7 @@ abstract final class LiveUpdates {
 
   /// Button presses on any live update, including presses made while the
   /// app was not running once Dart listens again.
-  static Stream<LiveUpdateActionEvent> get onAction => _platform.actions.map(
+  static Stream<LiveUpdateActionEvent> get onAction => _platform.actions().map(
     (e) => LiveUpdateActionEvent(updateId: e.$1, actionId: e.$2),
   );
 
@@ -208,7 +213,8 @@ abstract final class LiveUpdates {
   ) => registerBackgroundActionHandler(handler);
 
   /// Currently running live updates started by this app, including ones
-  /// started remotely with a push-to-start token.
+  /// started remotely with a push-to-start token. Ended and dismissed ones
+  /// are not included.
   static Future<List<LiveUpdate>> active() async => [
     for (final id in await _platform.activeIds())
       LiveUpdate._(id, await _platform.keyForId(id)),

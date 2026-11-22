@@ -31,8 +31,9 @@ public class LiveUpdatesPlugin: NSObject, FlutterPlugin, FlutterSceneLifeCycleDe
     // Keeps the FFIgen block trampolines linked into the app.
     live_updates_objc_link()
     // Background engines register plugins again; the URL handling delegate
-    // is process-wide, so it is added only once.
-    guard instances.isEmpty else { return }
+    // is process-wide, so it is added only once, by an app engine (a
+    // headless engine never receives scene callbacks).
+    guard instances.isEmpty, !LiveUpdatesBackgroundRunner.registeringPlugins else { return }
     let instance = LiveUpdatesPlugin()
     instances.append(instance)
     // Scene-based apps get URLs through the scene delegate only; registering
@@ -44,15 +45,8 @@ public class LiveUpdatesPlugin: NSObject, FlutterPlugin, FlutterSceneLifeCycleDe
     }
   }
 
-  public func application(
-    _ application: UIApplication,
-    didFinishLaunchingWithOptions launchOptions: [AnyHashable: Any] = [:]
-  ) -> Bool {
-    if let url = launchOptions[UIApplication.LaunchOptionsKey.url] as? URL {
-      _ = LiveUpdatesBridge.handleURL(url)
-    }
-    return true
-  }
+  // A launch URL is not handled in didFinishLaunching: UIKit passes it to
+  // application(_:open:options:) as well, which would deliver it twice.
 
   public func application(
     _ app: UIApplication, open url: URL,

@@ -6,6 +6,7 @@ import 'package:objective_c/objective_c.dart' as objc;
 import '../ios/bindings.g.dart';
 import '../models.dart';
 import 'buffered_broadcast.dart';
+import 'observed_broadcast.dart';
 import 'content_encoder.dart';
 import 'latest_value_stream.dart';
 import 'live_updates_platform.dart';
@@ -34,13 +35,16 @@ class IosLiveUpdatesPlatform extends LiveUpdatesPlatform with ContentEncoder {
       ),
     ),
   );
-  late final _actions = BufferedBroadcast<(String, String)>(
-    (add) => LiveUpdatesBridge.observeActions(
+  late final _actions = ObservedBroadcast<(String, String)>(
+    attach: (add) => LiveUpdatesBridge.observeActions(
       ObjCBlock_ffiVoid_NSString.listener((e) {
         final s = e.toDartString();
         final i = s.indexOf('\n');
         add((s.substring(0, i), s.substring(i + 1)));
       }),
+    ),
+    detach: (unhandled) => LiveUpdatesBridge.unobserveActions(
+      objc.NSArray.of([for (final (u, a) in unhandled) '$u\n$a'.toNSString()]),
     ),
   );
   final _pushTokens = <String, LatestValueStream<LiveUpdatePushToken>>{};
@@ -124,7 +128,8 @@ class IosLiveUpdatesPlatform extends LiveUpdatesPlatform with ContentEncoder {
       LiveUpdatesBridge.keyForId(_ns(id))?.toDartString();
 
   @override
-  Stream<(String, String)> get actions => _actions.stream;
+  Stream<(String, String)> actions({String? updateId}) =>
+      _actions.stream(updateId == null ? null : (e) => e.$1 == updateId);
 
   @override
   Future<void> setBackgroundActionHandler(int dispatcher, int handler) async =>

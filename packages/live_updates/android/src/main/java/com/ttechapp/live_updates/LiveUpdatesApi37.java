@@ -96,7 +96,7 @@ final class LiveUpdatesApi37 {
 
   /**
    * Sets a {@code MetricStyle} built from {@code metrics} (the JSON written
-   * by the Dart {@code AndroidMetric}). Returns false when nothing was set.
+   * by the Dart {@code LiveUpdateMetric}). Returns false when nothing was set.
    */
   static boolean setMetricStyle(
       Notification.Builder b, @Nullable JSONArray metrics, int criticalIndex) {

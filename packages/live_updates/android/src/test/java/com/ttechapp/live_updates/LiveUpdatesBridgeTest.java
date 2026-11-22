@@ -290,4 +290,34 @@ public class LiveUpdatesBridgeTest {
         LiveUpdatesBridge.start("{\"title\":\"A\",\"progress\":0.5,\"requestPromotion\":false}");
     assertFalse(shown(old).extras.getBoolean("android.requestPromotedOngoing"));
   }
+
+  @Test
+  public void stepsBecomeSegmentsPointsAndText() throws Exception {
+    String id =
+        LiveUpdatesBridge.start(
+            "{\"title\":\"Order\",\"steps\":{\"labels\":[\"Placed\",\"Preparing\",\"On the way\",\"Delivered\"],\"current\":1}}");
+    Notification n = shown(id);
+    Notification.ProgressStyle style =
+        (Notification.ProgressStyle) Notification.Builder.recoverBuilder(app, n).getStyle();
+    assertEquals(3, style.getProgressSegments().size());
+    assertEquals(3, style.getProgressPoints().size());
+    assertEquals(3, style.getProgressMax());
+    assertEquals(1, style.getProgress());
+    assertEquals("2/4 Preparing", n.extras.getCharSequence(Notification.EXTRA_TEXT).toString());
+  }
+
+  @Test
+  public void journeyAndMetricsAreShownAsText() throws Exception {
+    String id =
+        LiveUpdatesBridge.start(
+            "{\"title\":\"Trip\",\"body\":\"On time\",\"journey\":{\"from\":\"A\",\"to\":\"B\"},"
+                + "\"metrics\":[{\"label\":\"Home\",\"type\":\"integer\",\"value\":2},"
+                + "{\"label\":\"Dist\",\"type\":\"decimal\",\"value\":4.25,\"unit\":\"km\"},"
+                + "{\"label\":\"ETA\",\"type\":\"timer\",\"value\":1}]}");
+    Notification n = shown(id);
+    assertEquals("On time", n.extras.getCharSequence(Notification.EXTRA_TEXT).toString());
+    assertEquals(
+        "A \u2192 B \u00b7 Home: 2 \u00b7 Dist: 4.2 km",
+        n.extras.getCharSequence(Notification.EXTRA_SUB_TEXT).toString());
+  }
 }

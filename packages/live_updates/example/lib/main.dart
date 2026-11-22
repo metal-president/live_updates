@@ -39,6 +39,15 @@ class _ExamplePageState extends State<ExamplePage> {
   double _progress = 0;
   DateTime _eta = DateTime.now();
   bool _push = false;
+  IosLiveUpdateLayout _layout = IosLiveUpdateLayout.standard;
+
+  static const _layouts = {
+    'standard': IosLiveUpdateLayout.standard,
+    'timer': IosLiveUpdateLayout.timer,
+    'metrics': IosLiveUpdateLayout.metrics,
+    'stepper': IosLiveUpdateLayout.stepper,
+    'journey': IosLiveUpdateLayout.journey,
+  };
 
   @override
   void initState() {
@@ -79,11 +88,38 @@ class _ExamplePageState extends State<ExamplePage> {
     route: '/orders/1234',
     // Counted by the system: no update needed every second.
     timer: LiveUpdateTimer.countdown(_eta),
-    // The compact Dynamic Island shows the countdown instead of the progress.
-    ios: const IosLiveUpdateOptions(
+    // Data for the metrics, stepper and journey layouts. Android uses it
+    // too: metrics (Android 17), stages as progress segments, text.
+    metrics: [
+      LiveUpdateMetric.timer('Arrives in', _eta),
+      LiveUpdateMetric.decimal(
+        'Distance',
+        (1 - _progress) * 4,
+        unit: 'km',
+        semanticStyle: _progress >= 1
+            ? LiveUpdateSemanticStyle.safe
+            : LiveUpdateSemanticStyle.info,
+      ),
+    ],
+    steps: LiveUpdateSteps(const [
+      'Ordered',
+      'Preparing',
+      'On the way',
+      'Delivered',
+    ], current: (_progress * 3).round()),
+    journey: LiveUpdateJourney(
+      from: 'Shop',
+      to: 'Home',
+      toDetail:
+          '${_eta.hour.toString().padLeft(2, '0')}:'
+          '${_eta.minute.toString().padLeft(2, '0')}',
+    ),
+    ios: IosLiveUpdateOptions(
+      layout: _layout,
+      // The compact Dynamic Island shows the countdown instead of the progress.
       compactTrailing: IosIslandContent.timer,
       // Accent for progress, buttons and the timer (shown on a dark card).
-      color: Color(0xFF8C9EFF),
+      color: const Color(0xFF8C9EFF),
     ),
     image: const LiveUpdateImage.asset('assets/parcel.png', maxDimension: 128),
     actions: const [
@@ -103,32 +139,10 @@ class _ExamplePageState extends State<ExamplePage> {
     ],
     android: AndroidLiveUpdateOptions(
       shortCriticalText: 'ETA',
-      // Android 16+: preparing, on the way, delivered.
-      progressSegments: const [
-        AndroidProgressSegment(1),
-        AndroidProgressSegment(2),
-        AndroidProgressSegment(1),
-      ],
-      progressPoints: const [
-        AndroidProgressPoint(.25),
-        AndroidProgressPoint(.75),
-      ],
       // Gone after 2 hours even if the app never ends it.
       timeoutAfter: const Duration(hours: 2),
       // Sound once more when the order is delivered.
       alert: _progress >= 1,
-      // Android 17+: shown instead of the progress bar.
-      metrics: [
-        AndroidMetric.timer('Arrives in', _eta),
-        AndroidMetric.decimal(
-          'Distance',
-          (1 - _progress) * 4,
-          unit: 'km',
-          semanticStyle: _progress >= 1
-              ? LiveUpdateSemanticStyle.safe
-              : LiveUpdateSemanticStyle.info,
-        ),
-      ],
     ),
   );
 
@@ -197,6 +211,17 @@ class _ExamplePageState extends State<ExamplePage> {
             FilledButton(onPressed: _end, child: const Text('End')),
             OutlinedButton(onPressed: _listActive, child: const Text('Active')),
           ],
+        ),
+        ListTile(
+          title: const Text('iOS layout (applies on Start / Update)'),
+          trailing: DropdownButton<IosLiveUpdateLayout>(
+            value: _layout,
+            items: [
+              for (final MapEntry(:key, :value) in _layouts.entries)
+                DropdownMenuItem(value: value, child: Text(key)),
+            ],
+            onChanged: (v) => setState(() => _layout = v ?? _layout),
+          ),
         ),
         SwitchListTile(
           title: const Text('Request push token (needs Push capability)'),

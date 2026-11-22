@@ -20,9 +20,14 @@ final class LiveUpdateContent {
     this.image,
     this.actions = const [],
     this.timer,
+    this.metrics = const [],
+    this.criticalMetric,
+    this.steps,
+    this.journey,
     this.ios,
     this.android,
-  }) : assert(progress == null || (progress >= 0 && progress <= 1));
+  }) : assert(progress == null || (progress >= 0 && progress <= 1)),
+       assert(criticalMetric == null || criticalMetric >= 0);
 
   /// Primary text.
   final String title;
@@ -62,6 +67,30 @@ final class LiveUpdateContent {
   /// notification's chronometer (replacing [AndroidLiveUpdateOptions.when]).
   final LiveUpdateTimer? timer;
 
+  /// Values such as a score, a distance or a countdown (up to three are
+  /// used). iOS shows them with [IosLiveUpdateLayout.metrics]; Android 17
+  /// shows them with `MetricStyle` instead of the progress bar (and without
+  /// the body), older versions add them to the text.
+  ///
+  /// Keep labels short: Android recommends 10 characters or fewer.
+  final List<LiveUpdateMetric> metrics;
+
+  /// Index in [metrics] of the most important one, which Android may show in
+  /// the status bar chip of a promoted Live Update. Defaults to the first;
+  /// ignored when out of range.
+  final int? criticalMetric;
+
+  /// Stages of a process and the current one, such as an order going from
+  /// placed to delivered. iOS shows them with [IosLiveUpdateLayout.stepper];
+  /// Android 16+ turns them into progress segments and points (unless
+  /// [AndroidLiveUpdateOptions.progressSegments] are set) and shows the
+  /// current stage in the text.
+  final LiveUpdateSteps? steps;
+
+  /// Where something travels from and to. iOS shows it with
+  /// [IosLiveUpdateLayout.journey]; Android shows "from → to" in the text.
+  final LiveUpdateJourney? journey;
+
   /// iOS-only options.
   final IosLiveUpdateOptions? ios;
 
@@ -78,6 +107,10 @@ final class LiveUpdateContent {
     LiveUpdateImage? image,
     List<LiveUpdateAction>? actions,
     LiveUpdateTimer? timer,
+    List<LiveUpdateMetric>? metrics,
+    int? criticalMetric,
+    LiveUpdateSteps? steps,
+    LiveUpdateJourney? journey,
     IosLiveUpdateOptions? ios,
     AndroidLiveUpdateOptions? android,
   }) => LiveUpdateContent(
@@ -89,6 +122,10 @@ final class LiveUpdateContent {
     image: image ?? this.image,
     actions: actions ?? this.actions,
     timer: timer ?? this.timer,
+    metrics: metrics ?? this.metrics,
+    criticalMetric: criticalMetric ?? this.criticalMetric,
+    steps: steps ?? this.steps,
+    journey: journey ?? this.journey,
     ios: ios ?? this.ios,
     android: android ?? this.android,
   );
@@ -104,6 +141,10 @@ final class LiveUpdateContent {
       other.image == image &&
       listEquals(other.actions, actions) &&
       other.timer == timer &&
+      listEquals(other.metrics, metrics) &&
+      other.criticalMetric == criticalMetric &&
+      other.steps == steps &&
+      other.journey == journey &&
       other.ios == ios &&
       other.android == android;
 
@@ -117,6 +158,10 @@ final class LiveUpdateContent {
     image,
     Object.hashAll(actions),
     timer,
+    Object.hashAll(metrics),
+    criticalMetric,
+    steps,
+    journey,
     ios,
     android,
   );
@@ -150,6 +195,64 @@ final class LiveUpdateTimer {
 
   @override
   int get hashCode => Object.hash(start, end);
+}
+
+/// Stages of a process ([LiveUpdateContent.steps]).
+@immutable
+final class LiveUpdateSteps {
+  /// Creates steps; [current] is the index in [labels] of the current stage.
+  const LiveUpdateSteps(this.labels, {required this.current})
+    : assert(current >= 0);
+
+  /// Short names of the stages, in order.
+  final List<String> labels;
+
+  /// Index of the current stage in [labels].
+  final int current;
+
+  @override
+  bool operator ==(Object other) =>
+      other is LiveUpdateSteps &&
+      listEquals(other.labels, labels) &&
+      other.current == current;
+
+  @override
+  int get hashCode => Object.hash(Object.hashAll(labels), current);
+}
+
+/// Where something travels from and to ([LiveUpdateContent.journey]).
+@immutable
+final class LiveUpdateJourney {
+  /// Creates a journey.
+  const LiveUpdateJourney({
+    required this.from,
+    required this.to,
+    this.fromDetail,
+    this.toDetail,
+  });
+
+  /// Starting point, such as a station or an address.
+  final String from;
+
+  /// Destination.
+  final String to;
+
+  /// Extra line for [from], such as a departure time.
+  final String? fromDetail;
+
+  /// Extra line for [to], such as an arrival time.
+  final String? toDetail;
+
+  @override
+  bool operator ==(Object other) =>
+      other is LiveUpdateJourney &&
+      other.from == from &&
+      other.to == to &&
+      other.fromDetail == fromDetail &&
+      other.toDetail == toDetail;
+
+  @override
+  int get hashCode => Object.hash(from, to, fromDetail, toDetail);
 }
 
 /// A button on a live update.
@@ -305,6 +408,7 @@ final class IosLiveUpdateOptions {
     this.extra = const {},
     this.compactTrailing,
     this.minimal,
+    this.layout,
     this.color,
     this.backgroundColor,
     this.foregroundColor,
@@ -334,6 +438,10 @@ final class IosLiveUpdateOptions {
   /// the icon.
   final IosIslandContent? minimal;
 
+  /// Lock Screen layout of the generated widget: one of the UI patterns in
+  /// [IosLiveUpdateLayout]. `null` is [IosLiveUpdateLayout.standard].
+  final IosLiveUpdateLayout? layout;
+
   /// Accent color of the generated widget: progress bars, buttons, the timer
   /// and the Dynamic Island keyline. `null` keeps the system colors. The
   /// Android counterpart is [AndroidLiveUpdateOptions.color].
@@ -361,6 +469,7 @@ final class IosLiveUpdateOptions {
       mapEquals(other.extra, extra) &&
       other.compactTrailing == compactTrailing &&
       other.minimal == minimal &&
+      other.layout == layout &&
       other.color == color &&
       other.backgroundColor == backgroundColor &&
       other.foregroundColor == foregroundColor;
@@ -373,10 +482,55 @@ final class IosLiveUpdateOptions {
     Object.hashAllUnordered(extra.entries.map((e) => (e.key, e.value))),
     compactTrailing,
     minimal,
+    layout,
     color,
     backgroundColor,
     foregroundColor,
   );
+}
+
+/// A Lock Screen UI pattern of the generated iOS widget
+/// ([IosLiveUpdateOptions.layout]).
+///
+/// The generated layout file switches on `context.state.layout`, so a
+/// [IosLiveUpdateLayout.custom] name can select a layout you add there.
+@immutable
+final class IosLiveUpdateLayout {
+  const IosLiveUpdateLayout._(this.value);
+
+  /// Image, title, body, progress bar and buttons.
+  static const standard = IosLiveUpdateLayout._('standard');
+
+  /// A large countdown or stopwatch ([LiveUpdateContent.timer]) next to the
+  /// title.
+  static const timer = IosLiveUpdateLayout._('timer');
+
+  /// Up to three labeled values side by side ([LiveUpdateContent.metrics]).
+  static const metrics = IosLiveUpdateLayout._('metrics');
+
+  /// Stages as dots on a line with the current one highlighted
+  /// ([LiveUpdateContent.steps]).
+  static const stepper = IosLiveUpdateLayout._('stepper');
+
+  /// From and to with the progress between them
+  /// ([LiveUpdateContent.journey], [LiveUpdateContent.progress]).
+  static const journey = IosLiveUpdateLayout._('journey');
+
+  /// A layout of your own, handled in the generated layout file.
+  const IosLiveUpdateLayout.custom(this.value);
+
+  /// Name read by the widget.
+  final String value;
+
+  @override
+  bool operator ==(Object other) =>
+      other is IosLiveUpdateLayout && other.value == value;
+
+  @override
+  int get hashCode => value.hashCode;
+
+  @override
+  String toString() => 'IosLiveUpdateLayout($value)';
 }
 
 /// Content for a small Dynamic Island area
@@ -460,8 +614,6 @@ final class AndroidLiveUpdateOptions {
     this.when,
     this.showChronometer = false,
     this.mode = AndroidLiveUpdateMode.liveUpdate,
-    this.metrics = const [],
-    this.criticalMetric,
     this.bodySemanticStyle,
     this.progressSemanticStyle,
     this.progressSegments = const [],
@@ -469,7 +621,7 @@ final class AndroidLiveUpdateOptions {
     this.progressTrackerIcon,
     this.timeoutAfter,
     this.alert = false,
-  }) : assert(criticalMetric == null || criticalMetric >= 0);
+  });
 
   /// Notification channel id. The channel is created on first use.
   final String channelId;
@@ -501,27 +653,10 @@ final class AndroidLiveUpdateOptions {
   /// [AndroidLiveUpdateMode.classic] for anything else.
   final AndroidLiveUpdateMode mode;
 
-  /// Values such as a distance, a speed or a countdown, shown with Android
-  /// 17's `MetricStyle` instead of the progress bar. Up to three are used.
-  /// Ignored below Android 17, where [LiveUpdateContent.progress] is shown as
-  /// usual.
-  ///
-  /// Android 17's metric template has no room for [LiveUpdateContent.body],
-  /// so the body (and [bodySemanticStyle]) is not shown while metrics are
-  /// set. Put what users must see in the title or in an
-  /// [AndroidMetric.text].
-  ///
-  /// Keep labels short: Android recommends 10 characters or fewer.
-  final List<AndroidMetric> metrics;
-
-  /// Index in [metrics] of the most important metric, which Android may show
-  /// in the status bar chip of a promoted Live Update. Defaults to the first;
-  /// ignored when out of range.
-  final int? criticalMetric;
-
   /// Semantic color of [LiveUpdateContent.body] (Android 17+). The system
   /// picks the actual color, and only applies it to promoted Live Updates.
-  /// Not visible when [metrics] are set, because the body is not shown.
+  /// Not visible on Android 17 when [LiveUpdateContent.metrics] are set,
+  /// because the body is not shown.
   final LiveUpdateSemanticStyle? bodySemanticStyle;
 
   /// Semantic color of the progress bar (Android 17+, promoted Live Updates).
@@ -533,7 +668,8 @@ final class AndroidLiveUpdateOptions {
   /// still runs from 0 to 1 over the whole bar.
   ///
   /// Shown only with a [LiveUpdateContent.progress], and not on Android 17
-  /// when [metrics] are set (they replace the progress bar). The same applies
+  /// when [LiveUpdateContent.metrics] are set (they replace the progress
+  /// bar). The same applies
   /// to [progressPoints] and [progressTrackerIcon].
   final List<AndroidProgressSegment> progressSegments;
 
@@ -565,8 +701,6 @@ final class AndroidLiveUpdateOptions {
       other.when == when &&
       other.showChronometer == showChronometer &&
       other.mode == mode &&
-      listEquals(other.metrics, metrics) &&
-      other.criticalMetric == criticalMetric &&
       other.bodySemanticStyle == bodySemanticStyle &&
       other.progressSemanticStyle == progressSemanticStyle &&
       listEquals(other.progressSegments, progressSegments) &&
@@ -584,8 +718,6 @@ final class AndroidLiveUpdateOptions {
     when,
     showChronometer,
     mode,
-    Object.hashAll(metrics),
-    criticalMetric,
     bodySemanticStyle,
     progressSemanticStyle,
     Object.hashAll(progressSegments),
@@ -668,8 +800,8 @@ enum AndroidLiveUpdateMode {
 
   /// A regular ongoing notification with the standard progress bar on every
   /// Android version, as on Android 15 and earlier. Progress segments and
-  /// points, metrics, semantic colors and `shortCriticalText` are not used,
-  /// and the body is always shown.
+  /// points, semantic colors and `shortCriticalText` are not used, metrics
+  /// are added to the text, and the body is always shown.
   classic,
 }
 
@@ -691,103 +823,103 @@ enum LiveUpdateSemanticStyle {
   danger,
 }
 
-/// Kind of value held by an [AndroidMetric].
+/// Kind of value held by an [LiveUpdateMetric].
 ///
 /// New values may be added in minor releases; handle unknown values with a
 /// default branch.
-enum AndroidMetricKind {
-  /// [AndroidMetric.integer].
+enum LiveUpdateMetricKind {
+  /// [LiveUpdateMetric.integer].
   integer,
 
-  /// [AndroidMetric.decimal].
+  /// [LiveUpdateMetric.decimal].
   decimal,
 
-  /// [AndroidMetric.text].
+  /// [LiveUpdateMetric.text].
   text,
 
-  /// [AndroidMetric.timer].
+  /// [LiveUpdateMetric.timer].
   timer,
 
-  /// [AndroidMetric.stopwatch].
+  /// [LiveUpdateMetric.stopwatch].
   stopwatch,
 
-  /// [AndroidMetric.pausedTimer].
+  /// [LiveUpdateMetric.pausedTimer].
   pausedTimer,
 
-  /// [AndroidMetric.pausedStopwatch].
+  /// [LiveUpdateMetric.pausedStopwatch].
   pausedStopwatch,
 }
 
-/// One value of [AndroidLiveUpdateOptions.metrics] (Android 17+).
+/// One value of [LiveUpdateContent.metrics].
 ///
 /// Timers and stopwatches are counted by the system, so they keep running
 /// without updates from the app.
 @immutable
-final class AndroidMetric {
+final class LiveUpdateMetric {
   /// A whole number, such as `1979` steps. Android stores it as a 32-bit
   /// integer, so larger values are clamped.
-  const AndroidMetric.integer(
+  const LiveUpdateMetric.integer(
     this.label,
     int this.value, {
     this.unit,
     this.semanticStyle,
-  }) : kind = AndroidMetricKind.integer,
+  }) : kind = LiveUpdateMetricKind.integer,
        fractionDigits = null;
 
   /// A decimal number, such as `4.2` km, shown with at most
   /// [fractionDigits] digits after the decimal point. NaN and infinite values
   /// are left out.
-  const AndroidMetric.decimal(
+  const LiveUpdateMetric.decimal(
     this.label,
     double this.value, {
     this.unit,
     this.fractionDigits = 1,
     this.semanticStyle,
-  }) : kind = AndroidMetricKind.decimal,
+  }) : kind = LiveUpdateMetricKind.decimal,
        assert(fractionDigits == null || fractionDigits >= 0);
 
   /// Short text, such as a gate or a platform number.
-  const AndroidMetric.text(
+  const LiveUpdateMetric.text(
     this.label,
     String this.value, {
     this.unit,
     this.semanticStyle,
-  }) : kind = AndroidMetricKind.text,
+  }) : kind = LiveUpdateMetricKind.text,
        fractionDigits = null;
 
   /// A countdown to [end].
-  const AndroidMetric.timer(this.label, DateTime end, {this.semanticStyle})
-    : kind = AndroidMetricKind.timer,
+  const LiveUpdateMetric.timer(this.label, DateTime end, {this.semanticStyle})
+    : kind = LiveUpdateMetricKind.timer,
       value = end,
       unit = null,
       fractionDigits = null;
 
   /// Time elapsed since [start].
-  const AndroidMetric.stopwatch(
+  const LiveUpdateMetric.stopwatch(
     this.label,
     DateTime start, {
     this.semanticStyle,
-  }) : kind = AndroidMetricKind.stopwatch,
+  }) : kind = LiveUpdateMetricKind.stopwatch,
        value = start,
        unit = null,
        fractionDigits = null;
 
   /// A paused countdown with [remaining] time left.
-  const AndroidMetric.pausedTimer(
+  const LiveUpdateMetric.pausedTimer(
     this.label,
     Duration remaining, {
     this.semanticStyle,
-  }) : kind = AndroidMetricKind.pausedTimer,
+  }) : kind = LiveUpdateMetricKind.pausedTimer,
        value = remaining,
        unit = null,
        fractionDigits = null;
 
   /// A paused stopwatch showing [elapsed].
-  const AndroidMetric.pausedStopwatch(
+  const LiveUpdateMetric.pausedStopwatch(
     this.label,
     Duration elapsed, {
     this.semanticStyle,
-  }) : kind = AndroidMetricKind.pausedStopwatch,
+  }) : kind = LiveUpdateMetricKind.pausedStopwatch,
        value = elapsed,
        unit = null,
        fractionDigits = null;
@@ -796,7 +928,7 @@ final class AndroidMetric {
   final String label;
 
   /// Kind of [value].
-  final AndroidMetricKind kind;
+  final LiveUpdateMetricKind kind;
 
   /// An `int`, `double`, `String`, `DateTime` or `Duration`, depending on
   /// [kind].
@@ -805,7 +937,7 @@ final class AndroidMetric {
   /// Unit shown with a number or text, such as "km".
   final String? unit;
 
-  /// Maximum digits after the decimal point of [AndroidMetricKind.decimal].
+  /// Maximum digits after the decimal point of [LiveUpdateMetricKind.decimal].
   final int? fractionDigits;
 
   /// Semantic color of the value on a promoted Live Update.
@@ -813,7 +945,7 @@ final class AndroidMetric {
 
   @override
   bool operator ==(Object other) =>
-      other is AndroidMetric &&
+      other is LiveUpdateMetric &&
       other.label == label &&
       other.kind == kind &&
       other.value == value &&

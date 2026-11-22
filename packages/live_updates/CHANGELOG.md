@@ -1,5 +1,20 @@
 ## Unreleased
 
+- **Breaking:** `AndroidMetric` is renamed to `LiveUpdateMetric`
+  (`AndroidMetricKind` to `LiveUpdateMetricKind`), and `metrics` /
+  `criticalMetric` move from `AndroidLiveUpdateOptions` to
+  `LiveUpdateContent`. The content-state keys are unchanged.
+- Layouts: `IosLiveUpdateOptions.layout` (`IosLiveUpdateLayout.standard`,
+  `timer`, `metrics`, `stepper`, `journey`, or `custom('name')` for a layout
+  of your own) chooses the Lock Screen and expanded Dynamic Island pattern of
+  the generated widget. New shared data `LiveUpdateContent.steps`
+  (`LiveUpdateSteps`) and `journey` (`LiveUpdateJourney`).
+  Android uses the same data: steps become progress segments and points on
+  Android 16+, and steps, journey and metrics are added to the notification
+  text where the system does not show them otherwise. Run `create_widget` to
+  update `LiveUpdatesViews.swift`; the generated layout file now switches on
+  `context.state.layout` for custom layouts.
+
 - **Breaking:** `AndroidLiveUpdateOptions.requestPromotion` is replaced by
   `mode` (`AndroidLiveUpdateMode.liveUpdate`, `ongoing`, `classic`).
   `requestPromotion: false` becomes `mode: AndroidLiveUpdateMode.ongoing`;

@@ -17,6 +17,17 @@ extension LiveUpdateContentJson on LiveUpdateContent {
     if (timer?.start case final s?)
       'timerStart': s.millisecondsSinceEpoch / 1000,
     if (timer?.end case final e?) 'timerEnd': e.millisecondsSinceEpoch / 1000,
+    if (metrics.isNotEmpty) 'metrics': [for (final m in metrics) m.toJson()],
+    'criticalMetric': ?criticalMetric,
+    if (steps case final s?)
+      'steps': {'labels': s.labels, 'current': s.current},
+    if (journey case final j?)
+      'journey': {
+        'from': j.from,
+        'to': j.to,
+        'fromDetail': ?j.fromDetail,
+        'toDetail': ?j.toDetail,
+      },
     if (actions.isNotEmpty)
       'actions': [
         for (final a in actions)
@@ -38,6 +49,7 @@ extension LiveUpdateContentJson on LiveUpdateContent {
         'alert': {'title': a.title, 'body': a.body, 'sound': ?a.sound},
       'compactTrailing': ?ios.compactTrailing?.value,
       'minimal': ?ios.minimal?.value,
+      'layout': ?ios.layout?.value,
       // Not 'colorArgb': that key holds the Android color.
       'tintArgb': ?ios.color?.toARGB32(),
       'backgroundArgb': ?ios.backgroundColor?.toARGB32(),
@@ -52,9 +64,6 @@ extension LiveUpdateContentJson on LiveUpdateContent {
       'showChronometer': a.showChronometer,
       if (a.mode != AndroidLiveUpdateMode.liveUpdate)
         'androidMode': a.mode.name,
-      if (a.metrics.isNotEmpty)
-        'metrics': [for (final m in a.metrics) m.toJson()],
-      'criticalMetric': ?a.criticalMetric,
       'bodySemanticStyle': ?a.bodySemanticStyle?.name,
       'progressSemanticStyle': ?a.progressSemanticStyle?.name,
       if (a.progressSegments.isNotEmpty)
@@ -84,7 +93,7 @@ extension LiveUpdateContentJson on LiveUpdateContent {
   };
 }
 
-extension on AndroidMetric {
+extension on LiveUpdateMetric {
   Map<String, Object?> toJson() => {
     'label': label,
     'type': kind.name,
@@ -96,7 +105,7 @@ extension on AndroidMetric {
       final v => v,
     },
     'unit': ?unit,
-    if (kind == AndroidMetricKind.decimal) 'fractionDigits': ?fractionDigits,
+    if (kind == LiveUpdateMetricKind.decimal) 'fractionDigits': ?fractionDigits,
     'semanticStyle': ?semanticStyle?.name,
   };
 }

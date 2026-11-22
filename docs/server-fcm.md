@@ -36,15 +36,26 @@ On the server:
 
 Build the content once. Keys are those of `LiveUpdateContent` (see the
 package README): `title`, `body`, `progress`, `route`, `timerEnd` /
-`timerStart` (seconds since 1970), `actions`, `extra`, and Android options
-such as `channelId`, `shortCriticalText` or `progressSegments`, and the iOS
-options `compactTrailing` / `minimal` / `tintArgb` / `backgroundArgb` /
-`foregroundArgb`. Each platform
+`timerStart` (seconds since 1970), `metrics`, `steps`, `journey`, `actions`,
+`extra`, Android options such as `channelId`, `shortCriticalText` or
+`progressSegments`, and the iOS options `layout` / `compactTrailing` /
+`minimal` / `tintArgb` / `backgroundArgb` / `foregroundArgb`. Each platform
 ignores the keys it does not use. iOS requires `title`, and `extra` must map
 strings to strings, or the activity rejects the content.
 
 ```json
 {"title": "Order #1234", "body": "On the way", "progress": 0.6, "timerEnd": 1893456000}
+```
+
+With a layout and its data (`steps.current` is an index into `labels`):
+
+```json
+{
+  "title": "Order #1234",
+  "progress": 0.6,
+  "layout": "stepper",
+  "steps": {"labels": ["Ordered", "Preparing", "On the way", "Delivered"], "current": 2}
+}
 ```
 
 ## Android envelope
@@ -106,7 +117,7 @@ activity token for that key (or the push-to-start token to start one).
   (also a UNIX time), `relevance-score` and
   `alert` go next to `content-state`, not inside it.
 - A push replaces the whole content state: send every field that should stay,
-  including `extra`, `compactTrailing` and `minimal`.
+  including `extra`, `layout`, `compactTrailing` and `minimal`.
 - Delete the activity token once the update has ended; it cannot be used
   again.
 

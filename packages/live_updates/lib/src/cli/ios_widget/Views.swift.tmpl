@@ -7,8 +7,10 @@ import WidgetKit
 // plugin. Change the layout in {{name}}LiveActivity.swift instead, which
 // create_widget keeps.
 
-/// The Lock Screen and banner view: image, title, timer, body, progress and
-/// buttons.
+/// The Lock Screen and banner view, in the UI pattern chosen with
+/// `IosLiveUpdateOptions.layout`: "standard" (default), "timer", "metrics",
+/// "stepper" or "journey". Patterns whose data is missing fall back to the
+/// standard one.
 struct LiveUpdatesLockScreen: View {
   let state: LiveUpdatesAttributes.ContentState
   let activityID: String
@@ -19,24 +21,45 @@ struct LiveUpdatesLockScreen: View {
 
   var body: some View {
     VStack(spacing: 10) {
-      HStack(alignment: .center, spacing: 12) {
-        LiveUpdatesThumbnail(state: state).frame(width: 40, height: 40)
-        VStack(alignment: .leading, spacing: 4) {
-          HStack {
-            Text(state.title).font(.headline).lineLimit(1)
-              .foregroundStyle(palette.foreground ?? .primary)
-            if state.liveUpdatesHasTimer {
-              Spacer()
-              LiveUpdatesTimerText(state: state).font(.headline)
-                .foregroundStyle(palette.tint ?? palette.foreground ?? .primary)
+      switch state.liveUpdatesLayout {
+      case "timer":
+        HStack(alignment: .center, spacing: 12) {
+          LiveUpdatesThumbnail(state: state).frame(width: 40, height: 40)
+          LiveUpdatesTitleBlock(state: state, palette: palette)
+          Spacer(minLength: 8)
+          LiveUpdatesTimerText(state: state)
+            .font(.system(size: 34, weight: .semibold, design: .rounded))
+            .foregroundStyle(palette.tint ?? palette.foreground ?? .primary)
+        }
+      case "metrics":
+        LiveUpdatesHeader(state: state, palette: palette)
+        LiveUpdatesMetricsRow(state: state, palette: palette, large: true)
+      case "stepper":
+        LiveUpdatesHeader(state: state, palette: palette)
+        LiveUpdatesStepperRow(state: state, palette: palette)
+      case "journey":
+        LiveUpdatesHeader(state: state, palette: palette)
+        LiveUpdatesJourneyRow(state: state, palette: palette)
+      default:
+        HStack(alignment: .center, spacing: 12) {
+          LiveUpdatesThumbnail(state: state).frame(width: 40, height: 40)
+          VStack(alignment: .leading, spacing: 4) {
+            HStack {
+              Text(state.title).font(.headline).lineLimit(1)
+                .foregroundStyle(palette.foreground ?? .primary)
+              if state.liveUpdatesHasTimer {
+                Spacer()
+                LiveUpdatesTimerText(state: state).font(.headline)
+                  .foregroundStyle(palette.tint ?? palette.foreground ?? .primary)
+              }
             }
-          }
-          if let body = state.body {
-            Text(body).font(.subheadline).lineLimit(2)
-              .foregroundStyle(palette.foreground.map { AnyShapeStyle($0.opacity(0.7)) } ?? AnyShapeStyle(.secondary))
-          }
-          if let progress = state.progress {
-            ProgressView(value: progress)
+            if let body = state.body {
+              Text(body).font(.subheadline).lineLimit(2)
+                .foregroundStyle(palette.secondaryText)
+            }
+            if let progress = state.progress {
+              ProgressView(value: progress)
+            }
           }
         }
       }
@@ -45,6 +68,155 @@ struct LiveUpdatesLockScreen: View {
     .tint(palette.tint)
     .activityBackgroundTint(palette.background)
     .activitySystemActionForegroundColor(palette.tint)
+  }
+}
+
+/// Image, title and body in one row (header of the metrics, stepper and
+/// journey layouts).
+struct LiveUpdatesHeader: View {
+  let state: LiveUpdatesAttributes.ContentState
+  let palette: LiveUpdatesPalette
+
+  var body: some View {
+    HStack(alignment: .center, spacing: 10) {
+      LiveUpdatesThumbnail(state: state).frame(width: 28, height: 28)
+      LiveUpdatesTitleBlock(state: state, palette: palette)
+      Spacer(minLength: 0)
+    }
+  }
+}
+
+/// Title and, when set, the body below it.
+struct LiveUpdatesTitleBlock: View {
+  let state: LiveUpdatesAttributes.ContentState
+  let palette: LiveUpdatesPalette
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 2) {
+      Text(state.title).font(.headline).lineLimit(1)
+        .foregroundStyle(palette.foreground ?? .primary)
+      if let body = state.body {
+        Text(body).font(.subheadline).lineLimit(1)
+          .foregroundStyle(palette.secondaryText)
+      }
+    }
+  }
+}
+
+/// Up to three `LiveUpdateContent.metrics` side by side.
+struct LiveUpdatesMetricsRow: View {
+  let state: LiveUpdatesAttributes.ContentState
+  let palette: LiveUpdatesPalette
+  var large = false
+
+  var body: some View {
+    HStack(alignment: .top, spacing: 12) {
+      ForEach(Array(state.metrics.prefix(3).enumerated()), id: \.offset) { _, metric in
+        VStack(alignment: .leading, spacing: 2) {
+          Text(metric.label).font(.caption).lineLimit(1)
+            .foregroundStyle(palette.secondaryText)
+          LiveUpdatesMetricValue(metric: metric)
+            .font(large ? .title2.weight(.semibold) : .headline)
+            .foregroundStyle(palette.foreground ?? .primary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+      }
+    }
+  }
+}
+
+/// The value of one metric, with its unit. Timers are counted by the system.
+struct LiveUpdatesMetricValue: View {
+  let metric: LiveUpdatesMetric
+
+  var body: some View {
+    HStack(alignment: .firstTextBaseline, spacing: 2) {
+      value.monospacedDigit().lineLimit(1)
+      if let unit = metric.unit {
+        Text(unit).font(.caption)
+      }
+    }
+  }
+
+  @ViewBuilder private var value: some View {
+    switch (metric.type, metric.number) {
+    case ("integer", let n?):
+      Text(Int(exactly: n.rounded()) ?? 0, format: .number)
+    case ("decimal", let n?):
+      Text(n, format: .number.precision(.fractionLength(0...max(0, min(metric.fractionDigits ?? 1, 6)))))
+    case ("timer", let ms?) where abs(ms) < 1e14:
+      let end = Date(timeIntervalSince1970: ms / 1000)
+      Text(timerInterval: min(Date(), end)...end, countsDown: true)
+    case ("stopwatch", let ms?) where abs(ms) < 1e14:
+      Text(Date(timeIntervalSince1970: ms / 1000), style: .timer)
+    case ("pausedTimer", let ms?), ("pausedStopwatch", let ms?):
+      Text(Duration.milliseconds(Int64(max(0, min(ms, 1e12)))), format: .time(pattern: .minuteSecond))
+    default:
+      Text(metric.text ?? "–")
+    }
+  }
+}
+
+/// `LiveUpdateContent.steps` as dots on a line, with the current stage named.
+struct LiveUpdatesStepperRow: View {
+  let state: LiveUpdatesAttributes.ContentState
+  let palette: LiveUpdatesPalette
+
+  var body: some View {
+    if let steps = state.steps, !steps.labels.isEmpty {
+      let count = min(steps.labels.count, 8)
+      let current = max(0, min(steps.current, count - 1))
+      let accent = palette.tint ?? .accentColor
+      VStack(alignment: .leading, spacing: 6) {
+        HStack(spacing: 0) {
+          ForEach(0..<count, id: \.self) { index in
+            if index > 0 {
+              Rectangle()
+                .fill(index <= current ? accent : Color.secondary.opacity(0.4))
+                .frame(height: 3)
+            }
+            Circle()
+              .fill(index <= current ? accent : Color.secondary.opacity(0.4))
+              .frame(width: index == current ? 14 : 9, height: index == current ? 14 : 9)
+          }
+        }
+        HStack {
+          Text(steps.labels[current]).font(.subheadline.weight(.semibold)).lineLimit(1)
+            .foregroundStyle(palette.foreground ?? .primary)
+          Spacer()
+          Text("\(current + 1)/\(count)").font(.caption).monospacedDigit()
+            .foregroundStyle(palette.secondaryText)
+        }
+      }
+    }
+  }
+}
+
+/// `LiveUpdateContent.journey`: from and to with the progress between them.
+struct LiveUpdatesJourneyRow: View {
+  let state: LiveUpdatesAttributes.ContentState
+  let palette: LiveUpdatesPalette
+
+  var body: some View {
+    if let journey = state.journey {
+      HStack(alignment: .center, spacing: 10) {
+        end(journey.from, journey.fromDetail, alignment: .leading)
+        ProgressView(value: state.progress ?? 0)
+          .frame(minWidth: 40)
+        end(journey.to, journey.toDetail, alignment: .trailing)
+      }
+    }
+  }
+
+  private func end(_ place: String, _ detail: String?, alignment: HorizontalAlignment) -> some View {
+    VStack(alignment: alignment, spacing: 2) {
+      Text(place).font(.headline).lineLimit(1)
+        .foregroundStyle(palette.foreground ?? .primary)
+      if let detail {
+        Text(detail).font(.caption).lineLimit(1).monospacedDigit()
+          .foregroundStyle(palette.secondaryText)
+      }
+    }
   }
 }
 
@@ -79,11 +251,20 @@ struct LiveUpdatesExpandedBottom: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 6) {
-      if let body = state.body {
-        Text(body).font(.subheadline).foregroundStyle(.secondary)
-      }
-      if let progress = state.progress {
-        ProgressView(value: progress)
+      switch state.liveUpdatesLayout {
+      case "metrics":
+        LiveUpdatesMetricsRow(state: state, palette: palette)
+      case "stepper":
+        LiveUpdatesStepperRow(state: state, palette: palette)
+      case "journey":
+        LiveUpdatesJourneyRow(state: state, palette: palette)
+      default:
+        if let body = state.body {
+          Text(body).font(.subheadline).foregroundStyle(.secondary)
+        }
+        if let progress = state.progress {
+          ProgressView(value: progress)
+        }
       }
       LiveUpdatesActionButtons(actions: state.actions, activityID: activityID)
     }
@@ -140,6 +321,11 @@ struct LiveUpdatesPalette {
   let background: Color?
   /// Lock Screen text (`IosLiveUpdateOptions.foregroundColor`).
   let foreground: Color?
+
+  /// Secondary text: the foreground color at 70%, else the system's.
+  var secondaryText: AnyShapeStyle {
+    foreground.map { AnyShapeStyle($0.opacity(0.7)) } ?? AnyShapeStyle(.secondary)
+  }
 
   init(_ state: LiveUpdatesAttributes.ContentState, luminanceReduced: Bool) {
     tint = luminanceReduced ? nil : Self.color(state.tintArgb)
@@ -321,6 +507,20 @@ extension LiveUpdatesAttributes.ContentState {
 
   /// `IosLiveUpdateOptions.color` for the Dynamic Island keyline.
   var liveUpdatesKeylineTint: Color? { LiveUpdatesPalette.color(tintArgb) }
+
+  /// `layout` when its data is present ("timer" needs a timer, "metrics"
+  /// metrics, "stepper" steps, "journey" a journey), else "standard". Other
+  /// names are returned as they are, for layouts added to the layout file.
+  var liveUpdatesLayout: String {
+    switch layout {
+    case "timer": return liveUpdatesHasTimer ? "timer" : "standard"
+    case "metrics": return metrics.isEmpty ? "standard" : "metrics"
+    case "stepper": return (steps?.labels.isEmpty ?? true) ? "standard" : "stepper"
+    case "journey": return journey == nil ? "standard" : "journey"
+    case let other?: return other
+    case nil: return "standard"
+    }
+  }
 
   /// Text for "title", "body" or "extra:<key>".
   func liveUpdatesText(_ content: String) -> String? {

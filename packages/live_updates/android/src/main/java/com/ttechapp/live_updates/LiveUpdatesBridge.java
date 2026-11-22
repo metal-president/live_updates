@@ -653,6 +653,19 @@ public final class LiveUpdatesBridge {
           LiveUpdatesApi37.styledText(
               body, LiveUpdatesApi37.semanticStyle(optString(content, "bodySemanticStyle"))));
     }
+    // Steps, journey and (where MetricStyle is not used) metrics as text: the
+    // body line when there is no body, else the sub text.
+    String mode = androidMode(content);
+    boolean metricStyle =
+        LiveUpdatesApi37.available()
+            && !"classic".equals(mode)
+            && content.optJSONArray("metrics") != null
+            && content.optJSONArray("metrics").length() > 0;
+    String detail = detailText(content, !metricStyle);
+    if (detail != null) {
+      if (body == null) b.setContentText(detail);
+      else b.setSubText(detail);
+    }
     String image = optString(content, "image");
     if (image != null && !image.contains("/")) {
       android.graphics.Bitmap bitmap =
@@ -686,7 +699,10 @@ public final class LiveUpdatesBridge {
 
     boolean hasProgress = content.has("progress") && !content.isNull("progress");
     int progress = hasProgress ? (int) Math.round(content.optDouble("progress") * 100) : 0;
-    String mode = androidMode(content);
+    JSONObject steps = content.optJSONObject("steps");
+    int stepCount = steps == null ? 0 : stepLabels(steps).size();
+    int currentStep =
+        stepCount == 0 ? 0 : Math.max(0, Math.min(steps.optInt("current", 0), stepCount - 1));
     if (Build.VERSION.SDK_INT >= 36 && !"classic".equals(mode)) {
       requestPromotedOngoing(b, "liveUpdate".equals(mode));
       String chip = optString(content, "shortCriticalText");
@@ -694,13 +710,82 @@ public final class LiveUpdatesBridge {
       boolean metrics =
           LiveUpdatesApi37.setMetricStyle(
               b, content.optJSONArray("metrics"), content.optInt("criticalMetric", -1));
-      if (!metrics && hasProgress) {
-        b.setStyle(progressStyle(c, content, content.optDouble("progress")));
+      if (!metrics && (hasProgress || stepCount >= 2)) {
+        double fraction =
+            hasProgress
+                ? content.optDouble("progress")
+                : (double) currentStep / (stepCount - 1);
+        b.setStyle(progressStyle(c, content, fraction));
       }
     } else if (hasProgress) {
       b.setProgress(100, progress, false);
+    } else if (stepCount >= 2) {
+      b.setProgress(stepCount - 1, currentStep, false);
     }
     return b;
+  }
+
+  private static List<String> stepLabels(JSONObject steps) {
+    List<String> labels = new ArrayList<>();
+    org.json.JSONArray a = steps.optJSONArray("labels");
+    for (int i = 0; a != null && i < a.length() && labels.size() < MAX_PROGRESS_PARTS; i++) {
+      labels.add(a.optString(i));
+    }
+    return labels;
+  }
+
+  private static final int MAX_DETAIL_TEXT = 80;
+
+  /**
+   * "2/4 Preparing", "From → To" and, with {@code withMetrics}, "Label: value
+   * unit" for numbers and text (timers are left to the chronometer), joined
+   * with " · ". Null when there is nothing to show.
+   */
+  @Nullable
+  static String detailText(JSONObject content, boolean withMetrics) {
+    List<String> parts = new ArrayList<>();
+    JSONObject steps = content.optJSONObject("steps");
+    if (steps != null) {
+      List<String> labels = stepLabels(steps);
+      if (labels.size() >= 2) {
+        int current = Math.max(0, Math.min(steps.optInt("current", 0), labels.size() - 1));
+        parts.add((current + 1) + "/" + labels.size() + " " + clip(labels.get(current)));
+      }
+    }
+    JSONObject journey = content.optJSONObject("journey");
+    if (journey != null && journey.has("from") && journey.has("to")) {
+      parts.add(clip(journey.optString("from")) + " → " + clip(journey.optString("to")));
+    }
+    org.json.JSONArray metrics = withMetrics ? content.optJSONArray("metrics") : null;
+    for (int i = 0; metrics != null && i < metrics.length() && i < 3; i++) {
+      JSONObject m = metrics.optJSONObject(i);
+      if (m == null) continue;
+      Object value = m.opt("value");
+      String type = m.optString("type");
+      String text;
+      if ("integer".equals(type) && value instanceof Number) {
+        text = String.valueOf(((Number) value).longValue());
+      } else if ("decimal".equals(type) && value instanceof Number) {
+        double d = ((Number) value).doubleValue();
+        if (Double.isNaN(d) || Double.isInfinite(d)) continue;
+        int digits = Math.max(0, Math.min(m.optInt("fractionDigits", 1), 6));
+        java.text.NumberFormat f = java.text.NumberFormat.getNumberInstance();
+        f.setMaximumFractionDigits(digits);
+        text = f.format(d);
+      } else if ("text".equals(type) && value instanceof String) {
+        text = clip((String) value);
+      } else {
+        continue;
+      }
+      String unit = optString(m, "unit");
+      parts.add(clip(m.optString("label")) + ": " + text + (unit == null ? "" : " " + clip(unit)));
+    }
+    if (parts.isEmpty()) return null;
+    return String.join(" · ", parts);
+  }
+
+  private static String clip(String text) {
+    return text.length() <= MAX_DETAIL_TEXT ? text : text.substring(0, MAX_DETAIL_TEXT);
   }
 
   /**
@@ -764,6 +849,15 @@ public final class LiveUpdatesBridge {
         style.addProgressSegment(segment);
         total += length;
       }
+    }
+    JSONObject steps = content.optJSONObject("steps");
+    int stepCount = steps == null ? 0 : stepLabels(steps).size();
+    if (total == 0 && stepCount >= 2 && content.optJSONArray("progressPoints") == null) {
+      // One segment between each pair of stages and a point at each stage
+      // after the first (the system ignores a point at the start).
+      total = stepCount - 1;
+      for (int i = 0; i < total; i++) style.addProgressSegment(new Notification.ProgressStyle.Segment(1));
+      for (int i = 1; i < stepCount; i++) style.addProgressPoint(new Notification.ProgressStyle.Point(i));
     }
     if (total == 0) {
       total = 100;

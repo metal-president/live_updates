@@ -1,3 +1,11 @@
+## Unreleased
+
+- Android: in a regular notification (`AndroidLiveUpdateMode.classic`, and
+  Android 15 and earlier) with a body, the steps, journey and metrics text is
+  a second line of the expanded notification instead of being cut off in the
+  header.
+- Docs: screenshots of each layout on iOS and Android.
+
 ## 0.1.0
 
 Breaking changes (from now on they come only with a new minor version):

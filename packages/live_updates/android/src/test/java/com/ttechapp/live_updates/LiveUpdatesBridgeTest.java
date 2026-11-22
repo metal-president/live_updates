@@ -467,7 +467,7 @@ public class LiveUpdatesBridgeTest {
   public void journeyAndMetricsAreShownAsText() throws Exception {
     String id =
         LiveUpdatesBridge.start(
-            "{\"title\":\"Trip\",\"body\":\"On time\",\"journey\":{\"from\":\"A\",\"to\":\"B\"},"
+            "{\"title\":\"Trip\",\"body\":\"On time\",\"progress\":0.5,\"journey\":{\"from\":\"A\",\"to\":\"B\"},"
                 + "\"metrics\":[{\"label\":\"Home\",\"type\":\"integer\",\"value\":2},"
                 + "{\"label\":\"Dist\",\"type\":\"decimal\",\"value\":4.25,\"unit\":\"km\"},"
                 + "{\"label\":\"ETA\",\"type\":\"timer\",\"value\":1}]}");
@@ -595,5 +595,32 @@ public class LiveUpdatesBridgeTest {
     LiveUpdatesBridge.takeQueuedActions();
     LiveUpdatesBridge.takeQueuedActions();
     assertEquals(before + 2, LiveUpdatesBridge.takeCount);
+  }
+
+  @Test
+  public void regularNotificationsShowTheDetailAsASecondLine() throws Exception {
+    String id =
+        LiveUpdatesBridge.start(
+            "{\"title\":\"Order\",\"body\":\"On the way\",\"progress\":0.5,"
+                + "\"androidMode\":\"classic\",\"journey\":{\"from\":\"Shop\",\"to\":\"Home\"}}");
+    Notification n = shown(id);
+    // Not in the header, where it would be cut off.
+    assertEquals(null, n.extras.getCharSequence(Notification.EXTRA_SUB_TEXT));
+    assertEquals("On the way", n.extras.getCharSequence(Notification.EXTRA_TEXT).toString());
+    assertEquals(
+        "On the way\nShop \u2192 Home",
+        n.extras.getCharSequence(Notification.EXTRA_BIG_TEXT).toString());
+    assertEquals(50, n.extras.getInt(Notification.EXTRA_PROGRESS));
+  }
+
+  @Test
+  public void withoutAProgressStyleTheDetailIsASecondLineToo() throws Exception {
+    String id =
+        LiveUpdatesBridge.start(
+            "{\"title\":\"Trip\",\"body\":\"On time\",\"journey\":{\"from\":\"A\",\"to\":\"B\"}}");
+    Notification n = shown(id);
+    assertEquals(null, n.extras.getCharSequence(Notification.EXTRA_SUB_TEXT));
+    assertEquals(
+        "On time\nA \u2192 B", n.extras.getCharSequence(Notification.EXTRA_BIG_TEXT).toString());
   }
 }

@@ -5,6 +5,8 @@
   a second line of the expanded notification instead of being cut off in the
   header.
 - Docs: screenshots of each layout on iOS and Android.
+- Docs: README reorganized (shorter getting started, a table of where button
+  presses go, one Upgrading section) and the first usage example fixed.
 
 ## 0.1.0
 

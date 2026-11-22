@@ -15,10 +15,19 @@ Every release of `live_updates` and `live_updates_fcm` follows these steps.
    firebase_messaging, FFIgen / JNIgen), review what changed and update code
    and docs for it (new or deprecated APIs, changed behavior, version
    requirements).
-3. **Pull request.** Bump versions and changelogs, open a PR and wait for all
+3. **README review.** Read the README of each package as a new user would:
+   - Is it clear what the package is for, what it can do and when to use it?
+   - Can a new user follow the setup and the first example without missing
+     steps, prerequisites, dependencies or imports?
+   - Is the text easy to read: short sentences, no repeated notes, details
+     after the basics?
+
+   CI compiles the Dart examples of both READMEs
+   (`tool/check_readme_snippets.dart`); this review covers what it cannot.
+4. **Pull request.** Bump versions and changelogs, open a PR and wait for all
    CI jobs (`analyze-test`, `build-android`, `build-ios (swiftpm)`,
    `build-ios (cocoapods)`) to pass, then squash-merge.
-4. **Publish** from a clean, up-to-date `main`: `dart pub publish --dry-run`
+5. **Publish** from a clean, up-to-date `main`: `dart pub publish --dry-run`
    (0 warnings), then `dart pub publish` for `live_updates` first and
    `live_updates_fcm` after the new core version is visible on pub.dev.
-5. **Tag** each package: `live_updates-vX.Y.Z`, `live_updates_fcm-vX.Y.Z`.
+6. **Tag** each package: `live_updates-vX.Y.Z`, `live_updates_fcm-vX.Y.Z`.

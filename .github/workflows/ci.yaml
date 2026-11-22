@@ -20,8 +20,12 @@ jobs:
           flutter-version-file: .fvmrc
           cache: true
       - run: flutter pub get
-      - run: dart format --output=none --set-exit-if-changed packages
-      - run: flutter analyze packages
+      - run: dart format --output=none --set-exit-if-changed packages tool
+      - run: flutter analyze packages tool
+      - name: Check README code examples
+        run: |
+          dart run tool/check_readme_snippets.dart
+          flutter analyze build/readme_snippets
       - run: flutter test
         working-directory: packages/live_updates
       - run: flutter test

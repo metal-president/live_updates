@@ -1,19 +1,36 @@
 # live_updates_fcm
 
-Firebase Cloud Messaging integration for [`live_updates`](https://pub.dev/packages/live_updates).
+Remote updates for [`live_updates`](https://pub.dev/packages/live_updates)
+through Firebase Cloud Messaging. Use it if your app already uses FCM;
+live_updates works without it.
 
-- **Android:** FCM data messages with `live_updates_*` keys start, update and
-  end Live Update notifications, in the foreground and in the background.
-- **iOS:** the system applies Live Activity pushes itself, so the app needs no
-  message handling. Send the tokens from `LiveUpdatesFcm.tokens()` to your
-  server and push through FCM (`apns.live_activity_token`) or APNs directly.
+- **Android:** applies FCM data messages with `live_updates_*` keys that
+  start, update and end live updates, in the foreground and in the
+  background.
+- **iOS:** reports the Live Activity push tokens your server needs. The
+  system applies Live Activity pushes itself, so the app handles no messages.
+  Send them through FCM (`apns.live_activity_token`) or directly through APNs.
+
+## Getting started
+
+1. Set up [`live_updates`](https://pub.dev/packages/live_updates#getting-started)
+   (on iOS, including the widget extension and the Push Notifications
+   capability).
+2. Set up Firebase and
+   [`firebase_messaging`](https://pub.dev/packages/firebase_messaging) as
+   usual.
+3. Add the package:
+
+   ```bash
+   flutter pub add live_updates_fcm
+   ```
 
 ## Usage
 
-Set up [`firebase_messaging`](https://pub.dev/packages/firebase_messaging) as
-usual, then:
-
 ```dart
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/widgets.dart';
 import 'package:live_updates_fcm/live_updates_fcm.dart';
 
 @pragma('vm:entry-point')
@@ -25,7 +42,8 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
   FirebaseMessaging.onBackgroundMessage(onBackgroundMessage);
-  // Foreground messages; errors are malformed live_updates payloads.
+  // Handle foreground messages. onError receives live_updates payloads that
+  // could not be applied.
   LiveUpdatesFcm.listen(onError: (e, _) => debugPrint('$e'));
   runApp(const App());
 }
@@ -36,8 +54,10 @@ messages, so you can chain your own handling.
 
 ## Registering tokens with your server
 
-`LiveUpdatesFcm.tokens()` merges everything your server needs into one
-stream:
+Android needs only the installation ID. iOS also needs the push-to-start
+token (to start from your server) and an activity token for each live update
+started with `pushUpdates: true` (to update or end it).
+`LiveUpdatesFcm.tokens()` merges them into one stream:
 
 | Type | Platform | Send with |
 | --- | --- | --- |
@@ -62,25 +82,22 @@ await FirebaseMessaging.instance.register();
 ```
 
 Keep the latest token per type (and per `updateId`), and drop an activity
-token once that live update ends. Activity tokens carry the update's `key`
-(the key given to `startOrUpdate`, or `attributes.key` of a push-to-start), so
-your server can find the iOS token for the same id it sends to Android as
-`live_updates_id`. Activity tokens are emitted for live
-updates started with `pushUpdates: true`. A new subscription first receives
-the tokens that are already known.
+token when its live update ends. Each activity token carries the update's
+`key` (the key given to `startOrUpdate`, or `attributes.key` of a
+push-to-start), so your server can match it with the `live_updates_id` it
+sends to Android. A new subscription first receives the tokens already known.
 
 Tokens allow pushing to the device: send them over an authenticated
 connection, store them per authenticated user and device on your server (the
-client chooses `updateId` and `key`, so do not trust them across users), and do not log
-them. `LiveUpdatesToken.toString()` and `LiveUpdatePushToken.toString()`
-leave the value out.
+client chooses `updateId` and `key`, so do not trust them across users), and
+do not log them. `LiveUpdatesToken.toString()` and
+`LiveUpdatePushToken.toString()` leave the value out.
 
 ## Message format
 
-For a server that sends to both platforms through FCM, see
-[docs/server-fcm.md](https://github.com/metal-president/live_updates/blob/main/docs/server-fcm.md).
-
-Send a data message (no `notification` block) with high priority:
+[docs/server-fcm.md](https://github.com/metal-president/live_updates/blob/main/docs/server-fcm.md)
+shows complete messages for both platforms. For Android, send a data message
+(no `notification` block) with high priority:
 
 ```json
 {
@@ -103,8 +120,8 @@ Send a data message (no `notification` block) with high priority:
 | `live_updates_content` | JSON string with the keys of `LiveUpdateContent` (`title`, `body`, `progress`, `timerEnd`, `actions`, ...) and Android options |
 | `live_updates_dismiss_after` | Optional, seconds to keep the final content on `end` (without it, it stays until dismissed) |
 
-`packages/live_updates/tool/send_push.dart` in the repository sends these
-messages for testing.
+[`tool/send_push.dart`](https://github.com/metal-president/live_updates/blob/main/packages/live_updates/tool/send_push.dart)
+sends these messages for testing.
 
 ## License
 

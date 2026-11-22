@@ -35,6 +35,8 @@ class LiveUpdatesPlugin :
         binding.addOnNewIntentListener(this)
         binding.addRequestPermissionsResultListener(this)
         LiveUpdatesBridge.handleIntent(binding.activity.intent)
+        // Presses queued while the app was in the background.
+        LiveUpdatesBridge.deliverQueuedActions()
     }
 
     override fun onDetachedFromActivity() {

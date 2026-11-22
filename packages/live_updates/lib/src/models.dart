@@ -349,26 +349,30 @@ final class LiveUpdateActionEvent {
 final class LiveUpdateImage {
   /// An image from the app's assets, such as `assets/courier.png`.
   const LiveUpdateImage.asset(String this.assetName, {this.maxDimension = 256})
-    : filePath = null,
+    : assert(maxDimension > 0, 'maxDimension must be positive'),
+      filePath = null,
       bytes = null,
       url = null;
 
   /// An image file on the device.
   const LiveUpdateImage.file(String this.filePath, {this.maxDimension = 256})
-    : assetName = null,
+    : assert(maxDimension > 0, 'maxDimension must be positive'),
+      assetName = null,
       bytes = null,
       url = null;
 
   /// Encoded image bytes (PNG, JPEG, WebP, ...).
   const LiveUpdateImage.memory(Uint8List this.bytes, {this.maxDimension = 256})
-    : assetName = null,
+    : assert(maxDimension > 0, 'maxDimension must be positive'),
+      assetName = null,
       filePath = null,
       url = null;
 
   /// An image downloaded over HTTPS when the update is posted (redirects
   /// must stay on HTTPS).
   const LiveUpdateImage.network(Uri this.url, {this.maxDimension = 256})
-    : assetName = null,
+    : assert(maxDimension > 0, 'maxDimension must be positive'),
+      assetName = null,
       filePath = null,
       bytes = null;
 

@@ -202,11 +202,22 @@ extension type LiveUpdatesBridge._(objc.ObjCObject object$)
     );
   }
 
+  /// Called when an engine goes away: its isolate’s handlers are dead, so
+  /// presses are queued again and taps wait for the next listener.
+  static void engineDetached(int engineId) {
+    _objc_msgSend_17gvxvj(
+      _class_LiveUpdatesBridge,
+      _sel_engineDetached_,
+      engineId,
+    );
+  }
+
   /// Queues a button press and delivers it if Dart listens. Called on the
   /// main thread by <code>LiveUpdatesActionIntent</code> (looked up by name, so the
   /// widget extension does not link the plugin) and for open-app URLs.
-  /// Returns <code>true</code> when the press started the background action handler;
-  /// the caller should then wait for <code>LiveUpdatesBackgroundDone</code>.
+  /// Returns a positive number when the background action handler runs the
+  /// press: the caller should then wait for a <code>LiveUpdatesBackgroundDone</code>
+  /// whose <code>takes</code> is at least that number (or that has none). 0 otherwise.
   static objc.NSNumber enqueueAction(
     objc.NSString activityId, {
     required objc.NSString actionId,
@@ -280,28 +291,34 @@ extension type LiveUpdatesBridge._(objc.ObjCObject object$)
   static void observeActions(
     objc.ObjCBlock<ffi.Void Function(objc.NSString)> handler, {
     objc.NSArray? activityIds,
+    required int engineId,
   }) {
     final _$$ref = handler.ref;
     final _$$ref$1 = activityIds?.ref;
-    _objc_msgSend_1f7ydyk(
+    _objc_msgSend_jgfbgg(
       _class_LiveUpdatesBridge,
-      _sel_observeActions_activityIds_,
+      _sel_observeActions_activityIds_engineId_,
       _$$ref.pointer,
       _$$ref$1?.pointer ?? ffi.nullptr,
+      engineId,
     );
   }
 
   /// Calls <code>handler</code> with <code>"<state>:<id>"</code> for activity lifecycle changes:
   /// <code>started</code> (including activities started by push-to-start), then
   /// <code>active</code>, <code>stale</code>, <code>ended</code>, <code>dismissed</code> or <code>pending</code>.
+  /// Each engine (<code>engineId</code>) has its own handler, so a background engine
+  /// does not take the events of the app’s engine.
   static void observeActivities(
-    objc.ObjCBlock<ffi.Void Function(objc.NSString)> handler,
-  ) {
+    objc.ObjCBlock<ffi.Void Function(objc.NSString)> handler, {
+    required int engineId,
+  }) {
     final _$$ref = handler.ref;
-    _objc_msgSend_f167m6(
+    _objc_msgSend_145rqre(
       _class_LiveUpdatesBridge,
-      _sel_observeActivities_,
+      _sel_observeActivities_engineId_,
       _$$ref.pointer,
+      engineId,
     );
   }
 
@@ -333,15 +350,17 @@ extension type LiveUpdatesBridge._(objc.ObjCObject object$)
   }
 
   /// Calls <code>handler</code> with the route of every tap, including a tap that
-  /// launched the app before Dart subscribed.
+  /// launched the app before Dart subscribed. Each engine has its own.
   static void observeTaps(
-    objc.ObjCBlock<ffi.Void Function(objc.NSString)> handler,
-  ) {
+    objc.ObjCBlock<ffi.Void Function(objc.NSString)> handler, {
+    required int engineId,
+  }) {
     final _$$ref = handler.ref;
-    _objc_msgSend_f167m6(
+    _objc_msgSend_145rqre(
       _class_LiveUpdatesBridge,
-      _sel_observeTaps_,
+      _sel_observeTaps_engineId_,
       _$$ref.pointer,
+      engineId,
     );
   }
 
@@ -358,12 +377,16 @@ extension type LiveUpdatesBridge._(objc.ObjCObject object$)
   }
 
   /// Limits the presses Dart takes to those of <code>activityIds</code> (<code>nil</code>: all).
-  static void setActionFilter(objc.NSArray? activityIds) {
+  static void setActionFilter(
+    objc.NSArray? activityIds, {
+    required int engineId,
+  }) {
     final _$$ref = activityIds?.ref;
-    _objc_msgSend_xtuoz7(
+    _objc_msgSend_1m7prh1(
       _class_LiveUpdatesBridge,
-      _sel_setActionFilter_,
+      _sel_setActionFilter_engineId_,
       _$$ref?.pointer ?? ffi.nullptr,
+      engineId,
     );
   }
 
@@ -435,13 +458,12 @@ extension type LiveUpdatesBridge._(objc.ObjCObject object$)
 
   /// Stops delivering presses to Dart (nothing listens any more): queued and
   /// later presses are run by the background handler.
-  static void unobserveActions() {
-    _objc_msgSend_1pl9qdv(_class_LiveUpdatesBridge, _sel_unobserveActions);
-  }
-
-  /// Stops delivering taps to Dart; later routes wait for the next listener.
-  static void unobserveTaps() {
-    _objc_msgSend_1pl9qdv(_class_LiveUpdatesBridge, _sel_unobserveTaps);
+  static void unobserveActions(int engineId) {
+    _objc_msgSend_17gvxvj(
+      _class_LiveUpdatesBridge,
+      _sel_unobserveActions_,
+      engineId,
+    );
   }
 
   /// Updates the activity with <code>id</code>. <code>completion</code> receives an error message
@@ -1353,6 +1375,25 @@ final _class__BlockArgs_oimzbh = objc.getClass(
     _class__BlockArgs_oimzbh_raw,
   ).cast(),
 );
+final _objc_msgSend_145rqre = objc.msgSendPointer
+    .cast<
+      ffi.NativeFunction<
+        ffi.Void Function(
+          ffi.Pointer<objc.ObjCObjectImpl>,
+          ffi.Pointer<objc.ObjCSelector>,
+          ffi.Pointer<objc.ObjCBlockImpl>,
+          ffi.Int64,
+        )
+      >
+    >()
+    .asFunction<
+      void Function(
+        ffi.Pointer<objc.ObjCObjectImpl>,
+        ffi.Pointer<objc.ObjCSelector>,
+        ffi.Pointer<objc.ObjCBlockImpl>,
+        int,
+      )
+    >();
 final _objc_msgSend_151sglz = objc.msgSendPointer
     .cast<
       ffi.NativeFunction<
@@ -1403,6 +1444,23 @@ final _objc_msgSend_160jq1d = objc.msgSendPointer
         ffi.Pointer<objc.ObjCObjectImpl>,
         ffi.Pointer<objc.ObjCSelector>,
         int,
+        int,
+      )
+    >();
+final _objc_msgSend_17gvxvj = objc.msgSendPointer
+    .cast<
+      ffi.NativeFunction<
+        ffi.Void Function(
+          ffi.Pointer<objc.ObjCObjectImpl>,
+          ffi.Pointer<objc.ObjCSelector>,
+          ffi.Int64,
+        )
+      >
+    >()
+    .asFunction<
+      void Function(
+        ffi.Pointer<objc.ObjCObjectImpl>,
+        ffi.Pointer<objc.ObjCSelector>,
         int,
       )
     >();
@@ -1461,25 +1519,6 @@ final _objc_msgSend_1cwp428 = objc.msgSendPointer
         ffi.Pointer<objc.NSZone>,
       )
     >();
-final _objc_msgSend_1f7ydyk = objc.msgSendPointer
-    .cast<
-      ffi.NativeFunction<
-        ffi.Void Function(
-          ffi.Pointer<objc.ObjCObjectImpl>,
-          ffi.Pointer<objc.ObjCSelector>,
-          ffi.Pointer<objc.ObjCBlockImpl>,
-          ffi.Pointer<objc.ObjCObjectImpl>,
-        )
-      >
-    >()
-    .asFunction<
-      void Function(
-        ffi.Pointer<objc.ObjCObjectImpl>,
-        ffi.Pointer<objc.ObjCSelector>,
-        ffi.Pointer<objc.ObjCBlockImpl>,
-        ffi.Pointer<objc.ObjCObjectImpl>,
-      )
-    >();
 final _objc_msgSend_1lhpu4m = objc.msgSendPointer
     .cast<
       ffi.NativeFunction<
@@ -1497,6 +1536,25 @@ final _objc_msgSend_1lhpu4m = objc.msgSendPointer
         ffi.Pointer<objc.ObjCSelector>,
         ffi.Pointer<objc.ObjCObjectImpl>,
         ffi.Pointer<ffi.Pointer<objc.ObjCObjectImpl>>,
+      )
+    >();
+final _objc_msgSend_1m7prh1 = objc.msgSendPointer
+    .cast<
+      ffi.NativeFunction<
+        ffi.Void Function(
+          ffi.Pointer<objc.ObjCObjectImpl>,
+          ffi.Pointer<objc.ObjCSelector>,
+          ffi.Pointer<objc.ObjCObjectImpl>,
+          ffi.Int64,
+        )
+      >
+    >()
+    .asFunction<
+      void Function(
+        ffi.Pointer<objc.ObjCObjectImpl>,
+        ffi.Pointer<objc.ObjCSelector>,
+        ffi.Pointer<objc.ObjCObjectImpl>,
+        int,
       )
     >();
 final _objc_msgSend_1pl9qdv = objc.msgSendPointer
@@ -1586,6 +1644,27 @@ final _objc_msgSend_f167m6 = objc.msgSendPointer
         ffi.Pointer<objc.ObjCBlockImpl>,
       )
     >();
+final _objc_msgSend_jgfbgg = objc.msgSendPointer
+    .cast<
+      ffi.NativeFunction<
+        ffi.Void Function(
+          ffi.Pointer<objc.ObjCObjectImpl>,
+          ffi.Pointer<objc.ObjCSelector>,
+          ffi.Pointer<objc.ObjCBlockImpl>,
+          ffi.Pointer<objc.ObjCObjectImpl>,
+          ffi.Int64,
+        )
+      >
+    >()
+    .asFunction<
+      void Function(
+        ffi.Pointer<objc.ObjCObjectImpl>,
+        ffi.Pointer<objc.ObjCSelector>,
+        ffi.Pointer<objc.ObjCBlockImpl>,
+        ffi.Pointer<objc.ObjCObjectImpl>,
+        int,
+      )
+    >();
 final _objc_msgSend_o762yo = objc.msgSendPointer
     .cast<
       ffi.NativeFunction<
@@ -1652,6 +1731,7 @@ late final _sel_endAll_ = objc.registerName("endAll:");
 late final _sel_end_json_dismissAfter_completion_ = objc.registerName(
   "end:json:dismissAfter:completion:",
 );
+late final _sel_engineDetached_ = objc.registerName("engineDetached:");
 late final _sel_enqueueAction_actionId_ = objc.registerName(
   "enqueueAction:actionId:",
 );
@@ -1662,19 +1742,25 @@ late final _sel_isKindOfClass_ = objc.registerName("isKindOfClass:");
 late final _sel_isSupported = objc.registerName("isSupported");
 late final _sel_keyForId_ = objc.registerName("keyForId:");
 late final _sel_new = objc.registerName("new");
-late final _sel_observeActions_activityIds_ = objc.registerName(
-  "observeActions:activityIds:",
+late final _sel_observeActions_activityIds_engineId_ = objc.registerName(
+  "observeActions:activityIds:engineId:",
 );
-late final _sel_observeActivities_ = objc.registerName("observeActivities:");
+late final _sel_observeActivities_engineId_ = objc.registerName(
+  "observeActivities:engineId:",
+);
 late final _sel_observePushToStartTokens_ = objc.registerName(
   "observePushToStartTokens:",
 );
 late final _sel_observePushTokens_handler_ = objc.registerName(
   "observePushTokens:handler:",
 );
-late final _sel_observeTaps_ = objc.registerName("observeTaps:");
+late final _sel_observeTaps_engineId_ = objc.registerName(
+  "observeTaps:engineId:",
+);
 late final _sel_requeueActions_ = objc.registerName("requeueActions:");
-late final _sel_setActionFilter_ = objc.registerName("setActionFilter:");
+late final _sel_setActionFilter_engineId_ = objc.registerName(
+  "setActionFilter:engineId:",
+);
 late final _sel_setBackgroundActionHandler_handler_ = objc.registerName(
   "setBackgroundActionHandler:handler:",
 );
@@ -1683,8 +1769,7 @@ late final _sel_startOrUpdate_json_completion_ = objc.registerName(
 );
 late final _sel_start_error_ = objc.registerName("start:error:");
 late final _sel_takeQueuedActions = objc.registerName("takeQueuedActions");
-late final _sel_unobserveActions = objc.registerName("unobserveActions");
-late final _sel_unobserveTaps = objc.registerName("unobserveTaps");
+late final _sel_unobserveActions_ = objc.registerName("unobserveActions:");
 late final _sel_update_json_completion_ = objc.registerName(
   "update:json:completion:",
 );

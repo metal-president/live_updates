@@ -24,7 +24,12 @@ final class LiveUpdatesBackgroundRunner {
   private static final long TIMEOUT_MS = 9_000;
 
   @Nullable private static FlutterEngine engine;
+  /** Receivers waiting for a run, with the take count that covers each press. */
   private static final List<BroadcastReceiver.PendingResult> pending = new ArrayList<>();
+  private static final List<Integer> pendingTakes = new ArrayList<>();
+  /** Runs started in a row for presses that arrived as a run finished. */
+  private static int restarts;
+  private static final int MAX_RESTARTS = 3;
   private static final Handler main = new Handler(Looper.getMainLooper());
   private static final Runnable timeout = LiveUpdatesBackgroundRunner::timedOut;
 
@@ -38,7 +43,11 @@ final class LiveUpdatesBackgroundRunner {
     final Context app = context.getApplicationContext();
     main.post(
         () -> {
-          if (result != null) pending.add(result);
+          if (result != null) {
+            pending.add(result);
+            // The next take covers this press.
+            pendingTakes.add(LiveUpdatesBridge.takeCount + 1);
+          }
           if (engine != null) return; // Already running: it drains the queue.
           appContext = app;
           dispatcher = dispatcherHandle;
@@ -86,19 +95,33 @@ final class LiveUpdatesBackgroundRunner {
   }
 
   /**
-   * Shuts the engine down. A press queued after the handler took the last one
-   * (it saw an engine and did not start another) gets a new run, unless the
-   * run timed out.
+   * Shuts the engine down and finishes the receivers whose presses were taken
+   * (all of them after a timeout). A press queued after the handler took the
+   * last one gets a new run, while its receiver keeps waiting, unless the run
+   * timed out.
    */
   private static void stop(boolean mayRestart) {
     main.removeCallbacks(timeout);
     FlutterEngine e = engine;
     engine = null;
     if (e != null) e.destroy();
-    // Releases the receivers of this run (a late press's receiver too: its
-    // press runs in the new engine while the process is still alive).
+    boolean restart =
+        mayRestart && restarts < MAX_RESTARTS && LiveUpdatesBridge.hasQueuedBackgroundActions();
+    int covered = restart ? LiveUpdatesBridge.takeCount : Integer.MAX_VALUE;
+    for (int i = pending.size() - 1; i >= 0; i--) {
+      if (pendingTakes.get(i) <= covered) {
+        pending.remove(i).finish();
+        pendingTakes.remove(i);
+      }
+    }
+    if (restart) {
+      restarts++;
+      startEngine();
+      if (engine != null) return;
+    }
+    restarts = 0;
     for (BroadcastReceiver.PendingResult r : pending) r.finish();
     pending.clear();
-    if (mayRestart && LiveUpdatesBridge.hasQueuedBackgroundActions()) startEngine();
+    pendingTakes.clear();
   }
 }

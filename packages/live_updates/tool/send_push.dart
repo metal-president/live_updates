@@ -141,7 +141,9 @@ Future<void> main(List<String> args) async {
         'data': {
           'live_updates_event': event,
           'live_updates_id': _req(o, 'id'),
-          'live_updates_content': jsonEncode(content),
+          // An end without --content just removes the notification.
+          if (event != 'end' || o.containsKey('content'))
+            'live_updates_content': jsonEncode(content),
           'live_updates_dismiss_after': ?o['dismiss-after'],
         },
       };
@@ -192,9 +194,9 @@ Map<String, Object?> _aps(
         'title': o['alert-title'] ?? 'Live update',
         'body': o['alert-body'] ?? '',
       },
-    if (event == 'end')
-      'dismissal-date': now + int.parse(o['dismiss-after'] ?? '0'),
-    if (o['stale-after'] case final s?) 'stale-date': now + int.parse(s),
+    if (event == 'end') 'dismissal-date': now + _seconds(o, 'dismiss-after'),
+    if (o.containsKey('stale-after'))
+      'stale-date': now + _seconds(o, 'stale-after'),
   };
 }
 
@@ -382,4 +384,11 @@ String _req(Map<String, String> o, String key) =>
 Never _fail(String message) {
   stderr.writeln(message);
   exit(64);
+}
+
+/// Whole seconds from option [name] (0 when missing).
+int _seconds(Map<String, String> o, String name) {
+  final value = o[name];
+  if (value == null) return 0;
+  return int.tryParse(value) ?? _fail('--$name must be whole seconds');
 }

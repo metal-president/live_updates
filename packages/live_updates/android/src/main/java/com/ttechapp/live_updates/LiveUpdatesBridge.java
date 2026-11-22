@@ -85,10 +85,10 @@ public final class LiveUpdatesBridge {
   @Nullable static Activity activity;
   // Listeners belong to the Dart isolate of one engine (by engine id) and are
   // dropped when that engine detaches, so nothing is sent to a dead isolate.
-  @Nullable private static RouteListener routeListener;
-  private static long routeEngine;
-  @Nullable private static EventListener eventListener;
-  private static long eventEngine;
+  // Taps and lifecycle events go to every engine that listens, so a
+  // background engine does not take them from the app's engine.
+  private static final Map<Long, RouteListener> routeListeners = new java.util.LinkedHashMap<>();
+  private static final Map<Long, EventListener> eventListeners = new java.util.LinkedHashMap<>();
   private static final Set<String> known = new LinkedHashSet<>();
   /** Callers waiting for the permission prompt that is showing. */
   private static final List<ResultListener> permissionListeners = new ArrayList<>();
@@ -292,11 +292,13 @@ public final class LiveUpdatesBridge {
     Context c = context;
     if (c == null) return;
     synchronized (actionLock) {
-      List<String[]> pending = readPendingActions(c);
+      // In front: they were pressed before anything queued since.
+      List<String[]> pending = new ArrayList<>();
       for (String press : presses) {
         int i = press.indexOf('\n');
         if (i > 0) pending.add(new String[] {press.substring(0, i), press.substring(i + 1)});
       }
+      pending.addAll(readPendingActions(c));
       writePendingActions(c, pending);
       drainActions();
     }
@@ -305,9 +307,26 @@ public final class LiveUpdatesBridge {
 
   /** Whether the Dart listener takes presses of {@code updateId}; under actionLock. */
   private static boolean dartTakes(String updateId) {
-    if (actionListener == null) return false;
+    // Not while the app is in the background: its process could be frozen
+    // mid-handler, so the background handler (which holds the receiver) runs it.
+    if (actionListener == null || !inForeground()) return false;
     Set<String> filter = actionFilter;
     return filter == null || filter.contains(updateId);
+  }
+
+  private static boolean inForeground() {
+    android.app.ActivityManager.RunningAppProcessInfo info =
+        new android.app.ActivityManager.RunningAppProcessInfo();
+    android.app.ActivityManager.getMyMemoryState(info);
+    return info.importance
+        <= android.app.ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND;
+  }
+
+  /** Hands the queued presses Dart takes over (for example when the app comes back). */
+  static void deliverQueuedActions() {
+    synchronized (actionLock) {
+      drainActions();
+    }
   }
 
   /** Hands Dart the queued presses it takes; the rest stay queued. Under actionLock. */
@@ -417,9 +436,13 @@ public final class LiveUpdatesBridge {
         else out.add(a[0] + "\n" + a[1]);
       }
       writePendingActions(c, keep);
+      takeCount++;
     }
     return out.toArray(new String[0]);
   }
+
+  /** How many times the background handler took queued presses. */
+  static int takeCount;
 
   /** Whether presses wait for the background handler (no Dart listener takes them). */
   static boolean hasQueuedBackgroundActions() {
@@ -469,10 +492,14 @@ public final class LiveUpdatesBridge {
   static void engineDetached(long engineId) {
     // The listeners of this engine's isolate are gone: queue from now on.
     synchronized (actionLock) {
-      if (actionEngine == engineId) actionListener = null;
-      if (routeEngine == engineId) routeListener = null;
-      if (eventEngine == engineId) eventListener = null;
+      if (actionEngine == engineId) {
+        actionListener = null;
+        actionFilter = null;
+      }
+      routeListeners.remove(engineId);
+      eventListeners.remove(engineId);
     }
+    runQueuedInBackground();
   }
 
   /** At most this many dismissed ids are remembered (oldest are dropped). */
@@ -684,8 +711,7 @@ public final class LiveUpdatesBridge {
    */
   public static void observeEvents(@NonNull EventListener listener, long engineId) {
     synchronized (actionLock) {
-      eventListener = listener;
-      eventEngine = engineId;
+      eventListeners.put(engineId, listener);
     }
   }
 
@@ -708,27 +734,22 @@ public final class LiveUpdatesBridge {
         known.remove(id);
       }
     }
-    EventListener listener = eventListener;
-    if (listener != null) listener.onEvent(event + ":" + id);
+    List<EventListener> listeners;
+    synchronized (actionLock) {
+      listeners = new ArrayList<>(eventListeners.values());
+    }
+    for (EventListener l : listeners) l.onEvent(event + ":" + id);
   }
 
   /** Calls {@code listener} with every tap route, including one that launched the app. */
   public static void observeTaps(@NonNull RouteListener listener, long engineId) {
     List<String> pending;
     synchronized (actionLock) {
-      routeListener = listener;
-      routeEngine = engineId;
+      routeListeners.put(engineId, listener);
       pending = new ArrayList<>(pendingRoutes);
       pendingRoutes.clear();
     }
     for (String route : pending) listener.onRoute(route);
-  }
-
-  /** Stops delivering taps to Dart; later routes wait for the next listener. */
-  public static void unobserveTaps(long engineId) {
-    synchronized (actionLock) {
-      if (routeEngine == engineId) routeListener = null;
-    }
   }
 
   /** Called by the plugin for launch and new intents. */
@@ -754,24 +775,30 @@ public final class LiveUpdatesBridge {
     // Flutter reads it as a deep link (plugins see the intent first).
     Uri data = intent.getData();
     if (data != null && INTENT_SCHEME.equals(data.getScheme())) intent.setData(null);
-    // Open-app presses: the app is coming to the foreground, so its onAction
-    // listener handles them (no background engine).
     // Recreated from Recents: the original launch intent comes back; it was
     // handled when it first arrived.
     if ((intent.getFlags() & Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY) != 0) return;
     if (actionId != null && updateId != null) {
+      // Open-app press: the app is coming to the foreground, so its onAction
+      // listener takes it. If none does soon, the background handler runs it.
       emitAction(c, updateId, actionId, null, false);
-      // If no onAction listener takes it soon, the background handler runs it.
       new android.os.Handler(android.os.Looper.getMainLooper())
-          .postDelayed(LiveUpdatesBridge::runQueuedInBackground, OPEN_APP_GRACE_MS);
+          .postDelayed(
+              () -> {
+                synchronized (actionLock) {
+                  drainActions();
+                }
+                runQueuedInBackground();
+              },
+              OPEN_APP_GRACE_MS);
     }
     if (route == null) return;
-    RouteListener listener;
+    List<RouteListener> listeners;
     synchronized (actionLock) {
-      listener = routeListener;
-      if (listener == null) pendingRoutes.add(route);
+      listeners = new ArrayList<>(routeListeners.values());
+      if (listeners.isEmpty()) pendingRoutes.add(route);
     }
-    if (listener != null) listener.onRoute(route);
+    for (RouteListener l : listeners) l.onRoute(route);
   }
 
   private static void post(String id, JSONObject content) {

@@ -25,7 +25,13 @@
   (content-state keys `tintArgb` / `backgroundArgb` / `foregroundArgb`); the
   Always-On display uses system colors. Run
   `create_widget` to update `LiveUpdatesViews.swift`.
+- **Breaking (platform interface):** `LiveUpdatesPlatform.actions` is now
+  `actions({String? updateId})`.
 - Fixes:
+  - Presses reach the app's Dart listeners only while the app is in the
+    foreground; otherwise the background handler runs them, so the system
+    keeps the app alive for them. A background handler that can no longer be
+    found drops the queued presses instead of starting engines repeatedly.
   - Button presses go to the app only for the updates it listens to
     (`LiveUpdates.onAction`: all; `LiveUpdate.actions`: that update); other
     presses stay queued natively and run the background handler, also while
@@ -42,6 +48,9 @@
     not bring back a dismissed update; `update` no longer throws when the
     user turned the channel off; reopening from Recents does not deliver a
     tap again.
+  - Taps and lifecycle events reach every engine that listens (a
+    background engine no longer takes them from the app), and handlers of
+    a destroyed engine are dropped on iOS too.
   - iOS: a tap that launches an app without scenes is delivered once; taps
     keep working when the background handler started first; `active()`
     leaves out ended activities, `update` on an ended one throws,

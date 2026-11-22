@@ -1,3 +1,8 @@
+## Unreleased
+
+- `LiveUpdatesFcm.listen(onError:)`: a live_updates message that cannot be
+  applied is reported instead of becoming an uncaught error.
+
 ## 0.0.6
 
 - Docs: clearer iOS description and content keys.

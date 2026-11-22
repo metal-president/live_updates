@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:ffi' show Void;
+import 'dart:ui' show PlatformDispatcher;
 
 import 'package:objective_c/objective_c.dart' as objc;
 
@@ -7,6 +8,7 @@ import '../ios/bindings.g.dart';
 import '../models.dart';
 import 'buffered_broadcast.dart';
 import 'observed_broadcast.dart';
+import 'wire.dart';
 import 'content_encoder.dart';
 import 'latest_value_stream.dart';
 import 'live_updates_platform.dart';
@@ -26,6 +28,7 @@ class IosLiveUpdatesPlatform extends LiveUpdatesPlatform with ContentEncoder {
   late final _taps = BufferedBroadcast<String>(
     (add) => LiveUpdatesBridge.observeTaps(
       ObjCBlock_ffiVoid_NSString.listener((r) => add(r.toDartString())),
+      engineId: _engineId,
     ),
   );
   late final _pushToStart = LatestValueStream<LiveUpdatePushToken>(
@@ -39,18 +42,24 @@ class IosLiveUpdatesPlatform extends LiveUpdatesPlatform with ContentEncoder {
     keyOf: (e) => e.$1,
     attach: (add, keys) => LiveUpdatesBridge.observeActions(
       ObjCBlock_ffiVoid_NSString.listener((e) {
-        final s = e.toDartString();
-        final i = s.indexOf('\n');
-        add((s.substring(0, i), s.substring(i + 1)));
+        if (parsePress(e.toDartString()) case final press?) add(press);
       }),
       activityIds: _nsList(keys),
+      engineId: _engineId,
     ),
-    setFilter: (keys) => LiveUpdatesBridge.setActionFilter(_nsList(keys)),
-    detach: LiveUpdatesBridge.unobserveActions,
+    setFilter: (keys) =>
+        LiveUpdatesBridge.setActionFilter(_nsList(keys), engineId: _engineId),
+    detach: () => LiveUpdatesBridge.unobserveActions(_engineId),
     requeue: (events) => LiveUpdatesBridge.requeueActions(
-      _nsList({for (final (u, a) in events) '$u\n$a'})!,
+      objc.NSArray.of([
+        for (final (u, a) in events) encodePress(u, a).toNSString(),
+      ]),
     ),
   );
+
+  /// Identifies this isolate's engine, so the plugin drops its handlers
+  /// when the engine goes away.
+  static int get _engineId => PlatformDispatcher.instance.engineId ?? 0;
 
   static objc.NSArray? _nsList(Set<String>? values) => values == null
       ? null
@@ -155,9 +164,7 @@ class IosLiveUpdatesPlatform extends LiveUpdatesPlatform with ContentEncoder {
   @override
   Future<List<(String, String)>> takeQueuedActions() async => [
     for (final o in LiveUpdatesBridge.takeQueuedActions().asDart())
-      if (objc.NSString.as(o).toDartString() case final s)
-        if (s.indexOf('\n') case final at when at > 0)
-          (s.substring(0, at), s.substring(at + 1)),
+      ?parsePress(objc.NSString.as(o).toDartString()),
   ];
 
   @override
@@ -186,9 +193,7 @@ class IosLiveUpdatesPlatform extends LiveUpdatesPlatform with ContentEncoder {
       (cb) => LiveUpdatesBridge.end(
         _ns(id),
         json: json == null ? null : _ns(json),
-        dismissAfter: dismissAfter == null
-            ? -1
-            : dismissAfter.inMilliseconds / 1000,
+        dismissAfter: dismissSeconds(dismissAfter),
         completion: cb,
       ),
     );
@@ -202,10 +207,17 @@ class IosLiveUpdatesPlatform extends LiveUpdatesPlatform with ContentEncoder {
   ];
 
   @override
-  Future<void> endAll() {
+  Future<void> endAll() async {
     final done = Completer<void>();
     LiveUpdatesBridge.endAll(ObjCBlock_ffiVoid.listener(done.complete));
-    return done.future;
+    await done.future;
+    _closePushTokens(_pushTokens.keys.toList());
+  }
+
+  void _closePushTokens(Iterable<String> ids) {
+    for (final id in ids) {
+      unawaited(_pushTokens.remove(id)?.close());
+    }
   }
 
   @override
@@ -214,10 +226,15 @@ class IosLiveUpdatesPlatform extends LiveUpdatesPlatform with ContentEncoder {
       _eventsObserved = true;
       LiveUpdatesBridge.observeActivities(
         ObjCBlock_ffiVoid_NSString.listener((e) {
-          final s = e.toDartString();
-          final i = s.indexOf(':');
-          _events.add((s.substring(i + 1), s.substring(0, i)));
+          final event = parseEvent(e.toDartString());
+          if (event == null) return;
+          // Ended remotely or by the system: its token stream is done too.
+          if (event.$2 == 'ended' || event.$2 == 'dismissed') {
+            _closePushTokens([event.$1]);
+          }
+          _events.add(event);
         }),
+        engineId: _engineId,
       );
     }
     return _events.stream;

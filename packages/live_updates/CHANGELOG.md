@@ -1,3 +1,8 @@
+## Unreleased
+
+- Docs: the platform table names Live Activity push tokens and points Android
+  to FCM.
+
 ## 0.0.5
 
 - `LiveUpdate.key`: the key from `startOrUpdate`, a push-to-start

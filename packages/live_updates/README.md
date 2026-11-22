@@ -29,7 +29,7 @@ Screenshots of the example app in this repository.
 | Metrics, semantic colors | – | Android 17+ | – | |
 | Tap route | ✓ | ✓ | ✓ | |
 | Lifecycle events | ✓ | ✓ | ✓ | |
-| Push tokens | ✓ | – | – | |
+| Live Activity push tokens | ✓ | – (FCM via `live_updates_fcm`) | – (FCM via `live_updates_fcm`) | |
 | Remote payload | APNs (direct) | `handleRemotePayload` | `handleRemotePayload` | |
 
 Requirements: Flutter 3.50+, iOS 17.2+, Android minSdk as set by Flutter.

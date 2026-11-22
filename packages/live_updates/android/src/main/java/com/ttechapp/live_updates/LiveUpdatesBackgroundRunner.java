@@ -11,8 +11,6 @@ import io.flutter.embedding.engine.FlutterEngine;
 import io.flutter.embedding.engine.dart.DartExecutor;
 import io.flutter.embedding.engine.loader.FlutterLoader;
 import io.flutter.view.FlutterCallbackInformation;
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * Runs the Dart background action handler in a headless engine for presses
@@ -26,8 +24,8 @@ final class LiveUpdatesBackgroundRunner {
 
   @Nullable private static FlutterEngine engine;
   /** Receivers waiting for a run, with the take count that covers each press. */
-  private static final List<BroadcastReceiver.PendingResult> pending = new ArrayList<>();
-  private static final List<Integer> pendingTakes = new ArrayList<>();
+  private static final RunWaiters<BroadcastReceiver.PendingResult> pending =
+      new RunWaiters<>(BroadcastReceiver.PendingResult::finish);
   /** Runs started in a row for presses that arrived as a run finished. */
   private static int restarts;
   private static final int MAX_RESTARTS = 3;
@@ -44,11 +42,8 @@ final class LiveUpdatesBackgroundRunner {
     final Context app = context.getApplicationContext();
     main.post(
         () -> {
-          if (result != null) {
-            pending.add(result);
-            // The next take covers this press.
-            pendingTakes.add(LiveUpdatesBridge.takeCount + 1);
-          }
+          // The next take covers this press.
+          if (result != null) pending.add(result, LiveUpdatesBridge.takeCount + 1);
           if (engine != null) return; // Already running: it drains the queue.
           appContext = app;
           dispatcher = dispatcherHandle;
@@ -108,21 +103,13 @@ final class LiveUpdatesBackgroundRunner {
     if (e != null) e.destroy();
     boolean restart =
         mayRestart && restarts < MAX_RESTARTS && LiveUpdatesBridge.hasQueuedBackgroundActions();
-    int covered = restart ? LiveUpdatesBridge.takeCount : Integer.MAX_VALUE;
-    for (int i = pending.size() - 1; i >= 0; i--) {
-      if (pendingTakes.get(i) <= covered) {
-        pending.remove(i).finish();
-        pendingTakes.remove(i);
-      }
-    }
+    pending.finishCovered(restart ? LiveUpdatesBridge.takeCount : Integer.MAX_VALUE);
     if (restart) {
       restarts++;
       startEngine();
       if (engine != null) return;
     }
     restarts = 0;
-    for (BroadcastReceiver.PendingResult r : pending) r.finish();
-    pending.clear();
-    pendingTakes.clear();
+    pending.finishAll();
   }
 }

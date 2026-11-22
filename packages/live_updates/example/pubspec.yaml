@@ -8,6 +8,7 @@ environment:
   sdk: ^3.14.0
 
 dependencies:
+  cupertino_ui: ^1.1.7
   flutter:
     sdk: flutter
   live_updates: any

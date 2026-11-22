@@ -1,3 +1,7 @@
+import 'dart:ui' show Color;
+
+import 'package:cupertino_ui/cupertino_ui.dart' show CupertinoDynamicColor;
+
 import 'models.dart';
 
 /// Wire format shared with the native bridges.
@@ -38,8 +42,8 @@ extension LiveUpdateContentJson on LiveUpdateContent {
         'alert': {'title': a.title, 'body': a.body, 'sound': ?a.sound},
       'compactTrailing': ?ios.compactTrailing?.value,
       'minimal': ?ios.minimal?.value,
-      'tintArgb': ?ios.tint?.toARGB32(),
-      'backgroundArgb': ?ios.backgroundColor?.toARGB32(),
+      ..._colorJson('tint', ios.color),
+      ..._colorJson('background', ios.backgroundColor),
     },
     if (android case final a?) ...{
       'channelId': a.channelId,
@@ -97,3 +101,14 @@ extension on AndroidMetric {
     'semanticStyle': ?semanticStyle?.name,
   };
 }
+
+/// `<name>Argb`, plus `<name>DarkArgb` for a [CupertinoDynamicColor] whose
+/// dark variant differs. (Not `colorArgb`: that key is the Android color.)
+Map<String, int> _colorJson(String name, Color? color) => switch (color) {
+  null => const {},
+  final CupertinoDynamicColor c => {
+    '${name}Argb': c.color.toARGB32(),
+    if (c.darkColor != c.color) '${name}DarkArgb': c.darkColor.toARGB32(),
+  },
+  final c => {'${name}Argb': c.toARGB32()},
+};

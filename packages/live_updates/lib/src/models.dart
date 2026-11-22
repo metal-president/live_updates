@@ -305,7 +305,7 @@ final class IosLiveUpdateOptions {
     this.extra = const {},
     this.compactTrailing,
     this.minimal,
-    this.tint,
+    this.color,
     this.backgroundColor,
   });
 
@@ -336,11 +336,16 @@ final class IosLiveUpdateOptions {
   /// Accent color of the generated widget: progress bars, buttons, the timer
   /// and the Dynamic Island keyline. `null` keeps the system colors. The
   /// Android counterpart is [AndroidLiveUpdateOptions.color].
-  final Color? tint;
+  ///
+  /// Pass a `CupertinoDynamicColor` (for example
+  /// `CupertinoDynamicColor.withBrightness(color: ..., darkColor: ...)`) to
+  /// use a different color in dark mode. While the Always-On display dims the
+  /// Lock Screen, the system colors are used.
+  final Color? color;
 
   /// Background of the Lock Screen presentation. `null` keeps the system
-  /// background. Choose one that keeps the text readable in light and dark
-  /// mode.
+  /// background. Like [color], a `CupertinoDynamicColor` gives dark mode its
+  /// own background; keep the text readable in both modes.
   final Color? backgroundColor;
 
   @override
@@ -352,7 +357,7 @@ final class IosLiveUpdateOptions {
       mapEquals(other.extra, extra) &&
       other.compactTrailing == compactTrailing &&
       other.minimal == minimal &&
-      other.tint == tint &&
+      other.color == color &&
       other.backgroundColor == backgroundColor;
 
   @override
@@ -363,7 +368,7 @@ final class IosLiveUpdateOptions {
     Object.hashAllUnordered(extra.entries.map((e) => (e.key, e.value))),
     compactTrailing,
     minimal,
-    tint,
+    color,
     backgroundColor,
   );
 }

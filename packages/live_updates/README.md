@@ -6,7 +6,7 @@ iOS **Live Activities** and Android **Live Update** notifications with one Dart 
 - iOS 17.2+: ActivityKit Live Activities on the Lock Screen and in the Dynamic Island, with a ready-made SwiftUI widget you generate and customize.
 - Android: ongoing notifications that Android 16 renders with `ProgressStyle` and, on builds that support promoted notifications (Android 16 QPR1 and later), promotes to Live Updates with a status bar chip. Older Android versions show a regular ongoing notification with a progress bar.
 - Remote updates: iOS push-to-start and per-activity push tokens as streams; Android updates from a received payload (FCM glue lives in [`live_updates_fcm`](https://pub.dev/packages/live_updates_fcm)).
-- No platform channels: native code is called through [FFIgen](https://pub.dev/packages/ffigen) (iOS) and [JNIgen](https://pub.dev/packages/jnigen) (Android). Runtime dependencies are only Dart and Flutter team packages (`objective_c`, `jni`, `crypto`, `meta`).
+- No platform channels: native code is called through [FFIgen](https://pub.dev/packages/ffigen) (iOS) and [JNIgen](https://pub.dev/packages/jnigen) (Android). Runtime dependencies are only Dart and Flutter team packages (`ffi`, `objective_c`, `jni`, `crypto`, `meta`).
 - Other platforms are a safe no-op.
 
 > **Status:** 0.0.x. The API may still change in any release; pin the version you test with.
@@ -177,7 +177,8 @@ if (await LiveUpdates.requestPermission()) {
 
   // iOS keeps the last content on the Lock Screen for 5 minutes. Android
   // removes the notification now, unless you pass finalContent: then that
-  // content stays as a regular notification for the duration.
+  // content stays as a regular notification for the duration (Android 8.0+;
+  // on Android 7 until the user dismisses it).
   await update.end(dismissAfter: const Duration(minutes: 5));
 }
 

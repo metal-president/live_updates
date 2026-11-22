@@ -1,7 +1,8 @@
 ## Unreleased
 
-- Docs: the platform table names Live Activity push tokens and points Android
-  to FCM.
+- Docs: clearer platform table (Live Activity push tokens, buttons, images,
+  remote updates, broadcasts), requirements, `end(dismissAfter:)` on Android,
+  and complete push-to-start keys.
 
 ## 0.0.5
 

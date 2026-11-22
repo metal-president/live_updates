@@ -23,7 +23,10 @@ Options:
 ''';
 
 /// Entry point of `dart run live_updates:create_widget`.
-Future<int> createWidget(List<String> args) async {
+///
+/// [templates] overrides where the templates are read from (tests run
+/// without package URI resolution).
+Future<int> createWidget(List<String> args, {Directory? templates}) async {
   var name = 'LiveUpdatesWidget';
   var iosDir = 'ios';
   var editXcode = true;
@@ -75,16 +78,15 @@ Future<int> createWidget(List<String> args) async {
 
   if (editXcode && !_ensureXcodeprojGem()) return 69;
 
-  final templates = await _templatesDir();
+  templates ??= await _templatesDir();
+  final dir = templates;
   String render(String file) =>
-      File('${templates.path}/$file')
-          .readAsStringSync()
-          .replaceAll('{{name}}', name);
+      File('${dir.path}/$file').readAsStringSync().replaceAll('{{name}}', name);
 
   final out = Directory('${ios.path}/$name');
   // Owned by the plugin: always replaced, so they match the plugin version.
   final owned = {
-    'LiveUpdatesAttributes.swift': _attributesSource(templates),
+    'LiveUpdatesAttributes.swift': _attributesSource(dir),
     'LiveUpdatesViews.swift': render('Views.swift.tmpl'),
     'LiveUpdatesActionIntent.swift': render('ActionIntent.swift.tmpl'),
   };

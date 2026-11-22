@@ -56,23 +56,27 @@ struct LiveUpdatesSecureActionIntent: LiveActivityIntent {
 
 enum LiveUpdatesActionRunner {
   /// Hands the press to the live_updates plugin (looked up by name, so this
-  /// file also compiles in the widget extension) and, when it started the
-  /// Dart background handler, waits for it (at most 30 seconds).
+  /// file also compiles in the widget extension) and, when the Dart
+  /// background handler runs it, waits until a run that took it finished (at
+  /// most 30 seconds).
   static func run(activityId: String, actionId: String) async {
     // Listen before enqueueing so a quick "done" is not missed.
     let done = NotificationCenter.default.notifications(
       named: Notification.Name("LiveUpdatesBackgroundDone"))
-    let startedHandler = await MainActor.run { () -> Bool in
+    // 0: nothing to wait for; else the run count that covers this press.
+    let takes = await MainActor.run { () -> Int in
       guard let bridge = NSClassFromString("LiveUpdatesBridge") as AnyObject?,
         let result = bridge.perform(
           NSSelectorFromString("enqueueAction:actionId:"), with: activityId, with: actionId)
-      else { return false }
-      return (result.takeUnretainedValue() as? NSNumber)?.boolValue ?? false
+      else { return 0 }
+      return (result.takeUnretainedValue() as? NSNumber)?.intValue ?? 0
     }
-    guard startedHandler else { return }
+    guard takes > 0 else { return }
     await withTaskGroup(of: Void.self) { group in
       group.addTask {
-        for await _ in done { break }
+        for await note in done {
+          if (note.userInfo?["takes"] as? Int ?? Int.max) >= takes { break }
+        }
       }
       group.addTask { try? await Task.sleep(for: .seconds(30)) }
       await group.next()

@@ -1,5 +1,6 @@
 import ActivityKit
 import Foundation
+import UIKit
 
 /// Objective-C surface over ActivityKit, consumed from Dart through FFIgen.
 ///
@@ -199,25 +200,50 @@ public final class LiveUpdatesBridge: NSObject {
   /// Calls `handler` with `"<state>:<id>"` for activity lifecycle changes:
   /// `started` (including activities started by push-to-start), then
   /// `active`, `stale`, `ended`, `dismissed` or `pending`.
-  @objc public static func observeActivities(_ handler: @escaping (String) -> Void) {
-    activityTask?.cancel()
-    stateTasks.values.forEach { $0.cancel() }
-    stateTasks.removeAll()
-    func watch(_ activity: Activity<LiveUpdatesAttributes>) {
-      guard stateTasks[activity.id] == nil else { return }
-      stateTasks[activity.id] = Task {
-        for await state in activity.activityStateUpdates {
-          handler("\(name(of: state)):\(activity.id)")
-          // An ended activity stays listed until it is dismissed.
-          if state == .dismissed { break }
+  ///
+  /// Each engine (`engineId`) has its own handler, so a background engine
+  /// does not take the events of the app's engine.
+  @objc public static func observeActivities(
+    _ handler: @escaping (String) -> Void, engineId: Int64
+  ) {
+    onMain {
+      activityHandlers[engineId] = handler
+      guard activityTask == nil else { return }
+      func emit(_ event: String) {
+        DispatchQueue.main.async { activityHandlers.values.forEach { $0(event) } }
+      }
+      func watch(_ activity: Activity<LiveUpdatesAttributes>) {
+        guard stateTasks[activity.id] == nil else { return }
+        stateTasks[activity.id] = Task {
+          for await state in activity.activityStateUpdates {
+            emit("\(name(of: state)):\(activity.id)")
+            // An ended activity stays listed until it is dismissed.
+            if state == .dismissed { break }
+          }
+        }
+      }
+      Activity<LiveUpdatesAttributes>.activities.forEach(watch)
+      activityTask = Task {
+        for await activity in Activity<LiveUpdatesAttributes>.activityUpdates {
+          emit("started:\(activity.id)")
+          await MainActor.run { watch(activity) }
         }
       }
     }
-    Activity<LiveUpdatesAttributes>.activities.forEach(watch)
-    activityTask = Task {
-      for await activity in Activity<LiveUpdatesAttributes>.activityUpdates {
-        handler("started:\(activity.id)")
-        await MainActor.run { watch(activity) }
+  }
+
+  private static var activityHandlers: [Int64: (String) -> Void] = [:]
+
+  /// Called when an engine goes away: its isolate's handlers are dead, so
+  /// presses are queued again and taps wait for the next listener.
+  @objc public static func engineDetached(_ engineId: Int64) {
+    onMain {
+      activityHandlers.removeValue(forKey: engineId)
+      tapHandlers.removeValue(forKey: engineId)
+      if actionEngine == engineId {
+        actionHandler = nil
+        actionFilter = nil
+        if hasQueuedBackgroundActions { _ = startBackgroundHandler() }
       }
     }
   }
@@ -240,25 +266,36 @@ public final class LiveUpdatesBridge: NSObject {
   /// Activities whose presses Dart takes; `nil` for all (`onAction`). Other
   /// presses stay queued for the background handler.
   private static var actionFilter: Set<String>?
+  private static var actionEngine: Int64 = 0
+  private static var activeObserver: NSObjectProtocol?
 
   /// Calls `handler` with `"<activity id>\n<action id>"` for presses of
   /// `activityIds` (`nil`: all), including
   /// presses queued while Dart was not listening; other presses stay queued
   /// for the background handler.
   @objc public static func observeActions(
-    _ handler: @escaping (String) -> Void, activityIds: [String]?
+    _ handler: @escaping (String) -> Void, activityIds: [String]?, engineId: Int64
   ) {
     onMain {
       actionHandler = handler
+      actionEngine = engineId
       actionFilter = activityIds.map(Set.init)
+      // Presses wait while the app is in the background; hand them over
+      // when it comes back.
+      if activeObserver == nil {
+        activeObserver = NotificationCenter.default.addObserver(
+          forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main
+        ) { _ in drainActions() }
+      }
       drainActions()
       if hasQueuedBackgroundActions { _ = startBackgroundHandler() }
     }
   }
 
   /// Limits the presses Dart takes to those of `activityIds` (`nil`: all).
-  @objc public static func setActionFilter(_ activityIds: [String]?) {
+  @objc public static func setActionFilter(_ activityIds: [String]?, engineId: Int64) {
     onMain {
+      guard actionEngine == engineId else { return }
       actionFilter = activityIds.map(Set.init)
       drainActions()
       if hasQueuedBackgroundActions { _ = startBackgroundHandler() }
@@ -271,24 +308,31 @@ public final class LiveUpdatesBridge: NSObject {
   @objc public static func requeueActions(_ presses: [String]) {
     onMain {
       let defaults = UserDefaults.standard
+      // In front: they were pressed before anything queued since.
       defaults.set(
-        (defaults.stringArray(forKey: pendingActionsKey) ?? []) + presses,
+        presses + (defaults.stringArray(forKey: pendingActionsKey) ?? []),
         forKey: pendingActionsKey)
       drainActions()
       if hasQueuedBackgroundActions { _ = startBackgroundHandler() }
     }
   }
 
+  /// Whether the app's Dart listener takes `press`. Not while the app is in
+  /// the background: it could be suspended mid-handler, so the background
+  /// handler (which the intent waits for) runs it.
   private static func dartTakes(_ press: String) -> Bool {
-    guard actionHandler != nil else { return false }
+    guard actionHandler != nil, UIApplication.shared.applicationState == .active else {
+      return false
+    }
     guard let filter = actionFilter else { return true }
     return filter.contains(String(press.prefix { $0 != "\n" }))
   }
 
   /// Stops delivering presses to Dart (nothing listens any more): queued and
   /// later presses are run by the background handler.
-  @objc public static func unobserveActions() {
+  @objc public static func unobserveActions(_ engineId: Int64) {
     onMain {
+      guard actionEngine == engineId else { return }
       actionHandler = nil
       actionFilter = nil
       if hasQueuedBackgroundActions { _ = startBackgroundHandler() }
@@ -320,8 +364,9 @@ public final class LiveUpdatesBridge: NSObject {
   /// main thread by `LiveUpdatesActionIntent` (looked up by name, so the
   /// widget extension does not link the plugin) and for open-app URLs.
   ///
-  /// Returns `true` when the press started the background action handler;
-  /// the caller should then wait for `LiveUpdatesBackgroundDone`.
+  /// Returns a positive number when the background action handler runs the
+  /// press: the caller should then wait for a `LiveUpdatesBackgroundDone`
+  /// whose `takes` is at least that number (or that has none). 0 otherwise.
   @objc(enqueueAction:actionId:)
   @discardableResult
   public static func enqueueAction(_ activityId: String, actionId: String) -> NSNumber {
@@ -347,12 +392,18 @@ public final class LiveUpdatesBridge: NSObject {
       // Open-app press: the app's onAction listener should take it. If none
       // does soon after launch, the background handler runs it instead.
       DispatchQueue.main.asyncAfter(deadline: .now() + openAppGrace) {
+        drainActions()
         if hasQueuedBackgroundActions { _ = startBackgroundHandler() }
       }
-      return false
+      return 0
     }
-    return hasQueuedBackgroundActions ? startBackgroundHandler() : false
+    guard hasQueuedBackgroundActions, startBackgroundHandler().boolValue else { return 0 }
+    // The intent waits until a run took this press: the next take.
+    return NSNumber(value: takeCount + 1)
   }
+
+  /// How many times the background handler took queued presses.
+  static var takeCount = 0
 
   /// Time an app opened by a button gets to start listening to `onAction`.
   private static let openAppGrace: TimeInterval = 5
@@ -381,6 +432,7 @@ public final class LiveUpdatesBridge: NSObject {
     let pending = defaults.stringArray(forKey: pendingActionsKey) ?? []
     // Presses a Dart listener of the app takes are left to it.
     defaults.set(pending.filter(dartTakes), forKey: pendingActionsKey)
+    takeCount += 1
     return pending.filter { !dartTakes($0) }
   }
 
@@ -403,23 +455,18 @@ public final class LiveUpdatesBridge: NSObject {
     return started
   }
 
-  private static var tapHandler: ((String) -> Void)?
+  private static var tapHandlers: [Int64: (String) -> Void] = [:]
   private static var pendingRoutes: [String] = []
 
   /// Calls `handler` with the route of every tap, including a tap that
-  /// launched the app before Dart subscribed.
-  @objc public static func observeTaps(_ handler: @escaping (String) -> Void) {
+  /// launched the app before Dart subscribed. Each engine has its own.
+  @objc public static func observeTaps(_ handler: @escaping (String) -> Void, engineId: Int64) {
     onMain {
-      tapHandler = handler
+      tapHandlers[engineId] = handler
       let pending = pendingRoutes
       pendingRoutes.removeAll()
       pending.forEach(handler)
     }
-  }
-
-  /// Stops delivering taps to Dart; later routes wait for the next listener.
-  @objc public static func unobserveTaps() {
-    onMain { tapHandler = nil }
   }
 
   private static func find(_ id: String) -> Activity<LiveUpdatesAttributes>? {
@@ -520,7 +567,7 @@ extension LiveUpdatesBridge {
     // app's activities actually carries, so other apps cannot inject routes.
     guard Activity<LiveUpdatesAttributes>.activities.contains(where: { $0.content.state.route == route })
     else { return true }
-    if let handler = tapHandler { handler(route) } else { pendingRoutes.append(route) }
+    if tapHandlers.isEmpty { pendingRoutes.append(route) } else { tapHandlers.values.forEach { $0(route) } }
     return true
   }
 }

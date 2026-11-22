@@ -1608,41 +1608,6 @@ extension type LiveUpdatesBridge._(jni$_.JObject _$this)
       engineId,
     ).check();
   }
-
-  static final _id_unobserveTaps = _class.staticMethodId(
-    r'unobserveTaps',
-    r'(J)V',
-  );
-
-  static final _unobserveTaps =
-      jni$_.ProtectedJniExtensions.lookup<
-            jni$_.NativeFunction<
-              jni$_.JThrowablePtr Function(
-                jni$_.Pointer<jni$_.Void>,
-                jni$_.JMethodIDPtr,
-                jni$_.VarArgs<(jni$_.Int64,)>,
-              )
-            >
-          >('globalEnv_CallStaticVoidMethod')
-          .asFunction<
-            jni$_.JThrowablePtr Function(
-              jni$_.Pointer<jni$_.Void>,
-              jni$_.JMethodIDPtr,
-              core$_.int,
-            )
-          >();
-
-  /// from: `static public void unobserveTaps(long engineId)`
-  ///
-  /// Stops delivering taps to Dart; later routes wait for the next listener.
-  static void unobserveTaps(core$_.int engineId) {
-    final _$$classRef = _class.reference;
-    _unobserveTaps(
-      _$$classRef.pointer,
-      _id_unobserveTaps.pointer,
-      engineId,
-    ).check();
-  }
 }
 
 final class $LiveUpdatesBridge$Type$ extends jni$_.JType<LiveUpdatesBridge> {

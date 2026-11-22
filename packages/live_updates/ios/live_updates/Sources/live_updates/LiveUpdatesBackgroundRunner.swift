@@ -46,19 +46,32 @@ public final class LiveUpdatesBackgroundRunner: NSObject {
     DispatchQueue.main.async { stop(mayRestart: true) }
   }
 
-  /// Shuts the engine down and notifies waiting intents. A press queued after
-  /// the handler took the last one (it saw an engine and did not start
-  /// another) gets a new run, unless the run timed out.
+  /// Runs started in a row for presses that arrived as a run finished.
+  private static var restarts = 0
+  private static let maxRestarts = 3
+
+  /// Shuts the engine down and releases the intents whose presses were taken
+  /// (`takes` in the notification; all of them after a timeout). A press
+  /// queued after the handler took the last one gets a new run, while its
+  /// intent keeps waiting, unless the run timed out.
   private static func stop(mayRestart: Bool) {
     timeoutWork?.cancel()
     timeoutWork = nil
     engine?.destroyContext()
     engine = nil
-    // Releases the intents of this run (a late press's intent too: its press
-    // runs in the new engine with the time the app has left).
-    NotificationCenter.default.post(name: doneNotification, object: nil)
-    if mayRestart, LiveUpdatesBridge.hasQueuedBackgroundActions {
-      _ = LiveUpdatesBridge.startBackgroundHandler()
+    let restart =
+      mayRestart && restarts < maxRestarts && LiveUpdatesBridge.hasQueuedBackgroundActions
+    NotificationCenter.default.post(
+      name: doneNotification, object: nil,
+      userInfo: ["takes": restart ? LiveUpdatesBridge.takeCount : Int.max])
+    if restart, LiveUpdatesBridge.startBackgroundHandler().boolValue {
+      restarts += 1
+    } else {
+      restarts = 0
+      if restart {
+        NotificationCenter.default.post(
+          name: doneNotification, object: nil, userInfo: ["takes": Int.max])
+      }
     }
   }
 }

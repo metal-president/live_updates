@@ -4,6 +4,7 @@ library;
 import 'dart:async';
 
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart' show debugPrint, visibleForTesting;
 import 'package:live_updates/live_updates.dart';
 
 import 'src/tokens.dart';
@@ -79,6 +80,22 @@ abstract final class LiveUpdatesFcm {
   }
 
   /// Handles foreground FCM messages until the subscription is cancelled.
-  static StreamSubscription<RemoteMessage> listen() =>
-      FirebaseMessaging.onMessage.listen(handleMessage);
+  ///
+  /// A live_updates message that cannot be applied (malformed content) is
+  /// reported to [onError] instead of becoming an uncaught error; without
+  /// [onError] it is printed in debug builds.
+  static StreamSubscription<RemoteMessage> listen({
+    void Function(Object error, StackTrace stack)? onError,
+    @visibleForTesting Stream<RemoteMessage>? messages,
+  }) => (messages ?? FirebaseMessaging.onMessage).listen((message) async {
+    try {
+      await handleMessage(message);
+    } on Object catch (error, stack) {
+      if (onError != null) {
+        onError(error, stack);
+      } else {
+        debugPrint('live_updates_fcm: could not apply a message: $error');
+      }
+    }
+  });
 }

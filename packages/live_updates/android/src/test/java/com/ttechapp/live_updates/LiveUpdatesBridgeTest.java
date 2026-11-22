@@ -50,7 +50,9 @@ public class LiveUpdatesBridgeTest {
 
   @After
   public void tearDown() {
+    // Static state must not leak into the next test.
     LiveUpdatesBridge.engineDetached(1);
+    LiveUpdatesBridge.engineDetached(2);
   }
 
   private static boolean remote(String event, String id, String content) throws Exception {
@@ -506,5 +508,92 @@ public class LiveUpdatesBridgeTest {
     String id =
         LiveUpdatesBridge.start("{\"title\":\"Trip\",\"journey\":{\"from\":null,\"to\":\"B\"}}");
     assertEquals(null, shown(id).extras.getCharSequence(Notification.EXTRA_TEXT));
+  }
+
+  @Test
+  public void tapsAndEventsReachEveryEngineUntilItDetaches() throws Exception {
+    List<String> app1 = new ArrayList<>();
+    List<String> bg = new ArrayList<>();
+    LiveUpdatesBridge.observeTaps(app1::add, 1);
+    LiveUpdatesBridge.observeTaps(bg::add, 2); // a background engine
+    List<String> events1 = new ArrayList<>();
+    LiveUpdatesBridge.observeEvents(events1::add, 1);
+    LiveUpdatesBridge.observeEvents(e -> {}, 2);
+    LiveUpdatesBridge.engineDetached(2);
+
+    String id = LiveUpdatesBridge.start("{\"title\":\"A\",\"route\":\"/r\"}");
+    LiveUpdatesBridge.handleIntent(new Intent(shadowOf(shown(id).contentIntent).getSavedIntent()));
+    // The app's engine still gets them after the background engine left.
+    assertEquals(Arrays.asList("/r"), app1);
+    assertTrue(bg.isEmpty());
+    assertEquals(Arrays.asList("started:" + id), events1);
+  }
+
+  @Test
+  public void pendingTapsGoToTheNextListenerOnce() throws Exception {
+    String id = LiveUpdatesBridge.start("{\"title\":\"A\",\"route\":\"/later\"}");
+    LiveUpdatesBridge.handleIntent(new Intent(shadowOf(shown(id).contentIntent).getSavedIntent()));
+    List<String> first = new ArrayList<>();
+    List<String> second = new ArrayList<>();
+    LiveUpdatesBridge.observeTaps(first::add, 1);
+    LiveUpdatesBridge.observeTaps(second::add, 2);
+    assertEquals(Arrays.asList("/later"), first);
+    assertTrue(second.isEmpty());
+  }
+
+  @Test
+  public void openAppPressGoesToTheListener() throws Exception {
+    String id =
+        LiveUpdatesBridge.start(
+            "{\"title\":\"A\",\"actions\":[{\"id\":\"track\",\"title\":\"Track\",\"opensApp\":true}]}");
+    Intent press = shadowOf(shown(id).actions[0].actionIntent).getSavedIntent();
+    List<String> got = new ArrayList<>();
+    LiveUpdatesBridge.observeActions((u, a) -> got.add(u + ":" + a), 1, null);
+    LiveUpdatesBridge.handleIntent(new Intent(press));
+    assertEquals(Arrays.asList(id + ":track"), got);
+    // Taken: nothing is left for the background handler after the grace time.
+    org.robolectric.shadows.ShadowLooper.idleMainLooper(6, java.util.concurrent.TimeUnit.SECONDS);
+    assertEquals(0, LiveUpdatesBridge.takeQueuedActions().length);
+  }
+
+  @Test
+  public void openAppPressWithoutListenerStaysForTheBackgroundHandler() throws Exception {
+    String id =
+        LiveUpdatesBridge.start(
+            "{\"title\":\"A\",\"actions\":[{\"id\":\"track\",\"title\":\"Track\",\"opensApp\":true}]}");
+    Intent press = shadowOf(shown(id).actions[0].actionIntent).getSavedIntent();
+    LiveUpdatesBridge.handleIntent(new Intent(press));
+    org.robolectric.shadows.ShadowLooper.idleMainLooper(6, java.util.concurrent.TimeUnit.SECONDS);
+    assertEquals(
+        Arrays.asList(id + "\ntrack"), Arrays.asList(LiveUpdatesBridge.takeQueuedActions()));
+  }
+
+  @Test
+  public void forgedOpenAppPressesAreIgnored() {
+    List<String> got = new ArrayList<>();
+    LiveUpdatesBridge.observeActions((u, a) -> got.add(u + ":" + a), 1, null);
+    LiveUpdatesBridge.handleIntent(
+        new Intent()
+            .putExtra(LiveUpdatesBridge.EXTRA_TOKEN, "guess")
+            .putExtra("com.ttechapp.live_updates.ACTION_ID", "cancel")
+            .putExtra("com.ttechapp.live_updates.UPDATE_ID", "u1"));
+    assertTrue(got.isEmpty());
+  }
+
+  @Test
+  public void requeuedPressesKeepTheirOrder() {
+    LiveUpdatesBridge.emitAction(app, "u", "second");
+    LiveUpdatesBridge.requeueActions(new String[] {"u\nfirst"});
+    assertEquals(
+        Arrays.asList("u\nfirst", "u\nsecond"),
+        Arrays.asList(LiveUpdatesBridge.takeQueuedActions()));
+  }
+
+  @Test
+  public void eachTakeIsCounted() {
+    int before = LiveUpdatesBridge.takeCount;
+    LiveUpdatesBridge.takeQueuedActions();
+    LiveUpdatesBridge.takeQueuedActions();
+    assertEquals(before + 2, LiveUpdatesBridge.takeCount);
   }
 }

@@ -1,6 +1,6 @@
 import 'dart:ui' show CallbackHandle, DartPluginRegistrant, PluginUtilities;
 
-import 'package:flutter/foundation.dart' show debugPrint;
+import 'package:flutter/foundation.dart' show debugPrint, visibleForTesting;
 import 'package:flutter/widgets.dart' show WidgetsFlutterBinding;
 
 import 'models.dart';
@@ -42,35 +42,55 @@ Future<void> registerBackgroundActionHandler(
 Future<void> liveUpdatesBackgroundMain() async {
   WidgetsFlutterBinding.ensureInitialized();
   DartPluginRegistrant.ensureInitialized();
-  final platform = LiveUpdatesPlatform.instance;
+  await runBackgroundActions(
+    LiveUpdatesPlatform.instance,
+    (raw) => PluginUtilities.getCallbackFromHandle(
+      CallbackHandle.fromRawHandle(raw),
+    ),
+  );
+}
+
+/// Runs the handler that [resolve] finds for the stored handle on every
+/// queued press, until the queue is empty, then reports done.
+///
+/// Without a handler (removed from the app, or not an entry point) the
+/// queued presses are dropped: otherwise the platform would start an engine
+/// for them again and again.
+@visibleForTesting
+Future<void> runBackgroundActions(
+  LiveUpdatesPlatform platform,
+  Function? Function(int raw) resolve,
+) async {
   try {
     final raw = await platform.backgroundActionHandler();
-    final handler = raw == null
-        ? null
-        : PluginUtilities.getCallbackFromHandle(
-            CallbackHandle.fromRawHandle(raw),
+    final handler = raw == null ? null : resolve(raw);
+    if (handler is! LiveUpdateActionHandler) {
+      final dropped = await platform.takeQueuedActions();
+      debugPrint(
+        'live_updates: no background action handler; '
+        'dropped ${dropped.length} press(es)',
+      );
+      return;
+    }
+    // Presses that arrive while the handler runs are queued too: keep
+    // draining until the queue is empty.
+    for (
+      var queued = await platform.takeQueuedActions();
+      queued.isNotEmpty;
+      queued = await platform.takeQueuedActions()
+    ) {
+      for (final (updateId, actionId) in queued) {
+        try {
+          await handler(
+            LiveUpdateActionEvent(updateId: updateId, actionId: actionId),
           );
-    if (handler is LiveUpdateActionHandler) {
-      // Presses that arrive while the handler runs are queued too: keep
-      // draining until the queue is empty.
-      for (
-        var queued = await platform.takeQueuedActions();
-        queued.isNotEmpty;
-        queued = await platform.takeQueuedActions()
-      ) {
-        for (final (updateId, actionId) in queued) {
-          try {
-            await handler(
-              LiveUpdateActionEvent(updateId: updateId, actionId: actionId),
-            );
-          } on Object catch (error) {
-            debugPrint(
-              'live_updates: background action handler failed: $error',
-            );
-          }
+        } on Object catch (error) {
+          debugPrint('live_updates: background action handler failed: $error');
         }
       }
     }
+  } on Object catch (error) {
+    debugPrint('live_updates: background actions failed: $error');
   } finally {
     await platform.backgroundActionsDone();
   }

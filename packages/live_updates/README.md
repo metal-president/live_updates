@@ -252,10 +252,14 @@ LiveUpdates.onAction.listen((event) {
 - Buttons without `opensApp` run in the background: on iOS through
   `LiveUpdatesActionIntent` (a `LiveActivityIntent` that `create_widget`
   compiles into both the app and the widget), on Android through a broadcast
-  receiver. The press is delivered to `onAction` while the app runs. If the
-  app was not running, it is queued and delivered once Dart listens; use
-  `opensApp: true` when the press must be handled right away.
-- `opensApp: true` opens the app and delivers the press.
+  receiver. The press is delivered to `onAction` while the app is in the
+  foreground. Otherwise it runs the background handler (below), or, without
+  one, it is queued and delivered once the app listens in the foreground;
+  use `opensApp: true` when the press must open the app.
+- `opensApp: true` opens the app and delivers the press to `onAction`. If no
+  listener takes it within 5 seconds, the background handler runs it.
+- `LiveUpdate.actions` receives only that update's presses; presses of other
+  updates go to `onAction` or the background handler.
 - Background presses work on the Lock Screen without unlocking the device.
   Set `requiresUnlock: true` on buttons with consequences, such as cancelling
   an order: iOS asks for Face ID or the passcode first, and Android 12+ asks
@@ -287,10 +291,9 @@ Future<void> main() async {
 }
 ```
 
-- The handler runs only when no `onAction` listener is active; otherwise the
-  press goes to `onAction` as usual. (On iOS the system may launch your app
-  in the background for the press; if your app subscribes to `onAction` at
-  startup, that listener receives it.)
+- The handler runs for every press while the app is in the background (the
+  system keeps the app alive for it), and in the foreground for presses that
+  no `onAction` (or that update's `LiveUpdate.actions`) listener takes.
 - It must be a top-level or static function with
   `@pragma('vm:entry-point')`, and it has limited time (about 9 seconds on
   Android, 25 seconds on iOS).

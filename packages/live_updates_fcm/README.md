@@ -25,7 +25,7 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
   FirebaseMessaging.onBackgroundMessage(onBackgroundMessage);
-  LiveUpdatesFcm.listen(); // foreground messages
+  LiveUpdatesFcm.listen(onError: report); // foreground messages
   runApp(const App());
 }
 ```

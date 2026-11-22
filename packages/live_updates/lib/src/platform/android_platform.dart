@@ -9,6 +9,7 @@ import '../android/bindings.g.dart';
 import '../models.dart';
 import 'buffered_broadcast.dart';
 import 'observed_broadcast.dart';
+import 'wire.dart';
 import 'content_encoder.dart';
 import 'live_updates_platform.dart';
 
@@ -52,7 +53,9 @@ class AndroidLiveUpdatesPlatform extends LiveUpdatesPlatform
         LiveUpdatesBridge.setActionFilter(_engineId, _jList(keys)),
     detach: () => LiveUpdatesBridge.unobserveActions(_engineId),
     requeue: (events) => LiveUpdatesBridge.requeueActions(
-      _jList({for (final (u, a) in events) '$u\n$a'})!,
+      JArray.of(JString.type, [
+        for (final (u, a) in events) _j(encodePress(u, a)),
+      ]),
     ),
   );
 
@@ -157,8 +160,7 @@ class AndroidLiveUpdatesPlatform extends LiveUpdatesPlatform
     return [
       for (var i = 0; i < queued.length; i++)
         if (queued[i]?.toDartString(releaseOriginal: true) case final s?)
-          if (s.indexOf('\n') case final at when at > 0)
-            (s.substring(0, at), s.substring(at + 1)),
+          ?parsePress(s),
     ];
   }
 
@@ -187,7 +189,7 @@ class AndroidLiveUpdatesPlatform extends LiveUpdatesPlatform
         json == null ? null : _j(json),
         // Android has no system default policy: keep final content until
         // dismissed when no duration is given (-1), remove immediately for 0.
-        dismissAfter == null ? -1 : dismissAfter.inMilliseconds / 1000,
+        dismissSeconds(dismissAfter),
       ),
     );
   }
@@ -212,9 +214,8 @@ class AndroidLiveUpdatesPlatform extends LiveUpdatesPlatform
         LiveUpdatesBridge$EventListener.implement(
           $LiveUpdatesBridge$EventListener(
             onEvent: (e) {
-              final s = e.toDartString(releaseOriginal: true);
-              final i = s.indexOf(':');
-              _events.add((s.substring(i + 1), s.substring(0, i)));
+              final event = parseEvent(e.toDartString(releaseOriginal: true));
+              if (event != null) _events.add(event);
             },
             onEvent$async: true,
           ),

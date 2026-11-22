@@ -31,6 +31,11 @@ class ImageStore {
 
   /// Stores [image] and returns the file name relative to [directory].
   Future<String> store(LiveUpdateImage image) async {
+    if (image.maxDimension <= 0) {
+      throw LiveUpdateException(
+        'maxDimension must be positive, got ${image.maxDimension}',
+      );
+    }
     final source = await _load(image);
     final name = '$prefix${_hash(source, image.maxDimension)}.png';
     final file = File('${directory.path}/$name');

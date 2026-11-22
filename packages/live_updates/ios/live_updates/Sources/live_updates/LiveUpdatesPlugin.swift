@@ -30,6 +30,9 @@ public class LiveUpdatesPlugin: NSObject, FlutterPlugin, FlutterSceneLifeCycleDe
   public static func register(with registrar: FlutterPluginRegistrar) {
     // Keeps the FFIgen block trampolines linked into the app.
     live_updates_objc_link()
+    // Every engine: tell the bridge when it goes away, so the handlers of its
+    // dead isolate are dropped.
+    registrar.publish(LiveUpdatesEngineWatcher(engineId: registrar.engineIdentifier))
     // Background engines register plugins again; the URL handling delegate
     // is process-wide, so it is added only once, by an app engine (a
     // headless engine never receives scene callbacks).
@@ -64,5 +67,21 @@ public class LiveUpdatesPlugin: NSObject, FlutterPlugin, FlutterSceneLifeCycleDe
 
   public func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) -> Bool {
     URLContexts.contains { LiveUpdatesBridge.handleURL($0.url) }
+  }
+}
+
+/// Published once per engine; Flutter calls `detachFromEngine` when that
+/// engine is destroyed.
+final class LiveUpdatesEngineWatcher: NSObject, FlutterPlugin {
+  private let engineId: Int64
+
+  init(engineId: Int64) {
+    self.engineId = engineId
+  }
+
+  static func register(with registrar: FlutterPluginRegistrar) {}
+
+  func detachFromEngine(for registrar: FlutterPluginRegistrar) {
+    LiveUpdatesBridge.engineDetached(engineId)
   }
 }

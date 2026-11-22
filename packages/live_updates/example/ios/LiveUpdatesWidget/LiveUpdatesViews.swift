@@ -24,14 +24,16 @@ struct LiveUpdatesLockScreen: View {
         VStack(alignment: .leading, spacing: 4) {
           HStack {
             Text(state.title).font(.headline).lineLimit(1)
+              .foregroundStyle(palette.foreground ?? .primary)
             if state.liveUpdatesHasTimer {
               Spacer()
               LiveUpdatesTimerText(state: state).font(.headline)
-                .foregroundStyle(palette.tint ?? .primary)
+                .foregroundStyle(palette.tint ?? palette.foreground ?? .primary)
             }
           }
           if let body = state.body {
-            Text(body).font(.subheadline).foregroundStyle(.secondary).lineLimit(2)
+            Text(body).font(.subheadline).lineLimit(2)
+              .foregroundStyle(palette.foreground.map { AnyShapeStyle($0.opacity(0.7)) } ?? AnyShapeStyle(.secondary))
           }
           if let progress = state.progress {
             ProgressView(value: progress)
@@ -130,15 +132,19 @@ struct LiveUpdatesMinimal: View {
   }
 }
 
-/// `IosLiveUpdateOptions.color` and `backgroundColor`, or system colors while
+/// `IosLiveUpdateOptions.color`, `backgroundColor` and `foregroundColor`, or
+/// system colors while
 /// the Always-On display dims the Lock Screen.
 struct LiveUpdatesPalette {
   let tint: Color?
   let background: Color?
+  /// Lock Screen text (`IosLiveUpdateOptions.foregroundColor`).
+  let foreground: Color?
 
   init(_ state: LiveUpdatesAttributes.ContentState, luminanceReduced: Bool) {
     tint = luminanceReduced ? nil : Self.color(state.tintArgb)
     background = luminanceReduced ? nil : Self.color(state.backgroundArgb)
+    foreground = luminanceReduced ? nil : Self.color(state.foregroundArgb)
   }
 
   static func color(_ argb: Int?) -> Color? {

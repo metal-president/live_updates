@@ -41,6 +41,7 @@ extension LiveUpdateContentJson on LiveUpdateContent {
       // Not 'colorArgb': that key holds the Android color.
       'tintArgb': ?ios.color?.toARGB32(),
       'backgroundArgb': ?ios.backgroundColor?.toARGB32(),
+      'foregroundArgb': ?ios.foregroundColor?.toARGB32(),
     },
     if (android case final a?) ...{
       'channelId': a.channelId,

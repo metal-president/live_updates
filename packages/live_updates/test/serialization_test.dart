@@ -226,10 +226,12 @@ void main() {
       ios: IosLiveUpdateOptions(
         color: Color(0xFF3949AB),
         backgroundColor: Color(0xCC000000),
+        foregroundColor: Color(0xFF111111),
       ),
     ).toJson();
     expect(json['tintArgb'], 0xFF3949AB);
     expect(json['backgroundArgb'], 0xCC000000);
+    expect(json['foregroundArgb'], 0xFF111111);
     expect(json.containsKey('colorArgb'), isFalse);
   });
 }

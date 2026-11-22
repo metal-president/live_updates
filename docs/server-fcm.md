@@ -38,7 +38,8 @@ Build the content once. Keys are those of `LiveUpdateContent` (see the
 package README): `title`, `body`, `progress`, `route`, `timerEnd` /
 `timerStart` (seconds since 1970), `actions`, `extra`, and Android options
 such as `channelId`, `shortCriticalText` or `progressSegments`, and the iOS
-options `compactTrailing` / `minimal` / `tintArgb` / `backgroundArgb`. Each platform
+options `compactTrailing` / `minimal` / `tintArgb` / `backgroundArgb` /
+`foregroundArgb`. Each platform
 ignores the keys it does not use. iOS requires `title`, and `extra` must map
 strings to strings, or the activity rejects the content.
 

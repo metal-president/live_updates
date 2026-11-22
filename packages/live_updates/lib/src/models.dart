@@ -307,6 +307,7 @@ final class IosLiveUpdateOptions {
     this.minimal,
     this.color,
     this.backgroundColor,
+    this.foregroundColor,
   });
 
   /// When the system marks the activity as stale.
@@ -343,8 +344,13 @@ final class IosLiveUpdateOptions {
   final Color? color;
 
   /// Background of the Lock Screen presentation. `null` keeps the system
-  /// (dark) background. Keep the text, which is light, readable on it.
+  /// (dark) background. With a light background, also set [foregroundColor].
   final Color? backgroundColor;
+
+  /// Text color of the Lock Screen presentation (title and timer; the body
+  /// uses it at 70% opacity). `null` keeps the system's light text. The
+  /// Dynamic Island keeps its own (dark) colors.
+  final Color? foregroundColor;
 
   @override
   bool operator ==(Object other) =>
@@ -356,7 +362,8 @@ final class IosLiveUpdateOptions {
       other.compactTrailing == compactTrailing &&
       other.minimal == minimal &&
       other.color == color &&
-      other.backgroundColor == backgroundColor;
+      other.backgroundColor == backgroundColor &&
+      other.foregroundColor == foregroundColor;
 
   @override
   int get hashCode => Object.hash(
@@ -368,6 +375,7 @@ final class IosLiveUpdateOptions {
     minimal,
     color,
     backgroundColor,
+    foregroundColor,
   );
 }
 

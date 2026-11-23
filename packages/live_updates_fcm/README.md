@@ -83,10 +83,20 @@ started with `pushUpdates: true` (to update or end it).
 
 | Type | Platform | Send with |
 | --- | --- | --- |
-| `fcmInstallationId` | all | `message.fid` |
-| `fcmRegistrationToken` (opt-in, legacy) | all | `message.token` |
-| `pushToStart` | iOS 17.2+ | `message.apns.live_activity_token`, `"event": "start"` |
-| `activity` (with `updateId` and `key`) | iOS | `message.apns.live_activity_token`, `"event": "update"` / `"end"` |
+| `fcmInstallationId` | Android, iOS | `message.fid` |
+| `fcmRegistrationToken` (opt-in, legacy) | Android, iOS | `message.token` |
+| `pushToStart` | iOS 17.2+ | `message.apns.live_activity_token`, `"event": "start"`, together with `message.fid` |
+| `activity` (with `updateId` and `key`) | iOS | `message.apns.live_activity_token`, `"event": "update"` / `"end"`, together with `message.fid` |
+
+The Live Activity tokens do not address the device on their own: an iOS
+message also needs the installation ID as its target (`message.fid`), as in
+[docs/server-fcm.md](https://github.com/metal-president/live_updates/blob/main/docs/server-fcm.md#ios-envelope).
+
+`fcmRegistrationToken` is only for apps that cannot use installation IDs
+yet. Firebase does not issue registration tokens while installation IDs are
+turned on (step 3 of [Getting started](#getting-started)), so
+`tokens(includeRegistrationToken: true)` reports an error instead of a token
+in that setup. Use one of the two, not both.
 
 ```dart
 LiveUpdatesFcm.tokens().listen(

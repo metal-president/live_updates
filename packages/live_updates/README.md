@@ -317,7 +317,7 @@ Where a press is delivered:
 | Button | App in the foreground | App in the background or not running |
 | --- | --- | --- |
 | Without `opensApp` | `onAction`; the [background handler](#handling-presses-while-the-app-is-not-running) if no listener takes it | the background handler; without one, queued until the app listens in the foreground |
-| `opensApp: true` | opens the app, then `onAction`; the background handler if no listener takes it within 5 seconds | the same |
+| `opensApp: true` | `onAction`; the background handler if no listener takes it within 5 seconds | opens the app, then `onAction`; the background handler if no listener takes it within 5 seconds |
 
 - Buttons without `opensApp` run without opening the app: on iOS through
   `LiveUpdatesActionIntent` (a `LiveActivityIntent` that `create_widget`

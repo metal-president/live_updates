@@ -47,7 +47,9 @@ abstract final class LiveUpdatesFcm {
   ///   call `FirebaseMessaging.instance.register()` in your app to get it,
   /// - optionally the legacy registration token
   ///   ([LiveUpdatesTokenType.fcmRegistrationToken], `message.token`) when
-  ///   [includeRegistrationToken] is `true`,
+  ///   [includeRegistrationToken] is `true`. Firebase only issues it while
+  ///   installation IDs are turned off; with them on, the stream reports an
+  ///   error for it instead,
   /// - on iOS, the push-to-start token and the push token of each live
   ///   update that is running or starts later (those started with
   ///   `pushUpdates: true`).
@@ -68,8 +70,9 @@ abstract final class LiveUpdatesFcm {
     final m = messaging ?? FirebaseMessaging.instance;
     return mergeTokens(
       installationIds: m.onRegistered,
-      // The registration token APIs are deprecated in favor of FIDs but still
-      // work; they are only used when the app asks for them.
+      // The registration token APIs are deprecated in favor of FIDs and fail
+      // while installation IDs are turned on; they are only used when the app
+      // asks for them.
       // ignore: deprecated_member_use
       initialRegistrationToken: includeRegistrationToken ? m.getToken : null,
       registrationTokenRefresh: includeRegistrationToken

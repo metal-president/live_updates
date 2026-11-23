@@ -1,3 +1,16 @@
+## 0.1.2
+
+- Docs: Firebase does not issue registration tokens while installation IDs
+  are turned on, so `tokens(includeRegistrationToken: true)` reports an error
+  for that token in this setup. The README, dartdoc and a code comment now
+  say so (no behavior change).
+- Docs: the token table lists Android and iOS instead of "all", and says that
+  Live Activity messages also need a target (`message.fid`, or
+  `message.token` with the legacy registration token).
+- Docs: README notes that Firebase Cloud Messaging can lower the priority of
+  high priority messages that show nothing to the user, and that iOS Live
+  Activity pushes count toward a per-hour budget.
+
 ## 0.1.1
 
 - Docs: README adds getting started steps, including turning on Firebase

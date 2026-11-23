@@ -1,3 +1,16 @@
+## 0.1.2
+
+- Docs: README adds a Platform limits section (Live Activity duration, 4 KB
+  size limit, Lock Screen height, user settings, number of activities, push
+  budget and frequent updates, where Live Activities appear; Android
+  promotion criteria, user settings, status bar chip, notification
+  permission), each with a link to the official documentation.
+- Docs: in the buttons table, an `opensApp` press opens the app only when it
+  is in the background.
+- Docs: removed the unsourced guideline to keep metric labels to 10
+  characters.
+- Package topics: `dynamic-island` replaces `widget`.
+
 ## 0.1.1
 
 - Android: in a regular notification (`AndroidLiveUpdateMode.classic`, and

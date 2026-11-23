@@ -38,6 +38,7 @@ Screenshots of the example app in this repository.
 - [Platform support](#platform-support)
 - [Getting started](#getting-started)
 - [Platform guidelines](#platform-guidelines)
+- [Platform limits](#platform-limits)
 - [Usage](#usage)
 - [Customizing the iOS widget](#customizing-the-ios-widget)
 - [Remote updates](#remote-updates)
@@ -145,8 +146,82 @@ Interface Guidelines for Live Activities and Android's
   notification.
 - Do not bring back an update the user dismissed. On Android `update` fails
   for a dismissed update, and remote `update` payloads for it are ignored.
-- Keep `shortCriticalText` short (Android suggests at most 7 characters) and
-  metric labels to 10 characters or fewer.
+- Keep `shortCriticalText` under 7 characters (see
+  [Platform limits](#platform-limits)).
+
+## Platform limits
+
+Each limit links to the platform documentation it comes from. The systems
+change between OS versions, so check the source when something behaves
+differently.
+
+### iOS
+
+- **Duration:** a Live Activity can run for up to 8 hours. Then the system
+  ends it and removes it from the Dynamic Island; the Lock Screen keeps it
+  for up to 4 more hours (12 hours in total). For longer activities, end the
+  activity and start a new one, or use a regular notification.
+  ([source][ios-activitykit])
+- **After `end`:** the final content stays on the Lock Screen for up to
+  4 hours. `dismissAfter` longer than that is capped at 4 hours.
+  ([source][ios-activitykit])
+- **Size:** the attributes and the content together must stay under 4 KB,
+  for local updates and push payloads alike. Long texts, many buttons and
+  large `extra` maps count toward it. ([source][ios-activitykit])
+- **Height:** the Lock Screen view is 84 to 160 points high; content beyond
+  that is cut off. ([source][ios-hig-specs])
+- **User settings:** users can turn off Live Activities for your app in
+  Settings. `LiveUpdates.isSupported()` returns `false` then, and `start`
+  throws a `LiveUpdateException`. Check it before you offer a "Track on Lock
+  Screen" option. ([source][ios-activitykit])
+- **Number of activities:** the system limits how many Live Activities can
+  run at once (per app and per device; the exact number varies). Handle a
+  `LiveUpdateException` from `start`, and prefer one activity that you update
+  over several. ([source][ios-activitykit])
+- **Updates from the app:** `update` and `end` only run while your app runs.
+  To keep an activity current while the app is suspended or closed, update
+  it with [push notifications](#remote-updates). ([source][ios-push])
+- **Push budget:** iOS limits pushes with `apns-priority: 10` per hour and
+  throttles them beyond that budget. Send routine updates with
+  `apns-priority: 5` (not counted) and use `10` only for updates the user
+  must see at once. For many updates per hour (such as a live score), add
+  `NSSupportsLiveActivitiesFrequentUpdates` = YES to the Runner `Info.plist`;
+  users can still turn frequent updates off in Settings. ([source][ios-push])
+- **Where it appears:** the Lock Screen of iPhone and iPad, the Dynamic
+  Island on iPhone models that have one, StandBy, the Mac menu bar, the
+  Apple Watch Smart Stack and CarPlay. Devices without the Dynamic Island
+  show the Lock Screen view as a banner for updates with an alert. Buttons do
+  nothing in CarPlay, so make sure the content works without them.
+  ([source][ios-hig])
+
+### Android
+
+- **Promotion:** besides the requirements in
+  [Getting started](#android), Android only promotes notifications on a
+  channel whose importance is above "min". If you pass your own
+  `channelId`, do not create that channel with `IMPORTANCE_MIN`. Device
+  makers can apply additional criteria. ([source][android-live-update])
+- **User settings:** users can demote or dismiss a Live Update and turn off
+  Live Updates for your app in Settings. Updates then appear as regular
+  ongoing notifications; `LiveUpdates.canPostPromotedNotifications()` tells
+  you which. To send users to the setting, open the
+  `Settings.ACTION_MANAGE_APP_PROMOTED_NOTIFICATIONS` intent.
+  ([source][android-live-update])
+- **Status bar chip:** the chip is at most 96 dp wide. `shortCriticalText`
+  is shown in full only if it is shorter than 7 characters; longer text is
+  cut, or only the icon is shown when less than half of it fits. Without
+  `shortCriticalText`, a countdown timer at least 2 minutes in the future is
+  shown as the remaining time. ([source][android-live-update])
+- **Permissions:** on Android 13 and later nothing is shown until the user
+  grants the notification permission, including updates started by a
+  remote message. ([source][android-permission])
+
+[ios-activitykit]: https://developer.apple.com/documentation/activitykit/displaying-live-data-with-live-activities
+[ios-push]: https://developer.apple.com/documentation/activitykit/starting-and-updating-live-activities-with-activitykit-push-notifications
+[ios-hig]: https://developer.apple.com/design/human-interface-guidelines/live-activities
+[ios-hig-specs]: https://developer.apple.com/design/human-interface-guidelines/live-activities#Specifications
+[android-live-update]: https://developer.android.com/develop/ui/views/notifications/live-update
+[android-permission]: https://developer.android.com/develop/ui/views/notifications/notification-permission
 
 ## Usage
 
@@ -242,7 +317,7 @@ Where a press is delivered:
 | Button | App in the foreground | App in the background or not running |
 | --- | --- | --- |
 | Without `opensApp` | `onAction`; the [background handler](#handling-presses-while-the-app-is-not-running) if no listener takes it | the background handler; without one, queued until the app listens in the foreground |
-| `opensApp: true` | opens the app, then `onAction`; the background handler if no listener takes it within 5 seconds | the same |
+| `opensApp: true` | `onAction`; the background handler if no listener takes it within 5 seconds | opens the app, then `onAction`; the background handler if no listener takes it within 5 seconds |
 
 - Buttons without `opensApp` run without opening the app: on iOS through
   `LiveUpdatesActionIntent` (a `LiveActivityIntent` that `create_widget`

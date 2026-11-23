@@ -6,7 +6,7 @@ version: 0.1.1
 homepage: https://github.com/metal-president/live_updates
 repository: https://github.com/metal-president/live_updates/tree/main/packages/live_updates
 issue_tracker: https://github.com/metal-president/live_updates/issues
-topics: [live-activities, notifications, ios, android, widget]
+topics: [live-activities, notifications, ios, android, dynamic-island]
 screenshots:
   - description: iOS Live Activity on the Lock Screen with buttons, a timer and progress.
     path: doc/screenshots/ios_lock_screen.png

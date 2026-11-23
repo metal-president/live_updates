@@ -83,10 +83,21 @@ started with `pushUpdates: true` (to update or end it).
 
 | Type | Platform | Send with |
 | --- | --- | --- |
-| `fcmInstallationId` | all | `message.fid` |
-| `fcmRegistrationToken` (opt-in, legacy) | all | `message.token` |
-| `pushToStart` | iOS 17.2+ | `message.apns.live_activity_token`, `"event": "start"` |
-| `activity` (with `updateId` and `key`) | iOS | `message.apns.live_activity_token`, `"event": "update"` / `"end"` |
+| `fcmInstallationId` | Android, iOS | `message.fid` |
+| `fcmRegistrationToken` (opt-in, legacy) | Android, iOS | `message.token` |
+| `pushToStart` | iOS 17.2+ | `message.apns.live_activity_token`, `"event": "start"`, together with `message.fid` |
+| `activity` (with `updateId` and `key`) | iOS | `message.apns.live_activity_token`, `"event": "update"` / `"end"`, together with `message.fid` |
+
+The Live Activity tokens do not address the device on their own: an iOS
+message also needs a target: the installation ID (`message.fid`), or
+`message.token` if you use the legacy registration token instead, as in
+[docs/server-fcm.md](https://github.com/metal-president/live_updates/blob/main/docs/server-fcm.md#ios-envelope).
+
+`fcmRegistrationToken` is only for apps that cannot use installation IDs
+yet. Firebase does not issue registration tokens while installation IDs are
+turned on (step 3 of [Getting started](#getting-started)), so
+`tokens(includeRegistrationToken: true)` reports an error instead of a token
+in that setup. Use one of the two, not both.
 
 ```dart
 LiveUpdatesFcm.tokens().listen(
@@ -109,6 +120,10 @@ token when its live update ends. Each activity token carries the update's
 `key` (the key given to `startOrUpdate`, or `attributes.key` of a
 push-to-start), so your server can match it with the `live_updates_id` it
 sends to Android. A new subscription first receives the tokens already known.
+
+On iOS, Live Activity pushes count toward a per-hour budget; see
+[Platform limits](https://pub.dev/packages/live_updates#platform-limits)
+for `apns-priority` and frequent updates.
 
 Tokens allow pushing to the device: send them over an authenticated
 connection, store them per authenticated user and device on your server (the
@@ -142,6 +157,15 @@ shows complete messages for both platforms. For Android, send a data message
 | `live_updates_id` | Your id; later messages with the same id update the same notification |
 | `live_updates_content` | JSON string with the keys of `LiveUpdateContent` (`title`, `body`, `progress`, `timerEnd`, `actions`, ...) and Android options |
 | `live_updates_dismiss_after` | Optional, seconds to keep the final content on `end` (without it, it stays until dismissed) |
+
+High priority lets the message wake the device, but Firebase Cloud
+Messaging can lower the priority of an app's later messages when high
+priority messages often show nothing to the user. Send high priority only
+for messages that start or visibly change a live update, and stop sending
+updates for a live update that the user dismissed (the app ignores them).
+The app has a few seconds to handle each message, which is enough for
+`handleMessage` but not for extra network calls in the same handler.
+([source](https://firebase.google.com/docs/cloud-messaging/android-message-priority))
 
 [`tool/send_push.dart`](https://github.com/metal-president/live_updates/blob/main/packages/live_updates/tool/send_push.dart)
 sends these messages for testing.

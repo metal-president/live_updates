@@ -463,14 +463,15 @@ final class IosLiveUpdateOptions {
   /// and the Dynamic Island keyline. `null` keeps the system colors. The
   /// Android counterpart is [AndroidLiveUpdateOptions.color].
   ///
-  /// The default Lock Screen card is white in Light Mode and black in Dark
-  /// Mode, and the Dynamic Island is always black, so pick a color that reads
-  /// well on both. While the Always-On display dims the Lock Screen, the
+  /// The default Lock Screen card is dark (on iOS 27 black in Light and Dark
+  /// Mode alike; Apple's documentation describes a white card in Light Mode,
+  /// which earlier versions may show), and the Dynamic Island is always
+  /// black, so pick a color that reads well on dark and on white. While the Always-On display dims the Lock Screen, the
   /// system colors are used.
   final Color? color;
 
   /// Background of the Lock Screen presentation. `null` keeps the system
-  /// background (white in Light Mode, black in Dark Mode). With a custom
+  /// background (black on iOS 27; see [color]). With a custom
   /// background, also set [foregroundColor].
   final Color? backgroundColor;
 

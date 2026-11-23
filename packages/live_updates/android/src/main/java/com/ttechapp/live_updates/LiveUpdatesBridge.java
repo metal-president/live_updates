@@ -946,8 +946,9 @@ public final class LiveUpdatesBridge {
                 : (double) currentStep / (stepCount - 1);
         b.setStyle(progressStyle(c, content, fraction));
       }
-      // Android 16+ Live Updates keep the sub text as before (ProgressStyle and
-      // MetricStyle show it as a line of its own).
+      // Android 16+ (liveUpdate, ongoing) keeps the sub text as before:
+      // ProgressStyle and MetricStyle show it as a line of its own; without a
+      // style it stays in the header.
       styled = true;
     } else if (hasProgress) {
       b.setProgress(100, progress, false);

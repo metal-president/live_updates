@@ -72,9 +72,10 @@ final class LiveUpdateContent {
 
   /// Values such as a score, a distance or a countdown (up to three are
   /// used). iOS shows them with [IosLiveUpdateLayout.metrics]; Android 17
-  /// shows them with `MetricStyle` instead of the progress bar (and without
-  /// the body), older versions add the number and text metrics to the text
-  /// (use [timer] for a countdown there).
+  /// (except [AndroidLiveUpdateMode.classic]) shows them with `MetricStyle`
+  /// instead of the progress bar (and without the body); otherwise Android
+  /// adds the number and text metrics to the text (use [timer] for a
+  /// countdown there).
   ///
   /// Keep labels short: Android recommends 10 characters or fewer.
   final List<LiveUpdateMetric> metrics;
@@ -88,8 +89,7 @@ final class LiveUpdateContent {
   /// placed to delivered. iOS shows them with [IosLiveUpdateLayout.stepper];
   /// Android 16+ turns them into progress segments and points (unless
   /// [AndroidLiveUpdateOptions.progressSegments] or `progressPoints` are
-  /// set) and shows the
-  /// current stage in the text.
+  /// set) and shows the current stage in the text.
   final LiveUpdateSteps? steps;
 
   /// Where something travels from and to. iOS shows it with

@@ -4,7 +4,7 @@
 #
 Pod::Spec.new do |s|
   s.name             = 'live_updates'
-  s.version          = '0.1.1'
+  s.version          = '0.1.2'
   s.summary          = 'iOS Live Activities and Android Live Update notifications with one Dart API.'
   s.description      = <<-DESC
 iOS Live Activities and Android Live Update notifications with one Dart API.

@@ -4,9 +4,10 @@
   Android 15 and earlier) with a body, the steps, journey and metrics text is
   a second line of the expanded notification instead of being cut off in the
   header.
-- Docs: screenshots of each layout on iOS and Android. The default Lock
-  Screen card is black in Light and Dark Mode on iOS 27 (checked on a
-  device), not white in Light Mode as 0.1.0 said.
+- Docs: screenshots of each layout on iOS and Android. In tests on iOS 27
+  (device and simulator) the default Lock Screen card was black in Light and
+  Dark Mode; 0.1.0 said white in Light Mode, as Apple's guidelines describe
+  for Light Mode (which other versions or setups may still show).
 - Docs: README reorganized (shorter getting started, a table of where button
   presses go, one Upgrading section) and the first usage example fixed.
 

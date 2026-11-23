@@ -463,15 +463,17 @@ final class IosLiveUpdateOptions {
   /// and the Dynamic Island keyline. `null` keeps the system colors. The
   /// Android counterpart is [AndroidLiveUpdateOptions.color].
   ///
-  /// The default Lock Screen card is dark (on iOS 27 black in Light and Dark
-  /// Mode alike; Apple's documentation describes a white card in Light Mode,
-  /// which earlier versions may show), and the Dynamic Island is always
-  /// black, so pick a color that reads well on dark and on white. While the Always-On display dims the Lock Screen, the
+  /// In tests on iOS 27 the default Lock Screen card was black in Light and
+  /// Dark Mode alike; Apple's guidelines describe a light background in Light
+  /// Mode, which other versions or setups may show. The Dynamic Island is
+  /// always black. Pick a color that reads well on dark and on light
+  /// backgrounds. While the Always-On display dims the Lock Screen, the
   /// system colors are used.
   final Color? color;
 
   /// Background of the Lock Screen presentation. `null` keeps the system
-  /// background (black on iOS 27; see [color]). With a custom
+  /// background (black in tests on iOS 27; possibly light in Light Mode
+  /// elsewhere, see [color]). With a custom
   /// background, also set [foregroundColor].
   final Color? backgroundColor;
 
@@ -558,8 +560,8 @@ final class IosLiveUpdateLayout {
 /// ([IosLiveUpdateOptions.compactTrailing], [IosLiveUpdateOptions.minimal]).
 ///
 /// Text (title, body, extra) is left out when the island is limited in width
-/// (iOS 27, for example in landscape). A customized widget can read the choice as
-/// `context.state.compactTrailing` / `context.state.minimal`.
+/// (iOS 27, for example in landscape). A customized widget can read the
+/// choice as `context.state.compactTrailing` / `context.state.minimal`.
 @immutable
 final class IosIslandContent {
   const IosIslandContent._(this.value);

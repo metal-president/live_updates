@@ -1,7 +1,9 @@
-## Unreleased
+## 0.1.1
 
-- Docs: README adds getting started steps, the imports of the example and
-  which tokens each platform needs.
+- Docs: README adds getting started steps, including turning on Firebase
+  Installation IDs (Android manifest and iOS Info.plist keys) that
+  `LiveUpdatesFcm.tokens()` needs, the notification permission, the imports
+  of the example and which tokens each platform needs.
 
 ## 0.1.0
 

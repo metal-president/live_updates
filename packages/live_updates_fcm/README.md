@@ -19,11 +19,33 @@ live_updates works without it.
 2. Set up Firebase and
    [`firebase_messaging`](https://pub.dev/packages/firebase_messaging) as
    usual.
-3. Add the package:
+3. Turn on Firebase Installation IDs, which `LiveUpdatesFcm.tokens()`
+   reports (they are off by default):
+
+   - Android, inside `<application>` in `android/app/src/main/AndroidManifest.xml`:
+
+     ```xml
+     <meta-data
+         android:name="firebase_messaging_installation_id_enabled"
+         android:value="true" />
+     ```
+
+   - iOS, in `ios/Runner/Info.plist`:
+
+     ```xml
+     <key>FirebaseMessagingInstallationIdEnabled</key>
+     <true/>
+     ```
+
+4. Add the package:
 
    ```bash
    flutter pub add live_updates_fcm
    ```
+
+On Android 13 and later, live updates appear only after the user grants the
+notification permission (`LiveUpdates.requestPermission()`), including ones
+started by a message.
 
 ## Usage
 
@@ -77,7 +99,8 @@ LiveUpdatesFcm.tokens().listen(
   // Token sources can fail (for example before APNs is ready on iOS).
   onError: (Object error) => debugPrint('Token error: $error'),
 );
-// The installation ID is reported once the app registers with FCM.
+// The installation ID is reported once the app registers with FCM, which
+// happens on its own unless auto-init is turned off; then register:
 await FirebaseMessaging.instance.register();
 ```
 

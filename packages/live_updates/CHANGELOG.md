@@ -1,4 +1,4 @@
-## Unreleased
+## 0.1.1
 
 - Android: in a regular notification (`AndroidLiveUpdateMode.classic`, and
   Android 15 and earlier) with a body, the steps, journey and metrics text is
@@ -9,7 +9,8 @@
   Dark Mode; 0.1.0 said white in Light Mode, as Apple's guidelines describe
   for Light Mode (which other versions or setups may still show).
 - Docs: README reorganized (shorter getting started, a table of where button
-  presses go, one Upgrading section) and the first usage example fixed.
+  presses go, one Upgrading section) and the first usage example fixed;
+  accuracy fixes (Android 17 metrics in `classic`, imports in examples).
 
 ## 0.1.0
 

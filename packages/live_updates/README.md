@@ -155,30 +155,32 @@ Interface Guidelines for Live Activities and Android's
 ```dart
 import 'package:live_updates/live_updates.dart';
 
-if (!await LiveUpdates.requestPermission()) return;
+Future<void> trackOrder() async {
+  if (!await LiveUpdates.requestPermission()) return;
 
-final update = await LiveUpdates.start(
-  const LiveUpdateContent(
-    title: 'Order #1234',
-    body: 'Preparing',
-    progress: 0.1,
-    route: '/orders/1234',
-    android: AndroidLiveUpdateOptions(shortCriticalText: '10 min'),
-  ),
-);
+  final update = await LiveUpdates.start(
+    const LiveUpdateContent(
+      title: 'Order #1234',
+      body: 'Preparing',
+      progress: 0.1,
+      route: '/orders/1234',
+      android: AndroidLiveUpdateOptions(shortCriticalText: '10 min'),
+    ),
+  );
 
-await update.update(
-  const LiveUpdateContent(title: 'Order #1234', body: 'On the way', progress: 0.6),
-);
+  await update.update(
+    const LiveUpdateContent(title: 'Order #1234', body: 'On the way', progress: 0.6),
+  );
 
-// Lifecycle: stale (iOS), ended, dismissed (e.g. swiped away on Android).
-update.states.listen((state) => print(state));
+  // Lifecycle: stale (iOS), ended, dismissed (e.g. swiped away on Android).
+  update.states.listen((state) => print(state));
 
-// iOS keeps the final content on the Lock Screen for 5 minutes. Android
-// removes the notification now; pass finalContent to keep that content as a
-// regular notification for 5 minutes (Android 8.0+; on Android 7 until the
-// user dismisses it).
-await update.end(dismissAfter: const Duration(minutes: 5));
+  // iOS keeps the final content on the Lock Screen for 5 minutes. Android
+  // removes the notification now; pass finalContent to keep that content as a
+  // regular notification for 5 minutes (Android 8.0+; on Android 7 until the
+  // user dismisses it).
+  await update.end(dismissAfter: const Duration(minutes: 5));
+}
 ```
 
 ### Taps and running updates
@@ -262,6 +264,9 @@ app is not running. The plugin starts a headless Flutter engine, runs the
 handler and shuts the engine down:
 
 ```dart
+import 'package:flutter/widgets.dart';
+import 'package:live_updates/live_updates.dart';
+
 @pragma('vm:entry-point')
 Future<void> onBackgroundAction(LiveUpdateActionEvent event) async {
   if (event.actionId == 'cancel') {
@@ -342,11 +347,11 @@ LiveUpdateContent(
 | --- | --- | --- | --- |
 | `standard` (default) | image, title, body, progress bar | `progress` | progress bar |
 | `timer` | a large countdown or stopwatch | `timer` | chronometer |
-| `metrics` | up to three labeled values | `metrics` | Android 17 `MetricStyle`; older versions add number and text metrics to the text |
+| `metrics` | up to three labeled values | `metrics` | Android 17 `MetricStyle` (not in `classic`); otherwise number and text metrics in the text |
 | `stepper` | stages as dots, the current one highlighted | `steps` | Android 16+ progress segments and points; "2/4 Preparing" in the text |
 | `journey` | from and to with the progress between them | `journey`, `progress` | "Shop → Home" in the text |
 
-The same content on each platform (the example app; iOS 27 Lock Screen,
+Similar content on each platform (the example app; iOS 27 Lock Screen,
 Android 17 notification shade):
 
 | Layout | iOS | Android Live Update | Android ongoing notification |

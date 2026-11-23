@@ -25,8 +25,9 @@ Every release of `live_updates` and `live_updates_fcm` follows these steps.
    CI compiles the Dart examples of both READMEs
    (`tool/check_readme_snippets.dart`); this review covers what it cannot.
 4. **Pull request.** Bump versions and changelogs, open a PR and wait for all
-   CI jobs (`analyze-test`, `build-android`, `build-ios (swiftpm)`,
-   `build-ios (cocoapods)`) to pass, then squash-merge.
+   CI jobs (`analyze-test`, `android-unit-test`, `ios-unit-test`,
+   `build-android`, `build-ios (swiftpm)`, `build-ios (cocoapods)` and the
+   integration tests) to pass, then squash-merge.
 5. **Publish** from a clean, up-to-date `main`: `dart pub publish --dry-run`
    (0 warnings), then `dart pub publish` for `live_updates` first and
    `live_updates_fcm` after the new core version is visible on pub.dev.

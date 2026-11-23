@@ -377,9 +377,11 @@ sets the accent (progress, buttons, timer, Dynamic Island keyline), the Lock
 Screen background and its text color, like `AndroidLiveUpdateOptions.color`
 on Android.
 
-- By default the Lock Screen card is white in Light Mode and black in Dark
-  Mode, and the Dynamic Island is always black, so choose an accent that
-  reads well on both.
+- In our tests on iOS 27 (device and simulator), the default Lock Screen
+  card was black in Light and Dark Mode alike. Apple's guidelines describe a
+  light background in Light Mode, which other versions or setups may show.
+  The Dynamic Island is always black. Choose an accent that reads well on
+  dark and on light backgrounds.
 - With a custom background, set the text color too, for example
   `backgroundColor: Colors.white, foregroundColor: Colors.black`.
 - While the Always-On display dims the Lock Screen, the system colors are

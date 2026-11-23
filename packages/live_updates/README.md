@@ -2,13 +2,26 @@
 
 iOS **Live Activities** and Android **Live Update** notifications with one Dart API.
 
-- One API to start, update and end a live update: title, body, progress, a system-counted timer, an image, buttons and a tap route.
-- Five built-in iOS layouts (standard, timer, metrics, stepper, journey), chosen per update; Android shows the same content as progress stages, metrics or text.
-- iOS 17.2+: ActivityKit Live Activities on the Lock Screen and in the Dynamic Island, with a ready-made SwiftUI widget you generate and customize.
-- Android: ongoing notifications that Android 16 renders with `ProgressStyle` and, on builds that support promoted notifications (Android 16 QPR1 and later), promotes to Live Updates with a status bar chip. Older Android versions show a regular ongoing notification with a progress bar.
-- Remote updates: iOS push-to-start and per-activity push tokens as streams; Android updates from a received payload (FCM glue lives in [`live_updates_fcm`](https://pub.dev/packages/live_updates_fcm)).
-- No platform channels: native code is called through [FFIgen](https://pub.dev/packages/ffigen) (iOS) and [JNIgen](https://pub.dev/packages/jnigen) (Android). Runtime dependencies are only Dart and Flutter team packages (`ffi`, `objective_c`, `jni`, `crypto`, `meta`).
-- Other platforms are a safe no-op.
+- **One API for both platforms:** start, update and end with a title, body,
+  progress, a system-counted timer, an image, buttons and a tap route.
+- **iOS 17.2+:** Lock Screen and Dynamic Island, with five built-in layouts
+  (standard, timer, metrics, stepper, journey) and a SwiftUI widget you
+  generate with one command and can customize.
+- **Android:** `ProgressStyle` notifications on Android 16+, promoted to a
+  Live Update with a status bar chip when the system allows it (Android 16
+  QPR1 and later), and an ongoing notification with a progress bar on older
+  versions.
+- **Remote updates:** start, update and end from your server (APNs on iOS, a
+  data message on Android; optional FCM helper:
+  [`live_updates_fcm`](https://pub.dev/packages/live_updates_fcm)).
+- **Lightweight:** no platform channels (native code is called through
+  [FFIgen](https://pub.dev/packages/ffigen) and
+  [JNIgen](https://pub.dev/packages/jnigen)), and runtime dependencies are only
+  Dart and Flutter team packages (`ffi`, `objective_c`, `jni`, `crypto`,
+  `meta`). Other platforms are a safe no-op.
+
+In this README, a *live update* is either a Live Activity (iOS) or a Live
+Update notification (Android).
 
 > **Status:** 0.1.x. Breaking changes come with a new minor version (0.2.0); pin the version you test with.
 
@@ -20,7 +33,20 @@ iOS **Live Activities** and Android **Live Update** notifications with one Dart 
 
 Screenshots of the example app in this repository.
 
+## Contents
+
+- [Platform support](#platform-support)
+- [Getting started](#getting-started)
+- [Platform guidelines](#platform-guidelines)
+- [Usage](#usage)
+- [Customizing the iOS widget](#customizing-the-ios-widget)
+- [Remote updates](#remote-updates)
+- [Upgrading](#upgrading)
+- [How it works](#how-it-works)
+
 ## Platform support
+
+**Requirements:** Flutter 3.50+, iOS 17.2+, Android 7.0 (API 24)+.
 
 | | iOS | Android 16+ | Android 7–15 | Other |
 | --- | --- | --- | --- | --- |
@@ -38,9 +64,9 @@ Screenshots of the example app in this repository.
 | Remote updates | push to the system (APNs, or FCM), no app code | data message → `handleRemotePayload` | data message → `handleRemotePayload` | |
 | One push to many devices | broadcast channels (iOS 18+) | FCM topics | FCM topics | |
 
-Requirements: Flutter 3.50+, iOS 17.2+, Android 7.0 (API 24)+. Promotion to
-a Live Update needs Android 16 QPR1 or later; the "Android 16+" column
-otherwise describes an ongoing notification with those features.
+"Android 16+" shows a Live Update when the system promotes it (Android 16
+QPR1 and later); otherwise it is an ongoing notification with the same
+features.
 
 ## Getting started
 
@@ -50,28 +76,26 @@ flutter pub add live_updates
 
 ### iOS
 
-1. Generate the widget extension from your app's root directory:
+1. From your app's root directory, generate the widget extension:
 
    ```bash
    dart run live_updates:create_widget
    ```
 
    This writes `ios/LiveUpdatesWidget/`, adds a *LiveUpdatesWidget* extension
-   target to `Runner.xcodeproj` (using the `xcodeproj` Ruby gem that ships with
-   CocoaPods), sets `NSSupportsLiveActivities` and registers the
-   `liveupdates-<bundle id>` URL scheme used for taps. Use `--no-xcode` to only
-   write the files and add the target yourself (File > New > Target > Widget
-   Extension, deployment target 17.2).
+   target to `Runner.xcodeproj`, sets `NSSupportsLiveActivities`, and sets up
+   the URL scheme for taps (`liveupdates-<bundle id>`) and the App Group for
+   [images](#images). It needs Ruby with the `xcodeproj` gem (included with
+   CocoaPods) and offers to run `gem install --user-install xcodeproj` if it
+   is missing.
 
-   Flavors are supported: every build configuration (for example
-   `Debug-dev`, `Release-prod`) gets a widget bundle id and an App Group
-   derived from that configuration's app bundle id (`LIVE_UPDATES_APP_GROUP`
-   build setting). If the bundle id is defined in an `.xcconfig` instead of
-   the project, pass `--app-group group.<bundle id>`.
-
-   The command needs Ruby with the `xcodeproj` gem (included with
-   CocoaPods). If it is missing, the command offers to run
-   `gem install --user-install xcodeproj` for you.
+   - **Flavors:** every build configuration (for example `Debug-dev`,
+     `Release-prod`) gets a widget bundle id and an App Group derived from
+     its app bundle id (`LIVE_UPDATES_APP_GROUP` build setting). If the bundle
+     id is set in an `.xcconfig` instead of the project, pass
+     `--app-group group.<bundle id>`.
+   - **Manual setup:** pass `--no-xcode` to only write the files, then follow
+     [Manual setup](#manual-setup).
 
 2. Open the project in Xcode once and select a signing team for the new target.
 
@@ -93,52 +117,6 @@ With `--no-xcode` only the widget sources are written. Then, in Xcode:
 4. For images: add the App Groups capability with the same group to both
    targets and set `LiveUpdatesAppGroup` to that group in both Info.plist
    files.
-
-#### Customizing the widget
-
-`create_widget` writes two kinds of files to `ios/LiveUpdatesWidget/`:
-
-- **Yours to edit**: `LiveUpdatesWidgetLiveActivity.swift` (the layout of the
-  Lock Screen and every Dynamic Island presentation), the widget bundle and
-  `Info.plist`. Running `create_widget` again keeps them; `--force` replaces
-  them.
-- **Owned by the plugin**: `LiveUpdatesAttributes.swift`,
-  `LiveUpdatesViews.swift` (the building blocks the layout uses, such as
-  `LiveUpdatesLockScreen` and `LiveUpdatesCompactTrailing`) and
-  `LiveUpdatesActionIntent.swift`. Running `create_widget` again replaces
-  them, so run it after updating live_updates. Do not edit them: copy a view
-  into your layout file to change it.
-
-In the layout, `context.state` has every field of `LiveUpdateContent`, and
-`context.state.extra["driver"]` reads `IosLiveUpdateOptions.extra`, for
-values the template does not show.
-
-Without touching Swift, choose what the small Dynamic Island areas show:
-
-```dart
-ios: const IosLiveUpdateOptions(
-  extra: {'gate': 'B12'},
-  compactTrailing: IosIslandContent.extra('gate'), // or progress, timer, title, body
-  minimal: IosIslandContent.timer,                  // or progress, icon, ...
-),
-```
-
-Colors work the same way: `IosLiveUpdateOptions(color: ..., backgroundColor:
-..., foregroundColor: ...)` sets the accent (progress, buttons, timer, Dynamic
-Island keyline), the Lock Screen background and its text color, like
-`AndroidLiveUpdateOptions.color` on Android. By default the Lock Screen card
-is white in Light Mode and black in Dark Mode, and the Dynamic Island is
-always black, so choose an accent that reads well on both. With a custom
-background, set the text color too, for example `backgroundColor:
-Colors.white, foregroundColor: Colors.black`. While the Always-On display dims
-the Lock Screen, the system colors are used.
-
-Content that is missing (such as `progress` without a progress) falls back to
-the default, and text is left out when the island is limited in width (iOS 27,
-for example in landscape). These options need a layout that uses `LiveUpdatesCompactTrailing`
-and `LiveUpdatesMinimal`, as generated now: a layout generated by an older
-version ignores them until you run `create_widget --force` or switch to those
-views.
 
 ### Android
 
@@ -172,31 +150,40 @@ Interface Guidelines for Live Activities and Android's
 
 ## Usage
 
+### Start, update and end
+
 ```dart
 import 'package:live_updates/live_updates.dart';
 
-if (await LiveUpdates.requestPermission()) {
-  final update = await LiveUpdates.start(
-    const LiveUpdateContent(
-      title: 'Order #1234',
-      body: 'Preparing',
-      progress: 0.1,
-      route: '/orders/1234',
-      android: AndroidLiveUpdateOptions(shortCriticalText: '10 min'),
-    ),
-  );
+if (!await LiveUpdates.requestPermission()) return;
 
-  await update.update(
-    const LiveUpdateContent(title: 'Order #1234', body: 'On the way', progress: 0.6),
-  );
+final update = await LiveUpdates.start(
+  const LiveUpdateContent(
+    title: 'Order #1234',
+    body: 'Preparing',
+    progress: 0.1,
+    route: '/orders/1234',
+    android: AndroidLiveUpdateOptions(shortCriticalText: '10 min'),
+  ),
+);
 
-  // iOS keeps the last content on the Lock Screen for 5 minutes. Android
-  // removes the notification now, unless you pass finalContent: then that
-  // content stays as a regular notification for the duration (Android 8.0+;
-  // on Android 7 until the user dismisses it).
-  await update.end(dismissAfter: const Duration(minutes: 5));
-}
+await update.update(
+  const LiveUpdateContent(title: 'Order #1234', body: 'On the way', progress: 0.6),
+);
 
+// Lifecycle: stale (iOS), ended, dismissed (e.g. swiped away on Android).
+update.states.listen((state) => print(state));
+
+// iOS keeps the final content on the Lock Screen for 5 minutes. Android
+// removes the notification now; pass finalContent to keep that content as a
+// regular notification for 5 minutes (Android 8.0+; on Android 7 until the
+// user dismisses it).
+await update.end(dismissAfter: const Duration(minutes: 5));
+```
+
+### Taps and running updates
+
+```dart
 // Taps on a live update deliver its route. Only routes that one of the
 // app's live updates carries are delivered, but treat them like any deep
 // link: validate before acting on them.
@@ -207,9 +194,6 @@ final running = await LiveUpdates.active();
 
 // Live updates that appear while the app runs, including remote starts.
 LiveUpdates.onStarted.listen((update) => track(update));
-
-// Lifecycle: stale (iOS), ended, dismissed (e.g. swiped away on Android).
-update.states.listen((state) => print(state));
 
 await LiveUpdates.endAll();
 ```
@@ -251,21 +235,25 @@ LiveUpdates.onAction.listen((event) {
 });
 ```
 
-- Buttons without `opensApp` run in the background: on iOS through
+Where a press is delivered:
+
+| Button | App in the foreground | App in the background or not running |
+| --- | --- | --- |
+| Without `opensApp` | `onAction`; the [background handler](#handling-presses-while-the-app-is-not-running) if no listener takes it | the background handler; without one, queued until the app listens in the foreground |
+| `opensApp: true` | opens the app, then `onAction`; the background handler if no listener takes it within 5 seconds | the same |
+
+- Buttons without `opensApp` run without opening the app: on iOS through
   `LiveUpdatesActionIntent` (a `LiveActivityIntent` that `create_widget`
   compiles into both the app and the widget), on Android through a broadcast
-  receiver. The press is delivered to `onAction` while the app is in the
-  foreground. Otherwise it runs the background handler (below), or, without
-  one, it is queued and delivered once the app listens in the foreground;
-  use `opensApp: true` when the press must open the app.
-- `opensApp: true` opens the app and delivers the press to `onAction`. If no
-  listener takes it within 5 seconds, the background handler runs it.
+  receiver. Use `opensApp: true` when the press must open the app.
 - `LiveUpdate.actions` receives only that update's presses; presses of other
   updates go to `onAction` or the background handler.
-- Background presses work on the Lock Screen without unlocking the device.
-  Set `requiresUnlock: true` on buttons with consequences, such as cancelling
-  an order: iOS asks for Face ID or the passcode first, and Android 12+ asks
-  the user to unlock.
+- Presses work on the Lock Screen without unlocking the device. Set
+  `requiresUnlock: true` on buttons with consequences, such as cancelling an
+  order: iOS asks for Face ID or the passcode first, and Android 12+ asks the
+  user to unlock.
+- Android shows up to three actions. On iOS keep labels short: the whole
+  content must stay under ActivityKit's 4 KB limit.
 
 #### Handling presses while the app is not running
 
@@ -293,9 +281,6 @@ Future<void> main() async {
 }
 ```
 
-- The handler runs for every press while the app is in the background (the
-  system keeps the app alive for it), and in the foreground for presses that
-  no `onAction` (or that update's `LiveUpdate.actions`) listener takes.
 - It must be a top-level or static function with
   `@pragma('vm:entry-point')`, and it has limited time (about 9 seconds on
   Android, 25 seconds on iOS).
@@ -310,11 +295,6 @@ Future<void> main() async {
   ```
 
   On Android, plugins are registered automatically.
-- Apps that set up the widget with an older version should run
-  `dart run live_updates:create_widget` again to update
-  `LiveUpdatesActionIntent.swift`.
-- Android shows up to three actions. On iOS keep labels short: the whole
-  content must stay under ActivityKit's 4 KB limit.
 
 ### Timers
 
@@ -387,22 +367,38 @@ show.
 A layout whose data is missing falls back to `standard`. The expanded Dynamic
 Island shows the metrics, steps or journey of the chosen layout in place of
 the body (there is no room for both), and buttons stay at the bottom of every
-layout. The layout can change with each update.
+layout. The layout can change with each update. For a layout of your own, see
+[Custom layouts](#custom-layouts).
 
-For a layout of your own, pass `IosLiveUpdateLayout.custom('name')` and add a
-case to the switch in `LiveUpdatesWidgetLiveActivity.swift`:
+### Colors and the Dynamic Island
 
-```swift
-switch context.state.layout {
-case "name": MyLayout(state: context.state)
-default: LiveUpdatesLockScreen(state: context.state, activityID: context.activityID)
-}
+`IosLiveUpdateOptions(color: ..., backgroundColor: ..., foregroundColor: ...)`
+sets the accent (progress, buttons, timer, Dynamic Island keyline), the Lock
+Screen background and its text color, like `AndroidLiveUpdateOptions.color`
+on Android.
+
+- By default the Lock Screen card is white in Light Mode and black in Dark
+  Mode, and the Dynamic Island is always black, so choose an accent that
+  reads well on both.
+- With a custom background, set the text color too, for example
+  `backgroundColor: Colors.white, foregroundColor: Colors.black`.
+- While the Always-On display dims the Lock Screen, the system colors are
+  used.
+
+Choose what the small Dynamic Island areas show:
+
+```dart
+ios: const IosLiveUpdateOptions(
+  extra: {'gate': 'B12'},
+  compactTrailing: IosIslandContent.extra('gate'), // or progress, timer, title, body
+  minimal: IosIslandContent.timer,                  // or progress, icon, ...
+),
 ```
 
-Run `dart run live_updates:create_widget` after updating live_updates to get
-the built-in layouts (it updates `LiveUpdatesViews.swift` and keeps your
-layout file). A layout file generated by an older version has no switch; add
-it yourself, or regenerate the file with `--force` after copying your changes.
+If the chosen content is missing (such as `progress` without a progress), the
+default is shown. Text is left out when the island is narrow, for example in
+landscape on iOS 27. A layout file generated by an older version may ignore
+these options; see [Upgrading](#upgrading).
 
 ### Android display modes
 
@@ -445,13 +441,14 @@ LiveUpdateContent(
 );
 ```
 
-`progress` still runs from 0 to 1 over the whole bar, and the segments,
-points and tracker icon need it (or `steps`). Explicit segments and points take
-precedence over those made from `steps`. On Android 17 `metrics` replace the
-progress bar; below Android 16 the segments, points and tracker icon are ignored. The
-timeout counts from the latest post, and requested alerts are limited to one
-per update every 10 seconds. The iOS equivalent of `alert`
-is `IosLiveUpdateOptions.alert`.
+- `progress` still runs from 0 to 1 over the whole bar. Segments, points and
+  the tracker icon need it (or `steps`); explicit segments and points take
+  precedence over those made from `steps`.
+- Below Android 16 segments, points and the tracker icon are ignored. On
+  Android 17 `metrics` replace the progress bar.
+- `timeoutAfter` counts from the latest post.
+- Requested alerts are limited to one per update every 10 seconds. The iOS
+  equivalent of `alert` is `IosLiveUpdateOptions.alert`.
 
 ### Android 17 metrics and semantic colors
 
@@ -459,15 +456,15 @@ On Android 17 a Live Update with `metrics` (see [Layouts](#layouts)) shows
 them with `MetricStyle` instead of the progress bar. Timers and stopwatches
 are counted by the system, so they keep running between updates.
 `criticalMetric` picks the one that may appear in the status bar chip.
-Semantic styles let Android color the body text, the progress bar or a metric
-by meaning (info, safe, caution, danger); the system picks the colors and
-applies them to promoted Live Updates.
 
 While metrics are set, Android 17 does not show the body text (its metric
 template has no room for it), so put anything users must read in the title or
-in a `LiveUpdateMetric.text`. Below Android 17 the number and text metrics
-are added to the notification text, and semantic styles are ignored. The same
-keys work in remote payloads (see
+in a `LiveUpdateMetric.text`.
+
+Semantic styles let Android color the body text, the progress bar or a metric
+by meaning (info, safe, caution, danger); the system picks the colors and
+applies them to promoted Live Updates on Android 17. They are ignored on
+older versions. The same keys work in remote payloads (see
 [docs/testing-remote.md](https://github.com/metal-president/live_updates/blob/main/docs/testing-remote.md)).
 
 ### Images
@@ -501,6 +498,36 @@ Developer account. A customized widget loads an image with
 extension's asset catalog on iOS. Without it, the app icon (Android) or a
 system symbol (iOS widget template) is used.
 
+## Customizing the iOS widget
+
+`create_widget` writes two kinds of files to `ios/LiveUpdatesWidget/`:
+
+- **Yours to edit**: `LiveUpdatesWidgetLiveActivity.swift` (the layout of the
+  Lock Screen and every Dynamic Island presentation), the widget bundle and
+  `Info.plist`. Running `create_widget` again keeps them; `--force` replaces
+  them.
+- **Owned by the plugin**: `LiveUpdatesAttributes.swift`,
+  `LiveUpdatesViews.swift` (the building blocks the layout uses, such as
+  `LiveUpdatesLockScreen` and `LiveUpdatesCompactTrailing`) and
+  `LiveUpdatesActionIntent.swift`. Running `create_widget` again replaces
+  them. Do not edit them: copy a view into your layout file to change it.
+
+In the layout, `context.state` has every field of `LiveUpdateContent`, and
+`context.state.extra["driver"]` reads `IosLiveUpdateOptions.extra`, for
+values the template does not show.
+
+### Custom layouts
+
+For a layout of your own, pass `IosLiveUpdateLayout.custom('name')` and add a
+case to the switch in `LiveUpdatesWidgetLiveActivity.swift`:
+
+```swift
+switch context.state.layout {
+case "name": MyLayout(state: context.state)
+default: LiveUpdatesLockScreen(state: context.state, activityID: context.activityID)
+}
+```
+
 ## Remote updates
 
 The content JSON is the same on both platforms; only the push envelope
@@ -523,13 +550,26 @@ update.pushTokens.listen((token) => api.registerActivity(update.id, token.hex));
 ```
 
 Send pushes with `apns-push-type: liveactivity` and topic
-`<bundle id>.push-type.liveactivity`. The `content-state` uses the same keys as
-`LiveUpdateContent` (`title` is required): `title`, `body`, `progress`,
-`iconName`, `route`, `actions`, `extra`, `timerStart` / `timerEnd`
-(seconds since 1970), the island options `compactTrailing` / `minimal` and the
-colors `tintArgb` / `backgroundArgb` / `foregroundArgb` (ARGB integers).
-For push-to-start, set `"attributes-type": "LiveUpdatesAttributes"`,
-`"attributes": {"key": "<your id>"}` (or `{}` without a key) and an `alert`.
+`<bundle id>.push-type.liveactivity`. `content-state` uses the keys of
+`LiveUpdateContent` (`title` is required):
+
+```json
+{
+  "aps": {
+    "timestamp": 1893455400,
+    "event": "update",
+    "content-state": {"title": "Order #1234", "body": "On the way", "progress": 0.6}
+  }
+}
+```
+
+- Times (`timerStart`, `timerEnd`) are seconds since 1970, and colors
+  (`tintArgb`, `backgroundArgb`, `foregroundArgb`) are ARGB integers. Other
+  keys include `iconName`, `route`, `actions`, `extra` and the island options
+  `compactTrailing` / `minimal`.
+- For push-to-start, set `"attributes-type": "LiveUpdatesAttributes"`,
+  `"attributes": {"key": "<your id>"}` (or `{}` without a key) and an `alert`.
+
 [docs/server-fcm.md](https://github.com/metal-president/live_updates/blob/main/docs/server-fcm.md)
 has complete payloads.
 
@@ -549,8 +589,9 @@ final update = await LiveUpdates.start(
 - Enable **Broadcast Capability** for the App ID in your Apple Developer
   account (Identifiers > Push Notifications); Xcode cannot enable it.
 - Your server creates channels with APNs' channel management API and sends
-  `update` / `end` pushes to them; `tool/send_push.dart apns-channel` and
-  `apns-broadcast` show both requests.
+  `update` / `end` pushes to them;
+  [`tool/send_push.dart`](https://github.com/metal-president/live_updates/blob/main/packages/live_updates/tool/send_push.dart)
+  `apns-channel` and `apns-broadcast` show both requests.
 - Broadcasts cannot start activities. Start locally with `iosChannelId`, or
   send a push-to-start with `input-push-channel` so the started activity
   joins the channel.
@@ -573,7 +614,22 @@ With Firebase, [`live_updates_fcm`](https://pub.dev/packages/live_updates_fcm)
 does this for you.
 
 See [docs/testing-remote.md](https://github.com/metal-president/live_updates/blob/main/docs/testing-remote.md)
-for a step-by-step verification guide and `tool/send_push.dart` for a sender.
+for a step-by-step verification guide and
+[`tool/send_push.dart`](https://github.com/metal-president/live_updates/blob/main/packages/live_updates/tool/send_push.dart)
+for a sender.
+
+## Upgrading
+
+After updating live_updates, run `dart run live_updates:create_widget` again.
+It replaces the plugin-owned Swift files (`LiveUpdatesAttributes.swift`,
+`LiveUpdatesViews.swift`, `LiveUpdatesActionIntent.swift`), which brings new
+built-in layouts and button handling, and keeps your layout file.
+
+A layout file generated by an older version can miss newer features: the
+layout switch for [custom layouts](#custom-layouts), and the Dynamic Island
+options, which need `LiveUpdatesCompactTrailing` and `LiveUpdatesMinimal`.
+Add them yourself, or copy your changes aside, run
+`create_widget --force` and apply them again.
 
 ## How it works
 

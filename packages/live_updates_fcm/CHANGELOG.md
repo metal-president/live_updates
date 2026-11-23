@@ -1,3 +1,8 @@
+## Unreleased
+
+- Docs: README adds getting started steps, the imports of the example and
+  which tokens each platform needs.
+
 ## 0.1.0
 
 - `LiveUpdatesFcm.listen(onError:)`: a live_updates message that cannot be

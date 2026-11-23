@@ -110,6 +110,10 @@ token when its live update ends. Each activity token carries the update's
 push-to-start), so your server can match it with the `live_updates_id` it
 sends to Android. A new subscription first receives the tokens already known.
 
+On iOS, Live Activity pushes count toward a per-hour budget; see
+[Platform limits](https://pub.dev/packages/live_updates#platform-limits)
+for `apns-priority` and frequent updates.
+
 Tokens allow pushing to the device: send them over an authenticated
 connection, store them per authenticated user and device on your server (the
 client chooses `updateId` and `key`, so do not trust them across users), and
@@ -142,6 +146,15 @@ shows complete messages for both platforms. For Android, send a data message
 | `live_updates_id` | Your id; later messages with the same id update the same notification |
 | `live_updates_content` | JSON string with the keys of `LiveUpdateContent` (`title`, `body`, `progress`, `timerEnd`, `actions`, ...) and Android options |
 | `live_updates_dismiss_after` | Optional, seconds to keep the final content on `end` (without it, it stays until dismissed) |
+
+High priority lets the message wake the device, but Firebase Cloud
+Messaging can lower the priority of an app's later messages when high
+priority messages often show nothing to the user. Send high priority only
+for messages that start or visibly change a live update, and stop sending
+updates for a live update that the user dismissed (the app ignores them).
+The app has a few seconds to handle each message, which is enough for
+`handleMessage` but not for extra network calls in the same handler.
+([source](https://firebase.google.com/docs/cloud-messaging/android-message-priority))
 
 [`tool/send_push.dart`](https://github.com/metal-president/live_updates/blob/main/packages/live_updates/tool/send_push.dart)
 sends these messages for testing.

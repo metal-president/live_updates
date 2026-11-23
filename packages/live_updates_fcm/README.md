@@ -89,7 +89,8 @@ started with `pushUpdates: true` (to update or end it).
 | `activity` (with `updateId` and `key`) | iOS | `message.apns.live_activity_token`, `"event": "update"` / `"end"`, together with `message.fid` |
 
 The Live Activity tokens do not address the device on their own: an iOS
-message also needs the installation ID as its target (`message.fid`), as in
+message also needs a target: the installation ID (`message.fid`), or
+`message.token` if you use the legacy registration token instead, as in
 [docs/server-fcm.md](https://github.com/metal-president/live_updates/blob/main/docs/server-fcm.md#ios-envelope).
 
 `fcmRegistrationToken` is only for apps that cannot use installation IDs

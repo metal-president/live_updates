@@ -15,7 +15,7 @@ final class LiveUpdateContent {
     required this.title,
     this.body,
     this.progress,
-    this.iconName,
+    this.icon,
     this.route,
     this.image,
     this.actions = const [],
@@ -38,9 +38,15 @@ final class LiveUpdateContent {
   /// Progress between 0 and 1, or `null` when there is no progress bar.
   final double? progress;
 
-  /// Platform asset name of the icon (an Android drawable or mipmap, or an
-  /// image in the iOS widget extension's asset catalog).
-  final String? iconName;
+  /// Icon of the update on both platforms: the small icon of the Android
+  /// notification (status bar, Live Update chip) and the icon of the iOS
+  /// widget template (thumbnail when there is no [image], minimal Dynamic
+  /// Island).
+  ///
+  /// [AndroidLiveUpdateOptions.smallIcon] and [IosLiveUpdateOptions.icon]
+  /// take precedence on their platform. Without any icon, or when the icon
+  /// cannot be found, the platform default is used (see [LiveUpdateIcon]).
+  final LiveUpdateIcon? icon;
 
   /// Route delivered to [LiveUpdates.onTap] when the user taps the update.
   final String? route;
@@ -107,7 +113,7 @@ final class LiveUpdateContent {
     String? title,
     String? body,
     double? progress,
-    String? iconName,
+    LiveUpdateIcon? icon,
     String? route,
     LiveUpdateImage? image,
     List<LiveUpdateAction>? actions,
@@ -122,7 +128,7 @@ final class LiveUpdateContent {
     title: title ?? this.title,
     body: body ?? this.body,
     progress: progress ?? this.progress,
-    iconName: iconName ?? this.iconName,
+    icon: icon ?? this.icon,
     route: route ?? this.route,
     image: image ?? this.image,
     actions: actions ?? this.actions,
@@ -141,7 +147,7 @@ final class LiveUpdateContent {
       other.title == title &&
       other.body == body &&
       other.progress == progress &&
-      other.iconName == iconName &&
+      other.icon == icon &&
       other.route == route &&
       other.image == image &&
       listEquals(other.actions, actions) &&
@@ -158,7 +164,7 @@ final class LiveUpdateContent {
     title,
     body,
     progress,
-    iconName,
+    icon,
     route,
     image,
     Object.hashAll(actions),
@@ -273,7 +279,8 @@ final class LiveUpdateAction {
     required this.title,
     this.opensApp = false,
     this.requiresUnlock = false,
-    this.iosSystemImage,
+    this.icon,
+    this.iosIcon,
     this.androidIcon,
   });
 
@@ -297,11 +304,21 @@ final class LiveUpdateAction {
   /// ignored for [opensApp] buttons, which always open the app.
   final bool requiresUnlock;
 
-  /// SF Symbol shown on iOS, such as `xmark`.
-  final String? iosSystemImage;
+  /// Icon of the button on both platforms. [iosIcon] and [androidIcon]
+  /// take precedence on their platform; one that cannot be found is
+  /// replaced as described in [LiveUpdateIcon] (no icon on iOS).
+  ///
+  /// iOS shows it next to the title, such as `LiveUpdateIcon.symbol('xmark')`.
+  /// Android 7.0 and later do not show action icons in notifications, but
+  /// still pass them on (for example to watches); without one the default
+  /// icon is used.
+  final LiveUpdateIcon? icon;
 
-  /// Drawable name used as the action icon on Android.
-  final String? androidIcon;
+  /// Icon of the button on iOS, used instead of [icon].
+  final LiveUpdateIcon? iosIcon;
+
+  /// Icon of the button on Android, used instead of [icon].
+  final LiveUpdateIcon? androidIcon;
 
   @override
   bool operator ==(Object other) =>
@@ -310,7 +327,8 @@ final class LiveUpdateAction {
       other.title == title &&
       other.opensApp == opensApp &&
       other.requiresUnlock == requiresUnlock &&
-      other.iosSystemImage == iosSystemImage &&
+      other.icon == icon &&
+      other.iosIcon == iosIcon &&
       other.androidIcon == androidIcon;
 
   @override
@@ -319,7 +337,8 @@ final class LiveUpdateAction {
     title,
     opensApp,
     requiresUnlock,
-    iosSystemImage,
+    icon,
+    iosIcon,
     androidIcon,
   );
 }
@@ -347,6 +366,94 @@ final class LiveUpdateActionEvent {
 
   @override
   String toString() => 'LiveUpdateActionEvent($updateId, $actionId)';
+}
+
+/// An icon for [LiveUpdateContent.icon], [IosLiveUpdateOptions.icon],
+/// [IosLiveUpdateOptions.islandIcon], [AndroidLiveUpdateOptions.smallIcon],
+/// [AndroidLiveUpdateOptions.progressTrackerIcon] and the icons of
+/// [LiveUpdateAction].
+///
+/// An icon is exactly one of: a native resource ([LiveUpdateIcon.native]),
+/// a Flutter asset ([LiveUpdateIcon.asset]) or an iOS system symbol
+/// ([LiveUpdateIcon.symbol]).
+///
+/// Each platform uses the first icon that is set, in this order:
+///
+/// 1. the platform option ([AndroidLiveUpdateOptions.smallIcon] or
+///    [IosLiveUpdateOptions.icon]; in the Dynamic Island
+///    [IosLiveUpdateOptions.islandIcon] and then [LiveUpdateContent.image]
+///    come first),
+/// 2. [LiveUpdateContent.icon],
+/// 3. the platform default: on Android the drawable named by the
+///    `com.ttechapp.live_updates.default_icon` meta-data in the app
+///    manifest, else the app icon; on iOS a system symbol.
+///
+/// When the chosen icon cannot be shown (a resource or asset that does not
+/// exist, or a symbol on Android), the platform default is used and a
+/// warning is logged. Lower entries of the list are not tried, so a typo
+/// does not silently pick another icon.
+@immutable
+final class LiveUpdateIcon {
+  /// A resource of the app: on Android a drawable (or mipmap) such as
+  /// `ic_stat_delivery` (the name only, without extension or `@drawable/`),
+  /// on iOS an image in the widget extension's asset catalog.
+  ///
+  /// Android release builds remove resources that the app's own code does
+  /// not reference, so list the drawables you name here in a keep file (see
+  /// the README).
+  const LiveUpdateIcon.native(String this.name)
+    : assetName = null,
+      symbolName = null;
+
+  /// An image from the app's Flutter assets, such as `assets/delivery.png`.
+  ///
+  /// On iOS it is scaled down to [maxDimension] pixels and copied into
+  /// the App Group shared with the widget extension (set up by
+  /// `create_widget`); for remote updates call [LiveUpdates.preloadIcons]
+  /// first, because a push does not run the app.
+  const LiveUpdateIcon.asset(String this.assetName)
+    : name = null,
+      symbolName = null;
+
+  /// An iOS system symbol, such as `shippingbox.fill`. Android has no
+  /// symbols and uses its default icon instead (so set
+  /// [AndroidLiveUpdateOptions.smallIcon] when [LiveUpdateContent.icon] is a
+  /// symbol).
+  const LiveUpdateIcon.symbol(String this.symbolName)
+    : name = null,
+      assetName = null;
+
+  /// Longest side in pixels of an [LiveUpdateIcon.asset] icon stored for
+  /// the iOS widget (40 points, the largest icon of the widget template, at
+  /// 3x). ActivityKit may fail to start an activity whose images are larger
+  /// than its presentation.
+  static const maxDimension = 120;
+
+  /// Resource name for [LiveUpdateIcon.native].
+  final String? name;
+
+  /// Asset name for [LiveUpdateIcon.asset].
+  final String? assetName;
+
+  /// Symbol name for [LiveUpdateIcon.symbol].
+  final String? symbolName;
+
+  @override
+  bool operator ==(Object other) =>
+      other is LiveUpdateIcon &&
+      other.name == name &&
+      other.assetName == assetName &&
+      other.symbolName == symbolName;
+
+  @override
+  int get hashCode => Object.hash(name, assetName, symbolName);
+
+  @override
+  String toString() => switch (this) {
+    LiveUpdateIcon(:final name?) => 'LiveUpdateIcon.native($name)',
+    LiveUpdateIcon(:final assetName?) => 'LiveUpdateIcon.asset($assetName)',
+    _ => 'LiveUpdateIcon.symbol($symbolName)',
+  };
 }
 
 /// An image for [LiveUpdateContent.image].
@@ -423,12 +530,15 @@ final class IosLiveUpdateOptions {
     this.relevanceScore,
     this.alert,
     this.extra = const {},
+    this.compactLeading,
     this.compactTrailing,
     this.minimal,
     this.layout,
     this.color,
     this.backgroundColor,
     this.foregroundColor,
+    this.icon,
+    this.islandIcon,
   });
 
   /// When the system marks the activity as stale.
@@ -443,6 +553,11 @@ final class IosLiveUpdateOptions {
   /// Additional values available to a customized widget as
   /// `context.state.extra`.
   final Map<String, String> extra;
+
+  /// What the generated widget shows on the leading side of the compact
+  /// Dynamic Island. `null` (or content that is missing) shows
+  /// [IosIslandContent.icon].
+  final IosIslandContent? compactLeading;
 
   /// What the generated widget shows on the trailing side of the compact
   /// Dynamic Island. `null` (or content that is missing, such as
@@ -483,6 +598,25 @@ final class IosLiveUpdateOptions {
   /// keeps its own (dark) colors.
   final Color? foregroundColor;
 
+  /// Icon of the generated widget on iOS, used instead of
+  /// [LiveUpdateContent.icon]: the thumbnail when there is no
+  /// [LiveUpdateContent.image], and [IosIslandContent.icon]. `null` uses
+  /// [LiveUpdateContent.icon]. See [LiveUpdateIcon] for the order and the
+  /// default.
+  final LiveUpdateIcon? icon;
+
+  /// Icon of the generated widget in the Dynamic Island (the leading side of
+  /// the compact and expanded presentations, and [IosIslandContent.icon]),
+  /// so that a photo [LiveUpdateContent.image] can stay on the Lock Screen
+  /// while the island shows a simple shape. Apple recommends compact and
+  /// minimal content that fits a 28-point circle.
+  ///
+  /// The island shows the first that is set: [islandIcon],
+  /// [LiveUpdateContent.image], [icon], [LiveUpdateContent.icon], the
+  /// default symbol. An [islandIcon] that cannot be found shows the default
+  /// symbol (see [LiveUpdateIcon]).
+  final LiveUpdateIcon? islandIcon;
+
   @override
   bool operator ==(Object other) =>
       other is IosLiveUpdateOptions &&
@@ -490,12 +624,15 @@ final class IosLiveUpdateOptions {
       other.relevanceScore == relevanceScore &&
       other.alert == alert &&
       mapEquals(other.extra, extra) &&
+      other.compactLeading == compactLeading &&
       other.compactTrailing == compactTrailing &&
       other.minimal == minimal &&
       other.layout == layout &&
       other.color == color &&
       other.backgroundColor == backgroundColor &&
-      other.foregroundColor == foregroundColor;
+      other.foregroundColor == foregroundColor &&
+      other.icon == icon &&
+      other.islandIcon == islandIcon;
 
   @override
   int get hashCode => Object.hash(
@@ -503,12 +640,15 @@ final class IosLiveUpdateOptions {
     relevanceScore,
     alert,
     Object.hashAllUnordered(extra.entries.map((e) => (e.key, e.value))),
+    compactLeading,
     compactTrailing,
     minimal,
     layout,
     color,
     backgroundColor,
     foregroundColor,
+    icon,
+    islandIcon,
   );
 }
 
@@ -557,11 +697,13 @@ final class IosLiveUpdateLayout {
 }
 
 /// Content for a small Dynamic Island area
-/// ([IosLiveUpdateOptions.compactTrailing], [IosLiveUpdateOptions.minimal]).
+/// ([IosLiveUpdateOptions.compactLeading],
+/// [IosLiveUpdateOptions.compactTrailing], [IosLiveUpdateOptions.minimal]).
 ///
 /// Text (title, body, extra) is left out when the island is limited in width
 /// (iOS 27, for example in landscape). A customized widget can read the
-/// choice as `context.state.compactTrailing` / `context.state.minimal`.
+/// choice as `context.state.compactLeading`, `context.state.compactTrailing`
+/// and `context.state.minimal`.
 @immutable
 final class IosIslandContent {
   const IosIslandContent._(this.value);
@@ -578,7 +720,8 @@ final class IosIslandContent {
   /// The body.
   static const body = IosIslandContent._('body');
 
-  /// The icon ([LiveUpdateContent.iconName]).
+  /// The icon ([IosLiveUpdateOptions.islandIcon], else the image or icon,
+  /// as described there).
   static const icon = IosIslandContent._('icon');
 
   /// The value of [IosLiveUpdateOptions.extra] for [key], such as a short
@@ -632,6 +775,7 @@ final class AndroidLiveUpdateOptions {
   const AndroidLiveUpdateOptions({
     this.channelId = 'live_updates',
     this.channelName = 'Live updates',
+    this.smallIcon,
     this.shortCriticalText,
     this.color,
     this.when,
@@ -651,6 +795,16 @@ final class AndroidLiveUpdateOptions {
 
   /// Notification channel name shown in system settings.
   final String channelName;
+
+  /// Small icon of the notification on Android, used instead of
+  /// [LiveUpdateContent.icon]. The system shows it in the status bar, in the
+  /// Live Update chip and in the notification header.
+  ///
+  /// Android draws only the alpha channel of a small icon (in white or in
+  /// [color]), so use a single-color drawable or asset with transparency;
+  /// a full-color picture such as the app icon becomes a solid shape. See
+  /// [LiveUpdateIcon] for the order and the default.
+  final LiveUpdateIcon? smallIcon;
 
   /// Short text for the status bar chip of a promoted Live Update, such as
   /// "5 min". Android suggests at most 7 characters and may truncate it.
@@ -701,9 +855,11 @@ final class AndroidLiveUpdateOptions {
   /// Marks on the progress bar, such as stops (Android 16+).
   final List<AndroidProgressPoint> progressPoints;
 
-  /// Drawable shown at the current position of the progress bar, such as a
-  /// car or a parcel (Android 16+).
-  final String? progressTrackerIcon;
+  /// Icon shown at the current position of the progress bar, such as a
+  /// car or a parcel (Android 16+). A [LiveUpdateIcon.native] drawable or a
+  /// [LiveUpdateIcon.asset]; one that cannot be found (or a symbol) shows no
+  /// tracker and logs a warning.
+  final LiveUpdateIcon? progressTrackerIcon;
 
   /// Removes the notification after this time (at least one minute, counted
   /// from the latest post) even if the app is not running, so a forgotten
@@ -723,6 +879,7 @@ final class AndroidLiveUpdateOptions {
       other is AndroidLiveUpdateOptions &&
       other.channelId == channelId &&
       other.channelName == channelName &&
+      other.smallIcon == smallIcon &&
       other.shortCriticalText == shortCriticalText &&
       other.color == color &&
       other.when == when &&
@@ -740,6 +897,7 @@ final class AndroidLiveUpdateOptions {
   int get hashCode => Object.hash(
     channelId,
     channelName,
+    smallIcon,
     shortCriticalText,
     color,
     when,

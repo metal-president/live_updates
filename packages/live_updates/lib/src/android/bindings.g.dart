@@ -708,7 +708,7 @@ final class $LiveUpdatesBridge$RouteListener$Type$
 /// Java surface over Android notifications, consumed from Dart through JNIgen.
 ///
 /// Content is exchanged as the same JSON used on iOS ({@code title, body,
-/// progress, iconName, route, image, actions, metrics, criticalMetric, steps,
+/// progress, icon, androidSmallIcon, route, image, actions, metrics, criticalMetric, steps,
 /// journey}) plus Android options: {@code channelId, channelName,
 /// shortCriticalText, colorArgb, whenEpochMillis, showChronometer, androidMode,
 /// bodySemanticStyle, progressSemanticStyle, progressSegments, progressPoints,

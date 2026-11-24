@@ -25,6 +25,12 @@ class IosLiveUpdatesPlatform extends LiveUpdatesPlatform with ContentEncoder {
       '`dart run live_updates:create_widget` and enable the App Group '
       'capability for Runner and the widget (see the README).';
 
+  @override
+  bool get storesIconAssets => true;
+
+  @override
+  Future<void> preloadIcons(List<String> assets) => storeIconAssets(assets);
+
   late final _taps = BufferedBroadcast<String>(
     (add) => LiveUpdatesBridge.observeTaps(
       ObjCBlock_ffiVoid_NSString.listener((r) => add(r.toDartString())),

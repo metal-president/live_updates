@@ -64,6 +64,17 @@ void fileRules() {
     },
   );
 
+  test('creates the asset catalog once and keeps it', () async {
+    expect(await run(), 0);
+    final catalog = file('Assets.xcassets/Contents.json');
+    expect(catalog.readAsStringSync(), contains('"version" : 1'));
+    final icon = file('Assets.xcassets/ic_parcel.imageset/Contents.json')
+      ..createSync(recursive: true)
+      ..writeAsStringSync('{}');
+    expect(await run(['--force']), 0);
+    expect(icon.existsSync(), isTrue);
+  });
+
   test('--force replaces your files too', () async {
     expect(await run(), 0);
     file('LiveUpdatesWidgetLiveActivity.swift').writeAsStringSync('// mine');

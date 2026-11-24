@@ -75,6 +75,9 @@ abstract class LiveUpdatesPlatform {
   /// Ids of live updates currently shown.
   Future<List<String>> activeIds();
 
+  /// See [LiveUpdates.preloadIcons].
+  Future<void> preloadIcons(List<String> assets) async {}
+
   /// Ends every live update of this app.
   Future<void> endAll();
 

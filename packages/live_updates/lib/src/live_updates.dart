@@ -241,6 +241,26 @@ abstract final class LiveUpdates {
   /// Ends every live update started by this app.
   static Future<void> endAll() => _platform.endAll();
 
+  /// Copies Flutter assets used as [LiveUpdateIcon.asset] icons into the
+  /// App Group shared with the iOS widget extension, so that content sent by
+  /// a push can name them.
+  ///
+  /// A push updates the Live Activity without running the app, so the
+  /// widget can only show asset icons that the app stored before. Local
+  /// [LiveUpdates.start] and [LiveUpdate.update] calls store their own
+  /// icons, so this is only needed for icons that first appear in a push.
+  ///
+  /// [assets] are asset names such as `assets/icons/parcel.png`, or folders
+  /// ending in `/` such as `assets/icons/` for every image under them. Call
+  /// it at app start: it also refreshes icons whose asset changed in an app
+  /// update. On Android (which reads assets from the app package) it does
+  /// nothing.
+  ///
+  /// Throws a [LiveUpdateException] on iOS when no App Group is set up (see
+  /// `create_widget`).
+  static Future<void> preloadIcons(List<String> assets) =>
+      _platform.preloadIcons(assets);
+
   /// iOS push-to-start tokens (iOS 17.2+, empty elsewhere). A new listener
   /// first receives the current token, if one is known.
   static Stream<LiveUpdatePushToken> get pushToStartTokens =>

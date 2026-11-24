@@ -13,7 +13,7 @@ extension LiveUpdateContentJson on LiveUpdateContent {
     // NaN or infinite (such as 0 / 0) would break the JSON; out of range is
     // clamped.
     if (progress case final p? when p.isFinite) 'progress': p.clamp(0, 1),
-    'iconName': ?iconName,
+    'icon': ?icon?.toJson(),
     'route': ?route,
     // Seconds since 1970, as the widget reads them.
     if (timer?.start case final s?)
@@ -38,8 +38,9 @@ extension LiveUpdateContentJson on LiveUpdateContent {
             'title': a.title,
             if (a.opensApp) 'opensApp': true,
             if (a.requiresUnlock) 'requiresUnlock': true,
-            'systemImage': ?a.iosSystemImage,
-            'androidIcon': ?a.androidIcon,
+            'icon': ?a.icon?.toJson(),
+            'iosIcon': ?a.iosIcon?.toJson(),
+            'androidIcon': ?a.androidIcon?.toJson(),
           },
       ],
     if (ios case final ios?) ...{
@@ -49,6 +50,7 @@ extension LiveUpdateContentJson on LiveUpdateContent {
       'relevanceScore': ?ios.relevanceScore,
       if (ios.alert case final a?)
         'alert': {'title': a.title, 'body': a.body, 'sound': ?a.sound},
+      'compactLeading': ?ios.compactLeading?.value,
       'compactTrailing': ?ios.compactTrailing?.value,
       'minimal': ?ios.minimal?.value,
       'layout': ?ios.layout?.value,
@@ -56,10 +58,13 @@ extension LiveUpdateContentJson on LiveUpdateContent {
       'tintArgb': ?ios.color?.toARGB32(),
       'backgroundArgb': ?ios.backgroundColor?.toARGB32(),
       'foregroundArgb': ?ios.foregroundColor?.toARGB32(),
+      'iosIcon': ?ios.icon?.toJson(),
+      'islandIcon': ?ios.islandIcon?.toJson(),
     },
     if (android case final a?) ...{
       'channelId': a.channelId,
       'channelName': a.channelName,
+      'androidSmallIcon': ?a.smallIcon?.toJson(),
       'shortCriticalText': ?a.shortCriticalText,
       'colorArgb': ?a.color?.toARGB32(),
       'whenEpochMillis': ?a.when?.millisecondsSinceEpoch,
@@ -87,7 +92,7 @@ extension LiveUpdateContentJson on LiveUpdateContent {
               'semanticStyle': ?p.semanticStyle?.name,
             },
         ],
-      'progressTrackerIcon': ?a.progressTrackerIcon,
+      'progressTrackerIcon': ?a.progressTrackerIcon?.toJson(),
       'timeoutAfterMillis': ?a.timeoutAfter?.inMilliseconds,
       // Not 'alert': that key holds the iOS alert.
       if (a.alert) 'androidAlert': true,
@@ -109,5 +114,16 @@ extension on LiveUpdateMetric {
     'unit': ?unit,
     if (kind == LiveUpdateMetricKind.decimal) 'fractionDigits': ?fractionDigits,
     'semanticStyle': ?semanticStyle?.name,
+  };
+}
+
+/// Wire format of a [LiveUpdateIcon]: exactly one of `native`, `asset` or
+/// `symbol`.
+extension LiveUpdateIconJson on LiveUpdateIcon {
+  /// Encodes this icon for the native side and for remote payloads.
+  Map<String, Object?> toJson() => switch (this) {
+    LiveUpdateIcon(:final name?) => {'native': name},
+    LiveUpdateIcon(:final assetName?) => {'asset': assetName},
+    _ => {'symbol': symbolName},
   };
 }

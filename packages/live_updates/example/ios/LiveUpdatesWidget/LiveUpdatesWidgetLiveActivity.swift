@@ -29,7 +29,7 @@ struct LiveUpdatesWidgetLiveActivity: Widget {
     } dynamicIsland: { context in
       DynamicIsland {
         DynamicIslandExpandedRegion(.leading) {
-          LiveUpdatesThumbnail(state: context.state).frame(width: 36, height: 36)
+          LiveUpdatesIslandIcon(state: context.state).frame(width: 36, height: 36)
         }
         DynamicIslandExpandedRegion(.trailing) {
           LiveUpdatesExpandedTrailing(state: context.state)
@@ -41,7 +41,8 @@ struct LiveUpdatesWidgetLiveActivity: Widget {
           LiveUpdatesExpandedBottom(state: context.state, activityID: context.activityID)
         }
       } compactLeading: {
-        LiveUpdatesThumbnail(state: context.state)
+        // IosLiveUpdateOptions.compactLeading chooses what appears here.
+        LiveUpdatesCompactLeading(state: context.state)
       } compactTrailing: {
         // IosLiveUpdateOptions.compactTrailing chooses what appears here.
         LiveUpdatesCompactTrailing(state: context.state)

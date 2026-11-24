@@ -38,10 +38,40 @@ Build the content once. Keys are those of `LiveUpdateContent` (see the
 package README): `title`, `body`, `progress`, `route`, `timerEnd` /
 `timerStart` (seconds since 1970), `metrics`, `steps`, `journey`, `actions`,
 `extra`, Android options such as `channelId`, `shortCriticalText` or
-`progressSegments`, and the iOS options `layout` / `compactTrailing` /
-`minimal` / `tintArgb` / `backgroundArgb` / `foregroundArgb`. Each platform
-ignores the keys it does not use. iOS requires `title`, and `extra` must map
-strings to strings, or the activity rejects the content.
+`progressSegments`, and the iOS options `layout` / `compactLeading` /
+`compactTrailing` / `minimal` / `tintArgb` / `backgroundArgb` /
+`foregroundArgb`. Each platform ignores the keys it does not use. iOS
+requires `title`, and `extra` must map strings to strings, or the activity
+rejects the content.
+
+Icons are objects with exactly one of `native` (a drawable on Android, an
+asset catalog image of the widget on iOS), `asset` (a Flutter asset; on iOS
+only one the app stored with `LiveUpdates.preloadIcons`) or `symbol` (an SF
+Symbols name, iOS only). An object with several of these keys uses the
+first of `native`, `asset`, `symbol`. An icon that cannot be shown falls back
+to the platform default (see Icons in the package README).
+
+| Key | Dart | Platform |
+| --- | --- | --- |
+| `icon` | `LiveUpdateContent.icon` | both |
+| `iosIcon` | `IosLiveUpdateOptions.icon` | iOS |
+| `islandIcon` | `IosLiveUpdateOptions.islandIcon` | iOS |
+| `androidSmallIcon` | `AndroidLiveUpdateOptions.smallIcon` | Android |
+| `progressTrackerIcon` | `AndroidLiveUpdateOptions.progressTrackerIcon` | Android |
+| `actions[].icon`, `actions[].iosIcon`, `actions[].androidIcon` | `LiveUpdateAction.icon`, `iosIcon`, `androidIcon` | as named |
+
+Each action also has `id`, `title` and optionally `opensApp` and
+`requiresUnlock` (booleans).
+
+```json
+{
+  "title": "Order #1234",
+  "icon": {"asset": "assets/icons/parcel.png"},
+  "islandIcon": {"symbol": "shippingbox.fill"},
+  "androidSmallIcon": {"native": "ic_stat_parcel"},
+  "actions": [{"id": "cancel", "title": "Cancel", "icon": {"symbol": "xmark"}}]
+}
+```
 
 ```json
 {"title": "Order #1234", "body": "On the way", "progress": 0.6, "timerEnd": 1893456000}

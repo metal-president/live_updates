@@ -520,7 +520,9 @@ private struct Payload: Decodable {
   var title: String
   var body: String?
   var progress: Double?
-  var iconName: String?
+  var icon: LiveUpdatesIcon?
+  var iosIcon: LiveUpdatesIcon?
+  var islandIcon: LiveUpdatesIcon?
   var route: String?
   var image: String?
   var actions: [LiveUpdatesAction]?
@@ -528,6 +530,7 @@ private struct Payload: Decodable {
   var timerStart: Double?
   var timerEnd: Double?
   var compactTrailing: String?
+  var compactLeading: String?
   var minimal: String?
   var tintArgb: Int?
   var backgroundArgb: Int?
@@ -550,10 +553,10 @@ private struct Payload: Decodable {
   var content: ActivityContent<LiveUpdatesAttributes.ContentState> {
     ActivityContent(
       state: .init(
-        title: title, body: body, progress: progress, iconName: iconName,
-        route: route, image: image, actions: actions ?? [], extra: extra ?? [:],
+        title: title, body: body, progress: progress, icon: icon, iosIcon: iosIcon,
+        islandIcon: islandIcon, route: route, image: image, actions: actions ?? [], extra: extra ?? [:],
         timerStart: timerStart, timerEnd: timerEnd,
-        compactTrailing: compactTrailing, minimal: minimal,
+        compactTrailing: compactTrailing, compactLeading: compactLeading, minimal: minimal,
         tintArgb: tintArgb, backgroundArgb: backgroundArgb, foregroundArgb: foregroundArgb,
         layout: layout, metrics: metrics ?? [], steps: steps, journey: journey),
       staleDate: staleDate.map { Date(timeIntervalSince1970: $0) },

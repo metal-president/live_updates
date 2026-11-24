@@ -102,8 +102,18 @@ def ensure_widget_files(project, target, name, ext_dir)
   end
 end
 
+# The extension's asset catalog, for icons named with LiveUpdateIcon.native.
+def ensure_assets(project, target, name, ext_dir)
+  return unless File.directory?(File.join(ext_dir, 'Assets.xcassets'))
+  group = project.main_group.find_subpath(name, true)
+  ref = group.files.find { |f| f.path == 'Assets.xcassets' } || group.new_reference('Assets.xcassets')
+  return if target.resources_build_phase.files_references.include?(ref)
+  target.resources_build_phase.add_file_reference(ref)
+end
+
 if (existing = project.targets.find { |t| t.name == name })
   ensure_widget_files(project, existing, name, ext_dir)
+  ensure_assets(project, existing, name, ext_dir)
   ensure_shared_intent(project, [runner, existing], name)
   project.save
   if use_group
@@ -126,6 +136,7 @@ Dir.children(ext_dir).sort.each do |file|
   ref = group.new_reference(file)
   target.add_file_references([ref]) if file.end_with?('.swift')
 end
+ensure_assets(project, target, name, ext_dir)
 
 target.build_configurations.each do |config|
   # Reuse Flutter's xcconfig so FLUTTER_BUILD_NAME/NUMBER are defined.

@@ -5,7 +5,9 @@ import android.os.Build;
 import android.text.SpannableString;
 import android.text.Spanned;
 import android.util.Log;
+import androidx.annotation.ChecksSdkIntAtLeast;
 import androidx.annotation.Nullable;
+import androidx.annotation.RequiresApi;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.time.Duration;
@@ -36,6 +38,7 @@ final class LiveUpdatesApi37 {
 
   private LiveUpdatesApi37() {}
 
+  @ChecksSdkIntAtLeast(api = 37)
   static boolean available() {
     return Build.VERSION.SDK_INT >= 37;
   }
@@ -145,6 +148,7 @@ final class LiveUpdatesApi37 {
   }
 
   @Nullable
+  @RequiresApi(37)
   private static Object metricValue(JSONObject m) throws ReflectiveOperationException {
     String unit = clip(LiveUpdatesBridge.optString(m, "unit"));
     String type = m.optString("type");

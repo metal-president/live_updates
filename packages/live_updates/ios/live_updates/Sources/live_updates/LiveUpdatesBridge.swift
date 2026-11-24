@@ -13,21 +13,44 @@ import UIKit
 /// Mutable state is only touched on the main thread: Dart calls these methods
 /// on the platform (main) thread, and Tasks hop to the main actor before
 /// touching it. Handlers are Dart listener blocks, callable from any thread.
+///
+/// The plugin builds for apps that target iOS 15.0, but Live Activities
+/// need iOS 17.2. Below that, `isAvailable` is `false` and Dart uses its
+/// no-op backend without calling the rest; if called anyway, methods return
+/// empty results, and `start`, `startOrUpdate` and `update` report an error.
 @objc(LiveUpdatesBridge)
 public final class LiveUpdatesBridge: NSObject {
   private static var tokenTasks: [String: Task<Void, Never>] = [:]
   private static var pushToStartTask: Task<Void, Never>?
 
+  /// Whether this iOS version supports live_updates (iOS 17.2 or later).
+  @objc public static func isAvailable() -> Bool {
+    if #available(iOS 17.2, *) { return true }
+    return false
+  }
+
+  /// Error for calls below iOS 17.2.
+  private static var unavailableError: NSError {
+    NSError(
+      domain: "live_updates", code: 3,
+      userInfo: [NSLocalizedDescriptionKey: unavailableMessage])
+  }
+
+  private static let unavailableMessage = "Live Activities require iOS 17.2 or later."
+
   /// Whether Live Activities are enabled for this app.
   @objc public static func isSupported() -> Bool {
-    ActivityAuthorizationInfo().areActivitiesEnabled
+    guard #available(iOS 17.2, *) else { return false }
+    return ActivityAuthorizationInfo().areActivitiesEnabled
   }
 
   /// Requests a new activity and returns its id.
   @objc public static func start(_ json: String) throws -> String {
-    try request(try Payload.decode(json), key: nil)
+    guard #available(iOS 17.2, *) else { throw unavailableError }
+    return try request(try Payload.decode(json), key: nil)
   }
 
+  @available(iOS 17.2, *)
   private static func request(_ payload: Payload, key: String?) throws -> String {
     let wantsPush = payload.enablePushUpdates ?? false
     var pushType: PushType? = wantsPush ? .token : nil
@@ -69,6 +92,7 @@ public final class LiveUpdatesBridge: NSObject {
   @objc public static func startOrUpdate(
     _ key: String, json: String, completion: @escaping (String?, String?) -> Void
   ) {
+    guard #available(iOS 17.2, *) else { return completion(nil, unavailableMessage) }
     Task { @MainActor in
       do {
         let payload = try Payload.decode(json)
@@ -90,15 +114,18 @@ public final class LiveUpdatesBridge: NSObject {
 
   /// Id of the running activity whose key is `key`.
   @objc public static func idForKey(_ key: String) -> String? {
-    findByKey(key)?.id
+    guard #available(iOS 17.2, *) else { return nil }
+    return findByKey(key)?.id
   }
 
   /// Key of the activity with `id` (from `startOrUpdate` or the push-to-start
   /// `attributes`), or `nil`.
   @objc public static func keyForId(_ id: String) -> String? {
-    Activity<LiveUpdatesAttributes>.activities.first { $0.id == id }?.attributes.key
+    guard #available(iOS 17.2, *) else { return nil }
+    return Activity<LiveUpdatesAttributes>.activities.first { $0.id == id }?.attributes.key
   }
 
+  @available(iOS 17.2, *)
   private static func findByKey(_ key: String) -> Activity<LiveUpdatesAttributes>? {
     Activity<LiveUpdatesAttributes>.activities.first {
       $0.attributes.key == key && ($0.activityState == .active || $0.activityState == .stale)
@@ -110,6 +137,7 @@ public final class LiveUpdatesBridge: NSObject {
   @objc public static func update(
     _ id: String, json: String, completion: @escaping (String?) -> Void
   ) {
+    guard #available(iOS 17.2, *) else { return completion(unavailableMessage) }
     Task {
       do {
         let payload = try Payload.decode(json)
@@ -131,6 +159,7 @@ public final class LiveUpdatesBridge: NSObject {
     _ id: String, json: String?, dismissAfter: Double,
     completion: @escaping (String?) -> Void
   ) {
+    guard #available(iOS 17.2, *) else { return completion(nil) }
     Task {
       do {
         let content = try json.map { try Payload.decode($0).content }
@@ -157,7 +186,8 @@ public final class LiveUpdatesBridge: NSObject {
 
   /// Ids of the activities that are running (not ended or dismissed).
   @objc public static func activeIds() -> [String] {
-    Activity<LiveUpdatesAttributes>.activities
+    guard #available(iOS 17.2, *) else { return [] }
+    return Activity<LiveUpdatesAttributes>.activities
       .filter { $0.activityState == .active || $0.activityState == .stale }
       .map(\.id)
   }
@@ -166,7 +196,7 @@ public final class LiveUpdatesBridge: NSObject {
   @objc public static func observePushTokens(
     _ id: String, handler: @escaping (String) -> Void
   ) {
-    guard let activity = find(id) else { return }
+    guard #available(iOS 17.2, *), let activity = find(id) else { return }
     tokenTasks[id]?.cancel()
     tokenTasks[id] = Task {
       for await token in activity.pushTokenUpdates {
@@ -177,6 +207,7 @@ public final class LiveUpdatesBridge: NSObject {
 
   /// Calls `handler` with every push-to-start token (hex).
   @objc public static func observePushToStartTokens(_ handler: @escaping (String) -> Void) {
+    guard #available(iOS 17.2, *) else { return }
     pushToStartTask?.cancel()
     pushToStartTask = Task {
       for await token in Activity<LiveUpdatesAttributes>.pushToStartTokenUpdates {
@@ -190,6 +221,7 @@ public final class LiveUpdatesBridge: NSObject {
 
   /// Ends every activity of this app immediately.
   @objc public static func endAll(_ completion: @escaping () -> Void) {
+    guard #available(iOS 17.2, *) else { return completion() }
     Task {
       for activity in Activity<LiveUpdatesAttributes>.activities {
         await activity.end(nil, dismissalPolicy: .immediate)
@@ -207,6 +239,7 @@ public final class LiveUpdatesBridge: NSObject {
   @objc public static func observeActivities(
     _ handler: @escaping (String) -> Void, engineId: Int64
   ) {
+    guard #available(iOS 17.2, *) else { return }
     onMain {
       activityHandlers[engineId] = handler
       guard activityTask == nil else { return }
@@ -249,6 +282,7 @@ public final class LiveUpdatesBridge: NSObject {
     }
   }
 
+  @available(iOS 17.2, *)
   private static func name(of state: ActivityState) -> String {
     switch state {
     case .active: return "active"
@@ -380,7 +414,7 @@ public final class LiveUpdatesBridge: NSObject {
     -> NSNumber
   {
     // Only accept presses of buttons the activity actually shows.
-    guard
+    guard #available(iOS 17.2, *),
       let state = find(activityId)?.content.state,
       state.actions.contains(where: { $0.id == actionId })
     else { return false }
@@ -470,6 +504,7 @@ public final class LiveUpdatesBridge: NSObject {
     }
   }
 
+  @available(iOS 17.2, *)
   private static func find(_ id: String) -> Activity<LiveUpdatesAttributes>? {
     Activity<LiveUpdatesAttributes>.activities.first { $0.id == id }
   }
@@ -511,6 +546,7 @@ private struct Payload: Decodable {
     try JSONDecoder().decode(Payload.self, from: Data(json.utf8))
   }
 
+  @available(iOS 17.2, *)
   var content: ActivityContent<LiveUpdatesAttributes.ContentState> {
     ActivityContent(
       state: .init(
@@ -525,6 +561,7 @@ private struct Payload: Decodable {
     )
   }
 
+  @available(iOS 17.2, *)
   var alertConfiguration: AlertConfiguration? {
     alert.map {
       AlertConfiguration(
@@ -550,6 +587,7 @@ extension LiveUpdatesBridge {
   /// Returns `true` if `url` is a live_updates tap URL.
   @discardableResult
   static func handleURL(_ url: URL) -> Bool {
+    guard #available(iOS 17.2, *) else { return false }
     guard url.scheme?.lowercased() == tapScheme.lowercased() else { return false }
     let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
     func item(_ name: String) -> String? { items.first(where: { $0.name == name })?.value }

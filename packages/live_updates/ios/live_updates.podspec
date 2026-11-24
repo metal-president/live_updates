@@ -18,7 +18,7 @@ iOS Live Activities and Android Live Update notifications with one Dart API.
   s.requires_arc = true
   s.resource_bundles = { 'live_updates_privacy' => ['live_updates/Sources/live_updates/PrivacyInfo.xcprivacy'] }
   s.dependency 'Flutter'
-  s.platform = :ios, '17.2'
+  s.platform = :ios, '15.0'
 
   # Flutter.framework does not contain a i386 slice.
   s.pod_target_xcconfig = { 'DEFINES_MODULE' => 'YES', 'EXCLUDED_ARCHS[sdk=iphonesimulator*]' => 'i386' }

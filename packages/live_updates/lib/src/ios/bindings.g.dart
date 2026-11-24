@@ -104,10 +104,17 @@ external ffi.Pointer<objc.ObjCBlockImpl> _1j14om6_wrapListenerBlock_xtuoz7(
 
 /// Objective-C surface over ActivityKit, consumed from Dart through FFIgen.
 /// Content is exchanged as JSON strings to keep the bridged surface small:
-/// <code>{"title", "body", "progress", "iconName", "route", "image", "actions", "extra", "staleDate" (epoch seconds), "relevanceScore", "enablePushUpdates", "alert": {"title", "body", "sound"}}</code>.
+/// the keys of <code>LiveUpdatesAttributes.ContentState</code> (written by the Dart
+/// <code>LiveUpdateContentJson</code>) plus “staleDate” (epoch seconds),
+/// “relevanceScore”, “enablePushUpdates”, “broadcastChannelId” and
+/// “alert”: {“title”, “body”, “sound”}.
 /// Mutable state is only touched on the main thread: Dart calls these methods
 /// on the platform (main) thread, and Tasks hop to the main actor before
 /// touching it. Handlers are Dart listener blocks, callable from any thread.
+/// The plugin builds for apps that target iOS 15.0, but Live Activities
+/// need iOS 17.2. Below that, <code>isAvailable</code> is <code>false</code> and Dart uses its
+/// no-op backend without calling the rest; if called anyway, methods return
+/// empty results, and <code>start</code>, <code>startOrUpdate</code> and <code>update</code> report an error.
 extension type LiveUpdatesBridge._(objc.ObjCObject object$)
     implements objc.ObjCObject, objc.NSObject {
   /// Constructs a [LiveUpdatesBridge] that points to the same underlying object as [other].
@@ -257,6 +264,11 @@ extension type LiveUpdatesBridge._(objc.ObjCObject object$)
     return $ret.address == 0
         ? null
         : objc.NSString.fromPointer($ret, retain: true, release: true);
+  }
+
+  /// Whether this iOS version supports live_updates (iOS 17.2 or later).
+  static bool isAvailable() {
+    return _objc_msgSend_91o635(_class_LiveUpdatesBridge, _sel_isAvailable);
   }
 
   /// Whether Live Activities are enabled for this app.
@@ -1738,6 +1750,7 @@ late final _sel_enqueueAction_actionId_ = objc.registerName(
 late final _sel_idForKey_ = objc.registerName("idForKey:");
 late final _sel_imageDirectory = objc.registerName("imageDirectory");
 late final _sel_init = objc.registerName("init");
+late final _sel_isAvailable = objc.registerName("isAvailable");
 late final _sel_isKindOfClass_ = objc.registerName("isKindOfClass:");
 late final _sel_isSupported = objc.registerName("isSupported");
 late final _sel_keyForId_ = objc.registerName("keyForId:");

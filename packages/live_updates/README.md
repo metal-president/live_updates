@@ -47,9 +47,12 @@ Screenshots of the example app in this repository.
 
 ## Platform support
 
-**Requirements:** Flutter 3.50+, iOS 17.2+, Android 7.0 (API 24)+.
+**Requirements:** Flutter 3.50+, iOS 15.0+, Android 7.0 (API 24)+. Live
+Activities need iOS 17.2: on iOS 15.0 to 17.1 the app builds and runs, and
+every call does nothing, as on other platforms (`isSupported()` returns
+`false`).
 
-| | iOS | Android 16+ | Android 7–15 | Other |
+| | iOS 17.2+ | Android 16+ | Android 7–15 | iOS 15.0–17.1, other |
 | --- | --- | --- | --- | --- |
 | Start / update / end | Live Activity | Live Update (when promoted) | Ongoing notification | no-op |
 | Progress | ✓ | `ProgressStyle` (segments, points) | progress bar | |
@@ -84,11 +87,16 @@ flutter pub add live_updates
    ```
 
    This writes `ios/LiveUpdatesWidget/`, adds a *LiveUpdatesWidget* extension
-   target to `Runner.xcodeproj`, sets `NSSupportsLiveActivities`, and sets up
-   the URL scheme for taps (`liveupdates-<bundle id>`) and the App Group for
-   [images](#images). It needs Ruby with the `xcodeproj` gem (included with
-   CocoaPods) and offers to run `gem install --user-install xcodeproj` if it
-   is missing.
+   target (iOS 17.2) to `Runner.xcodeproj`, sets `NSSupportsLiveActivities`,
+   and sets up the URL scheme for taps (`liveupdates-<bundle id>`) and the App
+   Group for [images](#images). It needs Ruby with the `xcodeproj` gem
+   (included with CocoaPods) and offers to run
+   `gem install --user-install xcodeproj` if it is missing.
+
+   - **Deployment target:** the app itself can target iOS 15.0 or later. If
+     you generated the widget with version 0.1.2 or earlier and your app
+     targets an iOS version below 17.0, run the command again: it updates
+     `LiveUpdatesActionIntent.swift`, which is also compiled into the app.
 
    - **Flavors:** every build configuration (for example `Debug-dev`,
      `Release-prod`) gets a widget bundle id and an App Group derived from

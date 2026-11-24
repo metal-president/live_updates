@@ -48,6 +48,13 @@ android {
         minSdk = 24
     }
 
+    lint {
+        // CI runs lintDebug for this check only: every API above minSdk must
+        // sit behind a Build.VERSION.SDK_INT check.
+        checkOnly += "NewApi"
+        abortOnError = true
+    }
+
     testOptions {
         unitTests {
             isIncludeAndroidResources = true

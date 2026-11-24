@@ -117,6 +117,9 @@ jobs:
         working-directory: packages/live_updates/example
       - run: ./gradlew :live_updates:testDebugUnitTest
         working-directory: packages/live_updates/example/android
+      # NewApi: APIs above minSdk 24 must sit behind a version check.
+      - run: ./gradlew :live_updates:lintDebug
+        working-directory: packages/live_updates/example/android
 
   build-ios:
     runs-on: macos-latest

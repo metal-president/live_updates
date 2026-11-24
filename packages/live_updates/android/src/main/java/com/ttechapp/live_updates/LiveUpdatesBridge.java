@@ -992,7 +992,65 @@ public final class LiveUpdatesBridge {
         b.setStyle(new Notification.BigTextStyle().bigText(body + "\n" + detail));
       }
     }
+    lockScreen(c, b, content, remote);
     return b;
+  }
+
+  /**
+   * Visibility on a secure lock screen while the user hides sensitive content there: {@code
+   * androidLockScreenVisibility} {@code secret} hides the notification; otherwise it is private,
+   * with a public version made from {@code publicContent} when present (without it the system
+   * shows only the app name and icon).
+   */
+  private static void lockScreen(
+      Context c, Notification.Builder b, JSONObject content, boolean remote) {
+    boolean secret = "secret".equals(optString(content, "androidLockScreenVisibility"));
+    b.setVisibility(secret ? Notification.VISIBILITY_SECRET : Notification.VISIBILITY_PRIVATE);
+    JSONObject pub = secret ? null : content.optJSONObject("publicContent");
+    if (pub == null || optString(pub, "title") == null) return;
+    try {
+      b.setPublicVersion(builder(c, publicContent(content, pub), remote).build());
+    } catch (JSONException e) {
+      // Cannot happen: only strings, numbers and parsed JSON values are put.
+      Log.w(LOG_TAG, "publicContent: " + e.getMessage());
+    }
+  }
+
+  /** Keys of the full content that the public version keeps (the rest may be private). */
+  private static final String[] PUBLIC_KEYS = {
+    "channelId", "channelName", "androidSmallIcon", "icon", "colorArgb", "androidMode",
+    "requestPromotion", "route",
+  };
+
+  private static final String[] PUBLIC_PROGRESS_KEYS = {
+    "progress", "progressSegments", "progressPoints", "progressSemanticStyle",
+  };
+
+  private static final String[] PUBLIC_TIMER_KEYS = {
+    "timerStart", "timerEnd", "whenEpochMillis", "showChronometer",
+  };
+
+  /**
+   * The content of the public version: {@code publicContent}'s title and body, the icon, color,
+   * channel, mode and tap route of {@code content}, and its progress and timer unless {@code
+   * keepProgress} or {@code keepTimer} is false. Images, actions, metrics, steps, the journey, the
+   * progress tracker icon and {@code shortCriticalText} are left out.
+   */
+  static JSONObject publicContent(JSONObject content, JSONObject pub) throws JSONException {
+    JSONObject out = new JSONObject();
+    copy(content, out, PUBLIC_KEYS);
+    if (pub.optBoolean("keepProgress", true)) copy(content, out, PUBLIC_PROGRESS_KEYS);
+    if (pub.optBoolean("keepTimer", true)) copy(content, out, PUBLIC_TIMER_KEYS);
+    out.put("title", optString(pub, "title"));
+    String body = optString(pub, "body");
+    if (body != null) out.put("body", body);
+    return out;
+  }
+
+  private static void copy(JSONObject from, JSONObject to, String[] keys) throws JSONException {
+    for (String key : keys) {
+      if (present(from, key)) to.put(key, from.get(key));
+    }
   }
 
   private static List<String> stepLabels(JSONObject steps) {

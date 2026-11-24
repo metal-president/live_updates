@@ -37,8 +37,11 @@ On the server:
 Build the content once. Keys are those of `LiveUpdateContent` (see the
 package README): `title`, `body`, `progress`, `route`, `timerEnd` /
 `timerStart` (seconds since 1970), `metrics`, `steps`, `journey`, `actions`,
-`extra`, Android options such as `channelId`, `shortCriticalText` or
-`progressSegments`, and the iOS options `layout` / `compactLeading` /
+`extra`, `publicContent` (what a locked device shows while it hides
+sensitive content: `{"title": ..., "body": ..., "keepProgress": true,
+"keepTimer": true}`), Android options such as `channelId`,
+`shortCriticalText`, `progressSegments` or `"androidLockScreenVisibility":
+"secret"`, and the iOS options `layout` / `compactLeading` /
 `compactTrailing` / `minimal` / `tintArgb` / `backgroundArgb` /
 `foregroundArgb`. Each platform ignores the keys it does not use. iOS
 requires `title`, and `extra` must map strings to strings, or the activity
@@ -150,7 +153,7 @@ activity token for that key (or the push-to-start token to start one).
   `alert` go next to `content-state`, not inside it.
 - A push replaces the whole content state: send every field that should stay,
   including `extra`, `layout`, `metrics`, `steps`, `journey`,
-  `compactTrailing` and `minimal`.
+  `publicContent`, `compactTrailing` and `minimal`.
 - Delete the activity token once the update has ended; it cannot be used
   again.
 

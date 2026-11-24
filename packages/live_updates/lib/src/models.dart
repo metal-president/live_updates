@@ -24,6 +24,7 @@ final class LiveUpdateContent {
     this.criticalMetric,
     this.steps,
     this.journey,
+    this.publicContent,
     this.ios,
     this.android,
   }) : assert(progress == null || (progress >= 0 && progress <= 1)),
@@ -102,6 +103,13 @@ final class LiveUpdateContent {
   /// [IosLiveUpdateLayout.journey]; Android shows "from → to" in the text.
   final LiveUpdateJourney? journey;
 
+  /// What the Lock Screen shows instead of this content while the system
+  /// hides sensitive content there. `null` shows this content as usual.
+  ///
+  /// Whether content is hidden depends on the person's device settings
+  /// (see [LiveUpdatePublicContent]); the library never hides it on its own.
+  final LiveUpdatePublicContent? publicContent;
+
   /// iOS-only options.
   final IosLiveUpdateOptions? ios;
 
@@ -122,6 +130,7 @@ final class LiveUpdateContent {
     int? criticalMetric,
     LiveUpdateSteps? steps,
     LiveUpdateJourney? journey,
+    LiveUpdatePublicContent? publicContent,
     IosLiveUpdateOptions? ios,
     AndroidLiveUpdateOptions? android,
   }) => LiveUpdateContent(
@@ -137,6 +146,7 @@ final class LiveUpdateContent {
     criticalMetric: criticalMetric ?? this.criticalMetric,
     steps: steps ?? this.steps,
     journey: journey ?? this.journey,
+    publicContent: publicContent ?? this.publicContent,
     ios: ios ?? this.ios,
     android: android ?? this.android,
   );
@@ -156,6 +166,7 @@ final class LiveUpdateContent {
       other.criticalMetric == criticalMetric &&
       other.steps == steps &&
       other.journey == journey &&
+      other.publicContent == publicContent &&
       other.ios == ios &&
       other.android == android;
 
@@ -173,6 +184,7 @@ final class LiveUpdateContent {
     criticalMetric,
     steps,
     journey,
+    publicContent,
     ios,
     android,
   );
@@ -180,6 +192,66 @@ final class LiveUpdateContent {
   @override
   String toString() =>
       'LiveUpdateContent(title: $title, body: $body, progress: $progress)';
+}
+
+/// Content shown on the Lock Screen instead of the full [LiveUpdateContent]
+/// while the system hides sensitive content there
+/// ([LiveUpdateContent.publicContent]).
+///
+/// Whether that happens depends on the person's device settings; the library
+/// never hides content on its own:
+///
+/// * Android: when the person chose to hide sensitive notification content
+///   on the lock screen, the system shows this version of the notification
+///   (`Notification.Builder.setPublicVersion`) while the device is locked.
+/// * iOS: when the system hides private data of the Live Activity on the
+///   Lock Screen (the widget sees the `privacy` redaction reason), the
+///   generated widget shows this content. In tests on iOS 27 this happened
+///   while the device was locked with Live Activities turned off under
+///   Settings > Face ID & Passcode > Allow Access When Locked.
+///
+/// Only [title], [body], the icon, the colors and, as chosen with
+/// [keepProgress] and [keepTimer], the progress and the timer are shown.
+/// Images, buttons, metrics, steps, the journey, extra values and Android's
+/// `shortCriticalText` are left out.
+@immutable
+final class LiveUpdatePublicContent {
+  /// Creates public content.
+  const LiveUpdatePublicContent({
+    required this.title,
+    this.body,
+    this.keepProgress = true,
+    this.keepTimer = true,
+  });
+
+  /// Primary text, such as "Delivery in progress".
+  final String title;
+
+  /// Secondary text.
+  final String? body;
+
+  /// Whether [LiveUpdateContent.progress] is still shown. Progress made only
+  /// from [LiveUpdateContent.steps] is not kept, because the steps are left
+  /// out.
+  final bool keepProgress;
+
+  /// Whether [LiveUpdateContent.timer] (and on Android
+  /// [AndroidLiveUpdateOptions.when]) is still shown.
+  final bool keepTimer;
+
+  @override
+  bool operator ==(Object other) =>
+      other is LiveUpdatePublicContent &&
+      other.title == title &&
+      other.body == body &&
+      other.keepProgress == keepProgress &&
+      other.keepTimer == keepTimer;
+
+  @override
+  int get hashCode => Object.hash(title, body, keepProgress, keepTimer);
+
+  @override
+  String toString() => 'LiveUpdatePublicContent(title: $title, body: $body)';
 }
 
 /// A timer counted by the system (see [LiveUpdateContent.timer]).
@@ -790,6 +862,7 @@ final class AndroidLiveUpdateOptions {
     this.progressTrackerIcon,
     this.timeoutAfter,
     this.alert = false,
+    this.lockScreenVisibility = AndroidLockScreenVisibility.private,
   });
 
   /// Notification channel id. The channel is created on first use.
@@ -877,6 +950,11 @@ final class AndroidLiveUpdateOptions {
   /// update every 10 seconds (iOS: [IosLiveUpdateOptions.alert]).
   final bool alert;
 
+  /// How much of the notification the lock screen shows while the person
+  /// hides sensitive notification content there. See
+  /// [AndroidLockScreenVisibility].
+  final AndroidLockScreenVisibility lockScreenVisibility;
+
   @override
   bool operator ==(Object other) =>
       other is AndroidLiveUpdateOptions &&
@@ -894,7 +972,8 @@ final class AndroidLiveUpdateOptions {
       listEquals(other.progressPoints, progressPoints) &&
       other.progressTrackerIcon == progressTrackerIcon &&
       other.timeoutAfter == timeoutAfter &&
-      other.alert == alert;
+      other.alert == alert &&
+      other.lockScreenVisibility == lockScreenVisibility;
 
   @override
   int get hashCode => Object.hash(
@@ -913,7 +992,28 @@ final class AndroidLiveUpdateOptions {
     progressTrackerIcon,
     timeoutAfter,
     alert,
+    lockScreenVisibility,
   );
+}
+
+/// What an Android lock screen shows of a notification while the person
+/// hides sensitive notification content there
+/// ([AndroidLiveUpdateOptions.lockScreenVisibility]).
+///
+/// There is no option to always show the full content: it would override
+/// the person's choice to hide sensitive content.
+///
+/// New values may be added in minor releases.
+enum AndroidLockScreenVisibility {
+  /// Shows [LiveUpdateContent.publicContent] when set; otherwise the system
+  /// shows the app name and icon without the content
+  /// (`Notification.VISIBILITY_PRIVATE`).
+  private,
+
+  /// Shows nothing of the notification on a secure lock screen
+  /// (`Notification.VISIBILITY_SECRET`); [LiveUpdateContent.publicContent]
+  /// is not used there.
+  secret,
 }
 
 /// A part of the Android progress bar

@@ -30,6 +30,13 @@ extension LiveUpdateContentJson on LiveUpdateContent {
         'fromDetail': ?j.fromDetail,
         'toDetail': ?j.toDetail,
       },
+    if (publicContent case final p?)
+      'publicContent': {
+        'title': p.title,
+        'body': ?p.body,
+        'keepProgress': p.keepProgress,
+        'keepTimer': p.keepTimer,
+      },
     if (actions.isNotEmpty)
       'actions': [
         for (final a in actions)
@@ -96,6 +103,8 @@ extension LiveUpdateContentJson on LiveUpdateContent {
       'timeoutAfterMillis': ?a.timeoutAfter?.inMilliseconds,
       // Not 'alert': that key holds the iOS alert.
       if (a.alert) 'androidAlert': true,
+      if (a.lockScreenVisibility != AndroidLockScreenVisibility.private)
+        'androidLockScreenVisibility': a.lockScreenVisibility.name,
     },
   };
 }

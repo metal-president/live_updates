@@ -66,6 +66,34 @@ public class LiveUpdatesFallbackTest {
   }
 
   @Test
+  public void publicContentBecomesThePublicVersion() throws Exception {
+    String id =
+        LiveUpdatesBridge.start(
+            "{\"title\":\"Order #1234\",\"progress\":0.5,\"timerEnd\":1893456000,"
+                + "\"journey\":{\"from\":\"A\",\"to\":\"B\"},"
+                + "\"actions\":[{\"id\":\"call\",\"title\":\"Call\"}],"
+                + "\"publicContent\":{\"title\":\"Delivery\",\"body\":\"On the way\"}}");
+    Notification n = shown(id);
+    assertEquals(Notification.VISIBILITY_PRIVATE, n.visibility);
+    Notification p = n.publicVersion;
+    assertNotNull(p);
+    assertEquals("Delivery", p.extras.getString(Notification.EXTRA_TITLE));
+    assertEquals("On the way", p.extras.getCharSequence(Notification.EXTRA_TEXT).toString());
+    assertNull(p.actions);
+    assertNull(p.extras.getCharSequence(Notification.EXTRA_BIG_TEXT));
+    assertEquals(50, p.extras.getInt(Notification.EXTRA_PROGRESS));
+    assertEquals(100, p.extras.getInt(Notification.EXTRA_PROGRESS_MAX));
+    assertTrue(p.extras.getBoolean(Notification.EXTRA_SHOW_CHRONOMETER));
+  }
+
+  @Test
+  public void secretVisibilityIsApplied() throws Exception {
+    String id =
+        LiveUpdatesBridge.start("{\"title\":\"Order\",\"androidLockScreenVisibility\":\"secret\"}");
+    assertEquals(Notification.VISIBILITY_SECRET, shown(id).visibility);
+  }
+
+  @Test
   public void liveUpdateModeFallsBackToAnOngoingProgressBar() throws Exception {
     String id =
         LiveUpdatesBridge.start(

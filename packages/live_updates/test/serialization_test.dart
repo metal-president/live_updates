@@ -290,4 +290,50 @@ void main() {
       'LiveUpdateIcon.symbol(a)',
     );
   });
+
+  test('public content and lock screen visibility are encoded', () {
+    expect(
+      const LiveUpdateContent(
+        title: 'Order #1234',
+        publicContent: LiveUpdatePublicContent(title: 'Delivery'),
+      ).toJson(),
+      {
+        'title': 'Order #1234',
+        'publicContent': {
+          'title': 'Delivery',
+          'keepProgress': true,
+          'keepTimer': true,
+        },
+      },
+    );
+    final json = const LiveUpdateContent(
+      title: 'T',
+      publicContent: LiveUpdatePublicContent(
+        title: 'P',
+        body: 'B',
+        keepProgress: false,
+        keepTimer: false,
+      ),
+      android: AndroidLiveUpdateOptions(
+        lockScreenVisibility: AndroidLockScreenVisibility.secret,
+      ),
+    ).toJson();
+    expect(json['publicContent'], {
+      'title': 'P',
+      'body': 'B',
+      'keepProgress': false,
+      'keepTimer': false,
+    });
+    expect(json['androidLockScreenVisibility'], 'secret');
+    // The default (private) is not sent.
+    expect(
+      const LiveUpdateContent(
+        title: 'T',
+        android: AndroidLiveUpdateOptions(),
+      ).toJson().containsKey('androidLockScreenVisibility'),
+      isFalse,
+    );
+    // Valid JSON for the native side and remote payloads.
+    expect(jsonDecode(jsonEncode(json)), json);
+  });
 }

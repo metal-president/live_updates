@@ -26,4 +26,59 @@ void main() {
     expect(b.ios, a.ios);
     expect(b, isNot(a));
   });
+
+  test('public content has value equality and is part of the content', () {
+    const p = LiveUpdatePublicContent(title: 'Delivery', body: 'On the way');
+    expect(
+      p,
+      const LiveUpdatePublicContent(title: 'Delivery', body: 'On the way'),
+    );
+    expect(
+      p.hashCode,
+      const LiveUpdatePublicContent(
+        title: 'Delivery',
+        body: 'On the way',
+      ).hashCode,
+    );
+    expect(p.keepProgress, isTrue);
+    expect(p.keepTimer, isTrue);
+    expect(
+      p,
+      isNot(
+        const LiveUpdatePublicContent(
+          title: 'Delivery',
+          body: 'On the way',
+          keepTimer: false,
+        ),
+      ),
+    );
+    expect(
+      p.toString(),
+      'LiveUpdatePublicContent(title: Delivery, body: On the way)',
+    );
+
+    const a = LiveUpdateContent(title: 'Order #1234', publicContent: p);
+    expect(a, const LiveUpdateContent(title: 'Order #1234', publicContent: p));
+    expect(a, isNot(const LiveUpdateContent(title: 'Order #1234')));
+    expect(a.copyWith(progress: .5).publicContent, p);
+    expect(
+      const LiveUpdateContent(title: 'T')
+          .copyWith(publicContent: p)
+          .publicContent,
+      p,
+    );
+  });
+
+  test('android lock screen visibility defaults to private', () {
+    const options = AndroidLiveUpdateOptions();
+    expect(options.lockScreenVisibility, AndroidLockScreenVisibility.private);
+    expect(
+      options,
+      isNot(
+        const AndroidLiveUpdateOptions(
+          lockScreenVisibility: AndroidLockScreenVisibility.secret,
+        ),
+      ),
+    );
+  });
 }

@@ -539,6 +539,7 @@ private struct Payload: Decodable {
   var metrics: [LiveUpdatesMetric]?
   var steps: LiveUpdatesSteps?
   var journey: LiveUpdatesJourney?
+  var publicContent: LiveUpdatesPublicContent?
   var staleDate: Double?
   var relevanceScore: Double?
   var enablePushUpdates: Bool?
@@ -558,7 +559,8 @@ private struct Payload: Decodable {
         timerStart: timerStart, timerEnd: timerEnd,
         compactTrailing: compactTrailing, compactLeading: compactLeading, minimal: minimal,
         tintArgb: tintArgb, backgroundArgb: backgroundArgb, foregroundArgb: foregroundArgb,
-        layout: layout, metrics: metrics ?? [], steps: steps, journey: journey),
+        layout: layout, metrics: metrics ?? [], steps: steps, journey: journey,
+        publicContent: publicContent),
       staleDate: staleDate.map { Date(timeIntervalSince1970: $0) },
       relevanceScore: relevanceScore ?? 0
     )

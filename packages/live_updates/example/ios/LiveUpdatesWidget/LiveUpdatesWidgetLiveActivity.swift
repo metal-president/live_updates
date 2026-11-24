@@ -11,6 +11,12 @@ import WidgetKit
 /// any of them with your own views; `context.state` has every field of
 /// `LiveUpdateContent`, and `context.state.extra["key"]` the values of
 /// `IosLiveUpdateOptions.extra`.
+///
+/// While the system hides private data on the Lock Screen, the building
+/// blocks show `LiveUpdateContent.publicContent` when it is set. A layout of
+/// your own should do the same: read `@Environment(\.redactionReasons)` in
+/// it and, when `state.liveUpdatesShowsPublic(redactionReasons)` is true, show
+/// `LiveUpdatesPublicLockScreen(state: state)` instead.
 struct LiveUpdatesWidgetLiveActivity: Widget {
   var body: some WidgetConfiguration {
     ActivityConfiguration(for: LiveUpdatesAttributes.self) { context in
@@ -35,7 +41,7 @@ struct LiveUpdatesWidgetLiveActivity: Widget {
           LiveUpdatesExpandedTrailing(state: context.state)
         }
         DynamicIslandExpandedRegion(.center) {
-          Text(context.state.title).font(.headline).lineLimit(1)
+          LiveUpdatesExpandedCenter(state: context.state)
         }
         DynamicIslandExpandedRegion(.bottom) {
           LiveUpdatesExpandedBottom(state: context.state, activityID: context.activityID)

@@ -52,6 +52,9 @@ public struct LiveUpdatesAttributes: ActivityAttributes {
     public var steps: LiveUpdatesSteps?
     /// `LiveUpdateContent.journey`.
     public var journey: LiveUpdatesJourney?
+    /// `LiveUpdateContent.publicContent`: shown instead of this content while
+    /// the system hides private data on the Lock Screen.
+    public var publicContent: LiveUpdatesPublicContent?
 
     public init(
       title: String, body: String? = nil, progress: Double? = nil,
@@ -62,7 +65,7 @@ public struct LiveUpdatesAttributes: ActivityAttributes {
       compactTrailing: String? = nil, compactLeading: String? = nil, minimal: String? = nil,
       tintArgb: Int? = nil, backgroundArgb: Int? = nil, foregroundArgb: Int? = nil,
       layout: String? = nil, metrics: [LiveUpdatesMetric] = [], steps: LiveUpdatesSteps? = nil,
-      journey: LiveUpdatesJourney? = nil
+      journey: LiveUpdatesJourney? = nil, publicContent: LiveUpdatesPublicContent? = nil
     ) {
       self.title = title
       self.body = body
@@ -86,6 +89,7 @@ public struct LiveUpdatesAttributes: ActivityAttributes {
       self.metrics = metrics
       self.steps = steps
       self.journey = journey
+      self.publicContent = publicContent
     }
 
     // Lenient decoding so APNs `content-state` may omit optional keys.
@@ -118,6 +122,8 @@ public struct LiveUpdatesAttributes: ActivityAttributes {
           ?? nil)?.compactMap(\.value) ?? []
       steps = (try? c.decodeIfPresent(LiveUpdatesSteps.self, forKey: .steps)) ?? nil
       journey = (try? c.decodeIfPresent(LiveUpdatesJourney.self, forKey: .journey)) ?? nil
+      publicContent =
+        (try? c.decodeIfPresent(LiveUpdatesPublicContent.self, forKey: .publicContent)) ?? nil
     }
   }
 
@@ -222,6 +228,32 @@ public struct LiveUpdatesJourney: Codable, Hashable {
     self.to = to
     self.fromDetail = fromDetail
     self.toDetail = toDetail
+  }
+}
+
+/// `LiveUpdateContent.publicContent`: what the Lock Screen shows while the
+/// system hides private data (the `privacy` redaction reason).
+public struct LiveUpdatesPublicContent: Codable, Hashable {
+  public var title: String
+  public var body: String?
+  /// Whether the progress of the full content is still shown.
+  public var keepProgress: Bool
+  /// Whether the timer of the full content is still shown.
+  public var keepTimer: Bool
+
+  public init(title: String, body: String? = nil, keepProgress: Bool = true, keepTimer: Bool = true) {
+    self.title = title
+    self.body = body
+    self.keepProgress = keepProgress
+    self.keepTimer = keepTimer
+  }
+
+  public init(from decoder: Decoder) throws {
+    let c = try decoder.container(keyedBy: CodingKeys.self)
+    title = try c.decode(String.self, forKey: .title)
+    body = try c.decodeIfPresent(String.self, forKey: .body)
+    keepProgress = (try? c.decodeIfPresent(Bool.self, forKey: .keepProgress)) ?? true
+    keepTimer = (try? c.decodeIfPresent(Bool.self, forKey: .keepTimer)) ?? true
   }
 }
 

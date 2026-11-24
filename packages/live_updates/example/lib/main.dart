@@ -123,6 +123,12 @@ class _ExamplePageState extends State<ExamplePage> {
                 '${_eta.minute.toString().padLeft(2, '0')}',
           )
         : null,
+    // Shown instead (keeping the progress and the countdown) while a locked
+    // device hides sensitive content, if the person chose that in Settings.
+    publicContent: const LiveUpdatePublicContent(
+      title: 'Delivery',
+      body: 'Unlock for details',
+    ),
     ios: IosLiveUpdateOptions(
       layout: _layout,
       // The compact Dynamic Island shows the countdown instead of the progress.

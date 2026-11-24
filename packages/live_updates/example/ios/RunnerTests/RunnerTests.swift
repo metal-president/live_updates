@@ -64,6 +64,36 @@ struct ContentStateDecodingTests {
     #expect(state.islandIcon == nil)
   }
 
+  @Test func publicContentDecodesWithDefaults() throws {
+    let state = try decode(#"{"title":"T","publicContent":{"title":"Delivery"}}"#)
+    #expect(state.publicContent == LiveUpdatesPublicContent(title: "Delivery"))
+    #expect(state.publicContent?.keepProgress == true)
+    #expect(state.publicContent?.keepTimer == true)
+    let full = try decode(
+      #"{"title":"T","publicContent":{"title":"P","body":"B","keepProgress":false,"keepTimer":false}}"#)
+    #expect(
+      full.publicContent
+        == LiveUpdatesPublicContent(title: "P", body: "B", keepProgress: false, keepTimer: false))
+  }
+
+  @Test func contentWithoutPublicContentStillDecodes() throws {
+    #expect(try decode(#"{"title":"T"}"#).publicContent == nil)
+  }
+
+  @Test func aMalformedPublicContentIsLeftOut() throws {
+    let state = try decode(#"{"title":"T","publicContent":{"body":"no title"}}"#)
+    #expect(state.title == "T")
+    #expect(state.publicContent == nil)
+    #expect(try decode(#"{"title":"T","publicContent":"x"}"#).publicContent == nil)
+  }
+
+  @Test func publicContentRoundTrips() throws {
+    let state = LiveUpdatesAttributes.ContentState(
+      title: "T", publicContent: LiveUpdatesPublicContent(title: "P", keepTimer: false))
+    let data = try JSONEncoder().encode(state)
+    #expect(try JSONDecoder().decode(LiveUpdatesAttributes.ContentState.self, from: data) == state)
+  }
+
   @Test func assetIconFileNameMatchesDart() {
     // Same value as IconStore.fileName('assets/parcel.png') in Dart.
     let url = LiveUpdatesImages.iconURL(asset: "assets/parcel.png")

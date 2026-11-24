@@ -70,6 +70,95 @@ public class LiveUpdatesBridgeTest {
   }
 
   @Test
+  public void visibilityIsPrivateWithoutPublicVersionByDefault() throws Exception {
+    Notification n = shown(LiveUpdatesBridge.start("{\"title\":\"Order\"}"));
+    assertEquals(Notification.VISIBILITY_PRIVATE, n.visibility);
+    assertEquals(null, n.publicVersion);
+  }
+
+  @Test
+  public void publicContentBecomesThePublicVersion() throws Exception {
+    String id =
+        LiveUpdatesBridge.start(
+            "{\"title\":\"Order #1234\",\"body\":\"Gate code 4321\",\"progress\":0.4,"
+                + "\"timerEnd\":1893456000,\"colorArgb\":4278190335,\"channelId\":\"rides\","
+                + "\"shortCriticalText\":\"4321\","
+                + "\"metrics\":[{\"label\":\"ETA\",\"type\":\"integer\",\"value\":5}],"
+                + "\"steps\":{\"labels\":[\"A\",\"B\"],\"current\":1},"
+                + "\"journey\":{\"from\":\"A\",\"to\":\"B\"},"
+                + "\"actions\":[{\"id\":\"call\",\"title\":\"Call\"}],"
+                + "\"publicContent\":{\"title\":\"Delivery\",\"body\":\"On the way\","
+                + "\"keepProgress\":true,\"keepTimer\":true}}");
+    Notification n = shown(id);
+    assertEquals(Notification.VISIBILITY_PRIVATE, n.visibility);
+    assertEquals(1, n.actions.length);
+    Notification p = n.publicVersion;
+    assertNotNull(p);
+    assertEquals("Delivery", p.extras.getString(Notification.EXTRA_TITLE));
+    assertEquals("On the way", p.extras.getCharSequence(Notification.EXTRA_TEXT).toString());
+    assertEquals(null, p.actions);
+    assertEquals(null, p.extras.getCharSequence(Notification.EXTRA_SUB_TEXT));
+    assertEquals("rides", p.getChannelId());
+    assertEquals(0xFF0000FF, p.color);
+    assertTrue((p.flags & Notification.FLAG_ONGOING_EVENT) != 0);
+    assertEquals(1893456000000L, p.when);
+    assertTrue(p.extras.getBoolean(Notification.EXTRA_SHOW_CHRONOMETER));
+    // The progress is kept (ProgressStyle on Android 16), the stages are not.
+    assertEquals(
+        "android.app.Notification$ProgressStyle", p.extras.getString(Notification.EXTRA_TEMPLATE));
+    Notification.ProgressStyle style =
+        (Notification.ProgressStyle) Notification.Builder.recoverBuilder(app, p).getStyle();
+    assertEquals(40, style.getProgress());
+    assertEquals(100, style.getProgressMax());
+    assertTrue(style.getProgressPoints().isEmpty());
+    assertNotNull(p.contentIntent);
+  }
+
+  @Test
+  public void publicContentCanDropProgressAndTimer() throws Exception {
+    String id =
+        LiveUpdatesBridge.start(
+            "{\"title\":\"Order\",\"progress\":0.4,\"timerStart\":1893456000,"
+                + "\"whenEpochMillis\":1893456000000,\"showChronometer\":true,"
+                + "\"publicContent\":{\"title\":\"Delivery\","
+                + "\"keepProgress\":false,\"keepTimer\":false}}");
+    Notification p = shown(id).publicVersion;
+    assertEquals("Delivery", p.extras.getString(Notification.EXTRA_TITLE));
+    assertEquals(null, p.extras.getCharSequence(Notification.EXTRA_TEXT));
+    assertEquals(null, p.extras.getString(Notification.EXTRA_TEMPLATE));
+    assertEquals(0, p.extras.getInt(Notification.EXTRA_PROGRESS_MAX));
+    assertFalse(p.extras.getBoolean(Notification.EXTRA_SHOW_CHRONOMETER));
+    // The system's post time, not the timer or `when` of the full content.
+    assertTrue(p.when < 1893456000000L);
+  }
+
+  @Test
+  public void secretVisibilityHidesTheNotification() throws Exception {
+    String id =
+        LiveUpdatesBridge.start(
+            "{\"title\":\"Order\",\"androidLockScreenVisibility\":\"secret\","
+                + "\"publicContent\":{\"title\":\"Delivery\"}}");
+    Notification n = shown(id);
+    assertEquals(Notification.VISIBILITY_SECRET, n.visibility);
+    assertEquals(null, n.publicVersion);
+  }
+
+  @Test
+  public void remotePayloadsUseThePublicContentKeys() throws Exception {
+    remote(
+        "start",
+        "pub",
+        "{\"title\":\"Order\",\"publicContent\":{\"title\":\"Delivery\"}}");
+    assertEquals("Delivery", shown("pub").publicVersion.extras.getString(Notification.EXTRA_TITLE));
+    remote("update", "pub", "{\"title\":\"Order\",\"androidLockScreenVisibility\":\"secret\"}");
+    assertEquals(Notification.VISIBILITY_SECRET, shown("pub").visibility);
+    // A publicContent without a title is ignored.
+    remote("update", "pub", "{\"title\":\"Order\",\"publicContent\":{\"body\":\"x\"}}");
+    assertEquals(Notification.VISIBILITY_PRIVATE, shown("pub").visibility);
+    assertEquals(null, shown("pub").publicVersion);
+  }
+
+  @Test
   public void remotePayloadStartsUpdatesAndEnds() throws Exception {
     assertTrue(remote("start", "r1", "{\"title\":\"Order\",\"progress\":0.1}"));
     Notification n = shown("r1");

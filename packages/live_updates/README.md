@@ -556,6 +556,67 @@ applies them to promoted Live Updates on Android 17. They are ignored on
 older versions. The same keys work in remote payloads (see
 [docs/testing-remote.md](https://github.com/metal-president/live_updates/blob/main/docs/testing-remote.md)).
 
+### Hiding content on the Lock Screen
+
+People can choose to hide sensitive content on a locked device. For those
+moments, give the update a `publicContent` without personal details:
+
+```dart
+await LiveUpdates.start(
+  const LiveUpdateContent(
+    title: 'Order #1234',
+    body: 'Courier at the door, gate code 4321',
+    progress: .6,
+    publicContent: LiveUpdatePublicContent(
+      title: 'Delivery',
+      body: 'On the way',
+    ),
+  ),
+);
+```
+
+The library never hides content on its own; the person's settings decide:
+
+- **Android:** when the person hides sensitive notification content on the
+  lock screen, Android shows the public version of the notification
+  ([`setPublicVersion`][android-public-version]) while the device is locked.
+  live_updates posts every notification as
+  [`VISIBILITY_PRIVATE`][android-visibility] (Android's default): without
+  `publicContent`, a locked device shows only the app name and icon. People
+  can also change lock screen visibility per notification channel
+  ([lock screen visibility][android-lock-screen]).
+- **iOS:** when the system hides private data, the widget sees the
+  [`privacy`][ios-privacy] redaction reason, and the generated widget shows
+  `publicContent`. For widgets, Apple documents that people control this
+  with the Lock Screen items under Settings > Face ID & Passcode > Allow
+  Access When Locked ([hide sensitive content][ios-hide-sensitive]). Apple
+  does not describe it for Live Activities; in tests on iOS 27 the Live
+  Activity got the `privacy` reason while the device was locked with Live
+  Activities turned off there, and not after unlocking with Face ID.
+  Without `publicContent` the widget shows the full content as before.
+
+The public version keeps the icon, the colors, the tap route and, unless you
+pass `keepProgress: false` or `keepTimer: false`, the progress and the
+timer. Images, buttons, metrics, steps, the journey, `extra` values and
+Android's `shortCriticalText` are left out.
+
+To hide the whole notification on a locked Android device instead, pass
+`AndroidLiveUpdateOptions(lockScreenVisibility:
+AndroidLockScreenVisibility.secret)` ([`VISIBILITY_SECRET`][android-visibility-secret]).
+There is no option to always show the full content: it would override the
+person's choice.
+
+In remote payloads, the keys are `publicContent` (an object with `title`,
+optional `body`, and `keepProgress` / `keepTimer`, which default to `true`)
+and, for Android, `"androidLockScreenVisibility": "secret"`.
+
+[android-public-version]: https://developer.android.com/reference/android/app/Notification.Builder#setPublicVersion(android.app.Notification)
+[android-visibility]: https://developer.android.com/reference/android/app/Notification#VISIBILITY_PRIVATE
+[android-visibility-secret]: https://developer.android.com/reference/android/app/Notification#VISIBILITY_SECRET
+[android-lock-screen]: https://developer.android.com/develop/ui/views/notifications/build-notification
+[ios-privacy]: https://developer.apple.com/documentation/swiftui/redactionreasons/privacy
+[ios-hide-sensitive]: https://developer.apple.com/documentation/widgetkit/creating-a-widget-extension#Hide-sensitive-content
+
 ### Images
 
 Pass a picture with the content. It becomes the thumbnail in the iOS widget
@@ -735,6 +796,25 @@ default: LiveUpdatesLockScreen(state: context.state, activityID: context.activit
 }
 ```
 
+The built-in building blocks show `publicContent` while the system hides
+private data (see [Hiding content on the Lock Screen](#hiding-content-on-the-lock-screen)).
+A layout of your own should do the same:
+
+```swift
+struct MyLayout: View {
+  let state: LiveUpdatesAttributes.ContentState
+  @Environment(\.redactionReasons) private var redactionReasons
+
+  var body: some View {
+    if state.liveUpdatesShowsPublic(redactionReasons) {
+      LiveUpdatesPublicLockScreen(state: state)
+    } else {
+      // Your layout.
+    }
+  }
+}
+```
+
 ## Remote updates
 
 The content JSON is the same on both platforms; only the push envelope
@@ -772,9 +852,11 @@ Send pushes with `apns-push-type: liveactivity` and topic
 
 - Times (`timerStart`, `timerEnd`) are seconds since 1970, and colors
   (`tintArgb`, `backgroundArgb`, `foregroundArgb`) are ARGB integers. Other
-  keys include `route`, `actions`, `extra`, the icons (`icon`, `iosIcon`,
-  `islandIcon`, each an object such as `{"symbol": "shippingbox.fill"}`) and
-  the island options `compactLeading` / `compactTrailing` / `minimal`.
+  keys include `route`, `actions`, `extra`, `publicContent` (see
+  [Hiding content on the Lock Screen](#hiding-content-on-the-lock-screen)),
+  the icons (`icon`, `iosIcon`, `islandIcon`, each an object such as
+  `{"symbol": "shippingbox.fill"}`) and the island options
+  `compactLeading` / `compactTrailing` / `minimal`.
 - For push-to-start, set `"attributes-type": "LiveUpdatesAttributes"`,
   `"attributes": {"key": "<your id>"}` (or `{}` without a key) and an `alert`.
 
@@ -837,7 +919,8 @@ A layout file generated by an older version can miss newer features: the
 layout switch for [custom layouts](#custom-layouts), and the Dynamic Island
 options, which need `LiveUpdatesCompactLeading`, `LiveUpdatesCompactTrailing`,
 `LiveUpdatesMinimal` and `LiveUpdatesIslandIcon` (in the expanded leading
-region). Add them yourself, or copy your changes aside, run
+region), and `LiveUpdatesExpandedCenter` (in the expanded center region,
+so the title follows `publicContent`). Add them yourself, or copy your changes aside, run
 `create_widget --force` and apply them again.
 
 ### From 0.1.x to 0.2.0

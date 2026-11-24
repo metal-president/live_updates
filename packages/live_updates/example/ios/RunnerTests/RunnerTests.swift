@@ -45,6 +45,31 @@ struct ContentStateDecodingTests {
   @Test func theTitleIsRequired() {
     #expect(throws: (any Error).self) { try decode(#"{"body":"no title"}"#) }
   }
+
+  @Test func iconsDecodePerKey() throws {
+    let state = try decode(
+      #"{"title":"T","icon":{"asset":"assets/a.png"},"iosIcon":{"native":"pin"},"#
+        + #""islandIcon":{"symbol":"shippingbox"},"#
+        + #""actions":[{"id":"x","title":"X","icon":{"symbol":"xmark"},"androidIcon":{"native":"ic"}}]}"#)
+    #expect(state.icon == LiveUpdatesIcon(asset: "assets/a.png"))
+    #expect(state.iosIcon == LiveUpdatesIcon(native: "pin"))
+    #expect(state.islandIcon == LiveUpdatesIcon(symbol: "shippingbox"))
+    #expect(state.actions[0].icon == LiveUpdatesIcon(symbol: "xmark"))
+    #expect(state.actions[0].iosIcon == nil)
+  }
+
+  @Test func aMalformedIconIsLeftOut() throws {
+    let state = try decode(#"{"title":"T","icon":"pin","islandIcon":{"symbol":3}}"#)
+    #expect(state.icon == nil)
+    #expect(state.islandIcon == nil)
+  }
+
+  @Test func assetIconFileNameMatchesDart() {
+    // Same value as IconStore.fileName('assets/parcel.png') in Dart.
+    let url = LiveUpdatesImages.iconURL(asset: "assets/parcel.png")
+    #expect(url == nil || url?.lastPathComponent == "e036be2e00f1bd26358db437e998432d.png")
+    #expect(url == nil || url?.deletingLastPathComponent().lastPathComponent == "icons")
+  }
 }
 
 /// Button press routing between the app's Dart listeners and the background

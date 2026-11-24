@@ -379,10 +379,50 @@ public class LiveUpdatesBridgeTest {
   public void shortTimeoutsAndQualifiedIconNamesAreRejected() throws Exception {
     String id =
         LiveUpdatesBridge.start(
-            "{\"title\":\"A\",\"timeoutAfterMillis\":1,\"iconName\":\"android:drawable/ic_dialog_alert\"}");
+            "{\"title\":\"A\",\"timeoutAfterMillis\":1,"
+                + "\"icon\":{\"native\":\"android:drawable/ic_dialog_alert\"}}");
     Notification n = shown(id);
     assertEquals(60_000, n.getTimeoutAfter());
     assertEquals(android.R.drawable.ic_dialog_info, n.getSmallIcon().getResId());
+  }
+
+  @Test
+  public void iconsThatCannotBeShownUseTheDefault() throws Exception {
+    for (String icon :
+        new String[] {
+          "{\"native\":\"no_such_drawable\"}",
+          "{\"symbol\":\"shippingbox\"}",
+          "{\"asset\":\"assets/missing.png\"}",
+          "{\"asset\":\"../secret.png\"}",
+          "{}",
+          "\"ic_plain_string\""
+        }) {
+      String id = LiveUpdatesBridge.start("{\"title\":\"A\",\"icon\":" + icon + "}");
+      assertEquals(icon, android.R.drawable.ic_dialog_info, shown(id).getSmallIcon().getResId());
+    }
+  }
+
+  @Test
+  public void androidSmallIconWinsAndFailsToTheDefaultNotToIcon() throws Exception {
+    android.os.Bundle meta = new android.os.Bundle();
+    meta.putInt(LiveUpdatesBridge.DEFAULT_ICON_META, android.R.drawable.ic_menu_add);
+    shadowOf(app.getPackageManager())
+        .getInternalMutablePackageInfo(app.getPackageName())
+        .applicationInfo
+        .metaData = meta;
+    // No icon at all: the manifest default.
+    String id = LiveUpdatesBridge.start("{\"title\":\"A\"}");
+    assertEquals(android.R.drawable.ic_menu_add, shown(id).getSmallIcon().getResId());
+    // A missing androidSmallIcon does not fall back to icon.
+    id =
+        LiveUpdatesBridge.start(
+            "{\"title\":\"A\",\"icon\":{\"native\":\"x\"},\"androidSmallIcon\":{\"symbol\":\"y\"}}");
+    assertEquals(android.R.drawable.ic_menu_add, shown(id).getSmallIcon().getResId());
+    // A 0.1.x string value is not an icon object: the default, not icon.
+    id =
+        LiveUpdatesBridge.start(
+            "{\"title\":\"A\",\"icon\":{\"native\":\"ic_dialog_info\"},\"androidSmallIcon\":\"ic_x\"}");
+    assertEquals(android.R.drawable.ic_menu_add, shown(id).getSmallIcon().getResId());
   }
 
   @Test

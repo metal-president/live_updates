@@ -116,6 +116,17 @@ Future<int> createWidget(List<String> args, {Directory? templates}) async {
     f.writeAsStringSync(content);
     stdout.writeln('write  ${f.path}');
   }
+  // Asset catalog for LiveUpdateIcon.native images: created once, never
+  // replaced (it holds your images).
+  final catalog = File('${out.path}/Assets.xcassets/Contents.json');
+  if (catalog.existsSync()) {
+    stdout.writeln('keep   ${catalog.parent.path}');
+  } else {
+    catalog
+      ..createSync(recursive: true)
+      ..writeAsStringSync(_assetCatalogContents);
+    stdout.writeln('write  ${catalog.parent.path}');
+  }
   for (final MapEntry(key: file, value: content) in editable.entries) {
     final f = File('${out.path}/$file');
     if (f.existsSync() && !force) {
@@ -292,3 +303,12 @@ bool _registerTapScheme(String plist) {
   stdout.writeln('update $plist (URL scheme $scheme)');
   return true;
 }
+
+/// `Contents.json` of an empty asset catalog, as Xcode writes it.
+const _assetCatalogContents = '''{
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}
+''';

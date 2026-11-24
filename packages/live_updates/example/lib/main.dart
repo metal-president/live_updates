@@ -129,13 +129,18 @@ class _ExamplePageState extends State<ExamplePage> {
       compactTrailing: IosIslandContent.timer,
       // Accent for progress, buttons and the timer.
       color: const Color(0xFF8C9EFF),
+      // A simple shape in the Dynamic Island instead of the photo.
+      islandIcon: const LiveUpdateIcon.symbol('shippingbox.fill'),
     ),
     image: const LiveUpdateImage.asset('assets/parcel.png', maxDimension: 128),
+    // Shared icon (iOS thumbnail fallback); Android and the Dynamic Island
+    // get their own below.
+    icon: const LiveUpdateIcon.asset('assets/parcel.png'),
     actions: const [
       LiveUpdateAction(
         id: 'cancel',
         title: 'Cancel',
-        iosSystemImage: 'xmark',
+        icon: LiveUpdateIcon.symbol('xmark'),
         // Destructive: ask for an unlock on the Lock Screen first.
         requiresUnlock: true,
       ),
@@ -143,10 +148,12 @@ class _ExamplePageState extends State<ExamplePage> {
         id: 'details',
         title: 'Details',
         opensApp: true,
-        iosSystemImage: 'list.bullet',
+        icon: LiveUpdateIcon.symbol('list.bullet'),
       ),
     ],
     android: AndroidLiveUpdateOptions(
+      // Single-color status bar icon (res/drawable, kept by res/raw/keep.xml).
+      smallIcon: const LiveUpdateIcon.native('ic_stat_parcel'),
       mode: _mode,
       shortCriticalText: 'ETA',
       // Gone after 2 hours even if the app never ends it.

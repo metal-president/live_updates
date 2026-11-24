@@ -1,3 +1,37 @@
+## 0.2.0
+
+Breaking: icons are `LiveUpdateIcon` values. See "From 0.1.x to 0.2.0" in
+the README, and run `dart run live_updates:create_widget` again.
+
+- `LiveUpdateIcon`: a native resource (`.native`, an Android drawable or an
+  image in the widget extension's asset catalog), a Flutter asset (`.asset`)
+  or an SF Symbols name (`.symbol`, iOS only).
+- `LiveUpdateContent.icon` replaces `iconName`. New per-platform icons:
+  `AndroidLiveUpdateOptions.smallIcon`, `IosLiveUpdateOptions.icon` and
+  `IosLiveUpdateOptions.islandIcon` (the Dynamic Island, so a photo `image`
+  can stay on the Lock Screen). `AndroidLiveUpdateOptions.progressTrackerIcon`
+  is a `LiveUpdateIcon`.
+- `LiveUpdateAction.icon`, `iosIcon` and `androidIcon` (all `LiveUpdateIcon`)
+  replace `iosSystemImage` and the drawable name `androidIcon`.
+- Each place uses the first icon that is set, and an icon that cannot be
+  shown falls back to the platform default (not to the next icon) with a
+  warning in the log. Debug builds also print obvious mistakes in Dart.
+- Android: a default icon for updates without one (including remote ones)
+  through the `com.ttechapp.live_updates.default_icon` manifest meta-data.
+  Flutter assets are read from the app package, also for remote updates.
+- iOS: `LiveUpdates.preloadIcons` stores asset icons (single assets or whole
+  folders) for content sent by a push. `create_widget` adds an asset catalog
+  to the widget extension.
+- iOS: `IosLiveUpdateOptions.compactLeading` chooses the leading side of the
+  compact Dynamic Island, like `compactTrailing` and `minimal`.
+- Remote payloads: icons are objects (`{"native": ...}`, `{"asset": ...}` or
+  `{"symbol": ...}`) under `icon`, `iosIcon`, `islandIcon`,
+  `androidSmallIcon` and `progressTrackerIcon`; `iconName` and the action key
+  `systemImage` are no longer read.
+- Docs: README Icons section with the official size and color guidance of
+  both platforms, keeping drawables in release builds, and the remote icon
+  keys in docs/server-fcm.md.
+
 ## 0.1.3
 
 - iOS: apps can target iOS 15.0 (was 17.2). Below iOS 17.2 every call does

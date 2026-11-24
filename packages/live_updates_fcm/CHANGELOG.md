@@ -1,3 +1,9 @@
+## 0.2.0
+
+- Requires live_updates 0.2.0, whose icons are `LiveUpdateIcon` values. In
+  remote payloads, icons are objects such as `{"native": "ic_stat"}` (see
+  docs/server-fcm.md).
+
 ## 0.1.3
 
 - Requires live_updates 0.1.3, so apps can target iOS 15.0. Below iOS 17.2,

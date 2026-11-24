@@ -56,8 +56,8 @@ void main() {
             title: 'B',
             opensApp: true,
             requiresUnlock: true,
-            iosSystemImage: 'xmark',
-            androidIcon: 'ic_close',
+            icon: LiveUpdateIcon.symbol('xmark'),
+            androidIcon: LiveUpdateIcon.native('ic_close'),
           ),
         ],
       ).toJson()['actions'],
@@ -68,8 +68,8 @@ void main() {
           'title': 'B',
           'opensApp': true,
           'requiresUnlock': true,
-          'systemImage': 'xmark',
-          'androidIcon': 'ic_close',
+          'icon': {'symbol': 'xmark'},
+          'androidIcon': {'native': 'ic_close'},
         },
       ],
     );
@@ -185,7 +185,7 @@ void main() {
           ),
         ],
         progressPoints: [AndroidProgressPoint(.5)],
-        progressTrackerIcon: 'ic_car',
+        progressTrackerIcon: LiveUpdateIcon.native('ic_car'),
         timeoutAfter: Duration(minutes: 90),
         alert: true,
       ),
@@ -197,7 +197,7 @@ void main() {
     expect(json['progressPoints'], [
       {'position': .5},
     ]);
-    expect(json['progressTrackerIcon'], 'ic_car');
+    expect(json['progressTrackerIcon'], {'native': 'ic_car'});
     expect(json['timeoutAfterMillis'], 5400000);
     expect(json['androidAlert'], isTrue);
     // The iOS alert keeps its own key.
@@ -209,10 +209,12 @@ void main() {
       title: 't',
       ios: IosLiveUpdateOptions(
         extra: {'gate': 'B12'},
+        compactLeading: IosIslandContent.timer,
         compactTrailing: IosIslandContent.extra('gate'),
         minimal: IosIslandContent.timer,
       ),
     ).toJson();
+    expect(json['compactLeading'], 'timer');
     expect(json['compactTrailing'], 'extra:gate');
     expect(json['minimal'], 'timer');
     expect(
@@ -255,6 +257,37 @@ void main() {
         ios: IosLiveUpdateOptions(layout: IosLiveUpdateLayout.custom('map')),
       ).toJson()['layout'],
       'map',
+    );
+  });
+
+  test('icons: one kind each, platform options under their own keys', () {
+    final json = const LiveUpdateContent(
+      title: 'T',
+      icon: LiveUpdateIcon.asset('assets/a.png'),
+      ios: IosLiveUpdateOptions(
+        icon: LiveUpdateIcon.symbol('shippingbox'),
+        islandIcon: LiveUpdateIcon.native('island'),
+      ),
+      android: AndroidLiveUpdateOptions(
+        smallIcon: LiveUpdateIcon.native('ic_stat'),
+      ),
+    ).toJson();
+    expect(json['icon'], {'asset': 'assets/a.png'});
+    expect(json['iosIcon'], {'symbol': 'shippingbox'});
+    expect(json['islandIcon'], {'native': 'island'});
+    expect(json['androidSmallIcon'], {'native': 'ic_stat'});
+    expect(json.containsKey('iconName'), isFalse);
+  });
+
+  test('icon equality and toString', () {
+    expect(const LiveUpdateIcon.native('a'), const LiveUpdateIcon.native('a'));
+    expect(
+      const LiveUpdateIcon.native('a'),
+      isNot(const LiveUpdateIcon.asset('a')),
+    );
+    expect(
+      const LiveUpdateIcon.symbol('a').toString(),
+      'LiveUpdateIcon.symbol(a)',
     );
   });
 }

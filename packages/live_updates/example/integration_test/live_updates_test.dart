@@ -83,6 +83,50 @@ void main() {
     await update.end(dismissAfter: Duration.zero);
   });
 
+  testWidgets('icons of every kind, including missing ones, are accepted', (
+    tester,
+  ) async {
+    if (!await LiveUpdates.isSupported()) return;
+    await LiveUpdates.preloadIcons(['assets/']);
+    final update = await LiveUpdates.start(
+      const LiveUpdateContent(
+        title: 'With icons',
+        progress: .3,
+        icon: LiveUpdateIcon.asset('assets/parcel.png'),
+        ios: IosLiveUpdateOptions(
+          islandIcon: LiveUpdateIcon.symbol('shippingbox.fill'),
+          compactLeading: IosIslandContent.icon,
+        ),
+        android: AndroidLiveUpdateOptions(
+          smallIcon: LiveUpdateIcon.native('ic_stat_parcel'),
+          progressTrackerIcon: LiveUpdateIcon.asset('assets/parcel.png'),
+        ),
+        actions: [
+          LiveUpdateAction(
+            id: 'x',
+            title: 'X',
+            icon: LiveUpdateIcon.symbol('xmark'),
+            androidIcon: LiveUpdateIcon.native('ic_stat_parcel'),
+          ),
+        ],
+      ),
+    );
+    // Missing icons fall back to the default instead of failing.
+    await update.update(
+      const LiveUpdateContent(
+        title: 'With icons',
+        icon: LiveUpdateIcon.native('no_such_icon'),
+        ios: IosLiveUpdateOptions(
+          islandIcon: LiveUpdateIcon.asset('assets/missing.png'),
+        ),
+        android: AndroidLiveUpdateOptions(
+          smallIcon: LiveUpdateIcon.symbol('xmark'),
+        ),
+      ),
+    );
+    await update.end(dismissAfter: Duration.zero);
+  });
+
   testWidgets('startOrUpdate reuses the key and find resolves it', (
     tester,
   ) async {

@@ -10,14 +10,21 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.net.Uri;
+import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.drawable.Icon;
 import android.os.Build;
 import android.os.SystemClock;
 import android.service.notification.StatusBarNotification;
+import android.util.Log;
 import androidx.annotation.Keep;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import io.flutter.FlutterInjector;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -33,7 +40,7 @@ import org.json.JSONObject;
  * Java surface over Android notifications, consumed from Dart through JNIgen.
  *
  * <p>Content is exchanged as the same JSON used on iOS ({@code title, body,
- * progress, iconName, route, image, actions, metrics, criticalMetric, steps,
+ * progress, icon, androidSmallIcon, route, image, actions, metrics, criticalMetric, steps,
  * journey}) plus Android options: {@code channelId, channelName,
  * shortCriticalText, colorArgb, whenEpochMillis, showChronometer, androidMode,
  * bodySemanticStyle, progressSemanticStyle, progressSegments, progressPoints,
@@ -54,6 +61,20 @@ public final class LiveUpdatesBridge {
   static final String EXTRA_ACTION_ID = "com.ttechapp.live_updates.ACTION_ID";
 
   static final String TAG_PREFIX = "live_updates/";
+
+  /** Manifest meta-data naming the drawable used when no icon is given. */
+  static final String DEFAULT_ICON_META = "com.ttechapp.live_updates.default_icon";
+
+  private static final String LOG_TAG = "live_updates";
+
+  /** Resource id of the default icon, resolved once per engine attach (0: not yet). */
+  private static volatile int defaultIconRes;
+
+  /** Longest side of an asset small icon: 24 dp at xxxhdpi. */
+  private static final int SMALL_ICON_PX = 96;
+
+  /** Longest side of an asset progress tracker icon. */
+  private static final int TRACKER_ICON_PX = 128;
   static final int NOTIFICATION_ID = 0x4C55; // "LU"
   static final int PERMISSION_REQUEST_CODE = 0x4C55;
 
@@ -487,6 +508,7 @@ public final class LiveUpdatesBridge {
   /** Called by the plugin when an engine attaches or detaches. */
   static void engineAttached(Context c) {
     context = c.getApplicationContext();
+    defaultIconRes = 0;
   }
 
   static void engineDetached(long engineId) {
@@ -885,7 +907,7 @@ public final class LiveUpdatesBridge {
         .setOngoing(true)
         // Only the first post alerts, unless this post asks to.
         .setOnlyAlertOnce(!content.optBoolean("androidAlert", false))
-        .setSmallIcon(smallIcon(c, optString(content, "iconName")));
+        .setSmallIcon(smallIcon(c, content));
     String body = optString(content, "body");
     if (body != null) {
       b.setContentText(
@@ -1155,8 +1177,9 @@ public final class LiveUpdatesBridge {
         style.addProgressPoint(point);
       }
     }
-    String tracker = optString(content, "progressTrackerIcon");
-    Icon trackerIcon = tracker == null ? null : drawable(c, tracker);
+    JSONObject tracker = iconSpec(content, "progressTrackerIcon");
+    Icon trackerIcon =
+        tracker == null ? null : icon(c, tracker, TRACKER_ICON_PX, "progress tracker icon");
     if (trackerIcon != null) style.setProgressTrackerIcon(trackerIcon);
     double clamped = Double.isNaN(fraction) ? 0 : Math.max(0, Math.min(fraction, 1));
     return style.setProgress((int) Math.round(clamped * total));
@@ -1187,9 +1210,8 @@ public final class LiveUpdatesBridge {
       } else {
         pi = LiveUpdatesActionReceiver.intent(c, id, actionId);
       }
-      String iconName = optString(a, "androidIcon");
       Notification.Action.Builder action =
-          new Notification.Action.Builder(smallIcon(c, iconName), a.optString("title"), pi);
+          new Notification.Action.Builder(actionIcon(c, a), a.optString("title"), pi);
       if (a.optBoolean("requiresUnlock", false) && Build.VERSION.SDK_INT >= 31) {
         action.setAuthenticationRequired(true);
       }
@@ -1237,9 +1259,153 @@ public final class LiveUpdatesBridge {
         .build();
   }
 
-  private static Icon smallIcon(Context c, @Nullable String name) {
-    Icon icon = name == null ? null : drawable(c, name);
-    return icon != null ? icon : Icon.createWithResource(c, c.getApplicationInfo().icon);
+  /**
+   * The small icon: {@code androidSmallIcon}, else {@code icon}, else the default. An icon that
+   * cannot be shown falls back to the default (not to the next key), with a warning.
+   */
+  static Icon smallIcon(Context c, JSONObject content) {
+    return iconOrDefault(c, content, "androidSmallIcon", "small icon");
+  }
+
+  /**
+   * An action's icon: {@code androidIcon}, else {@code icon}, else the default. Android 7.0+
+   * templates do not show it, but it is required and passed on (for example to watches).
+   */
+  private static Icon actionIcon(Context c, JSONObject action) {
+    return iconOrDefault(c, action, "androidIcon", "action icon");
+  }
+
+  /**
+   * The icon under {@code key} if present, else under {@code icon}, else the default. Only the
+   * first present key is used: if it cannot be shown (including a value that is not an icon
+   * object), the default is used, not the next key.
+   */
+  private static Icon iconOrDefault(Context c, JSONObject obj, String key, String what) {
+    String chosen = present(obj, key) ? key : present(obj, "icon") ? "icon" : null;
+    JSONObject spec = chosen == null ? null : iconSpec(obj, chosen);
+    Icon icon = spec == null ? null : icon(c, spec, SMALL_ICON_PX, what);
+    return icon != null ? icon : defaultIcon(c);
+  }
+
+  private static boolean present(JSONObject obj, String key) {
+    return obj.has(key) && !obj.isNull(key);
+  }
+
+  /**
+   * The drawable named by the {@link #DEFAULT_ICON_META} meta-data, else the app icon.
+   */
+  static Icon defaultIcon(Context c) {
+    int res = defaultIconRes;
+    if (res == 0) {
+      try {
+        ApplicationInfo info =
+            c.getPackageManager()
+                .getApplicationInfo(c.getPackageName(), PackageManager.GET_META_DATA);
+        res = info.metaData == null ? 0 : info.metaData.getInt(DEFAULT_ICON_META, 0);
+      } catch (PackageManager.NameNotFoundException e) {
+        // Our own package: cannot happen.
+      }
+      if (res == 0) res = c.getApplicationInfo().icon;
+      defaultIconRes = res;
+    }
+    return Icon.createWithResource(c, res);
+  }
+
+  /** The icon object under {@code key}, or null (with a warning if it is not an object). */
+  @Nullable
+  private static JSONObject iconSpec(JSONObject content, String key) {
+    if (!present(content, key)) return null;
+    JSONObject spec = content.optJSONObject(key);
+    if (spec == null) {
+      Log.w(LOG_TAG, key + " must be an object with \"native\", \"asset\" or \"symbol\".");
+    }
+    return spec;
+  }
+
+  /**
+   * The icon described by {@code spec} ({@code native}, {@code asset} or {@code symbol}), or null
+   * with a warning when it cannot be shown.
+   */
+  @Nullable
+  static Icon icon(Context c, JSONObject spec, int maxPx, String what) {
+    String name = optString(spec, "native");
+    if (name != null) {
+      Icon icon = drawable(c, name);
+      if (icon == null) {
+        Log.w(
+            LOG_TAG,
+            what
+                + ": no drawable or mipmap named \""
+                + name
+                + "\" (give the resource name only, and keep it in release builds; see the README).");
+      }
+      return icon;
+    }
+    String asset = optString(spec, "asset");
+    if (asset != null) {
+      Icon icon = asset(c, asset, maxPx);
+      if (icon == null) {
+        Log.w(LOG_TAG, what + ": Flutter asset \"" + asset + "\" not found or not an image.");
+      }
+      return icon;
+    }
+    if (optString(spec, "symbol") != null) {
+      Log.w(LOG_TAG, what + ": symbols are iOS only; using the default.");
+      return null;
+    }
+    Log.w(LOG_TAG, what + ": expected \"native\", \"asset\" or \"symbol\".");
+    return null;
+  }
+
+  /** A Flutter asset of the app, scaled to at most {@code maxPx}, or null. */
+  @Nullable
+  private static Icon asset(Context c, String path, int maxPx) {
+    // Assets of this app only, by a plain relative path: no empty, "." or ".." segment, no
+    // backslash or control character.
+    if (path.isEmpty() || path.length() > 1024 || path.indexOf('\\') >= 0) return null;
+    for (int i = 0; i < path.length(); i++) {
+      if (Character.isISOControl(path.charAt(i))) return null;
+    }
+    for (String segment : path.split("/", -1)) {
+      if (segment.isEmpty() || segment.equals(".") || segment.equals("..")) return null;
+    }
+    String key;
+    try {
+      key = FlutterInjector.instance().flutterLoader().getLookupKeyForAsset(path);
+    } catch (RuntimeException | LinkageError e) {
+      // Loader not initialized: the default location of Flutter assets.
+      key = "flutter_assets/" + path;
+    }
+    BitmapFactory.Options bounds = new BitmapFactory.Options();
+    bounds.inJustDecodeBounds = true;
+    try (InputStream in = c.getAssets().open(key)) {
+      BitmapFactory.decodeStream(in, null, bounds);
+    } catch (IOException e) {
+      return null;
+    }
+    if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null;
+    BitmapFactory.Options options = new BitmapFactory.Options();
+    int longest = Math.max(bounds.outWidth, bounds.outHeight);
+    while (longest / (options.inSampleSize * 2) >= maxPx) options.inSampleSize *= 2;
+    Bitmap bitmap;
+    try (InputStream in = c.getAssets().open(key)) {
+      bitmap = BitmapFactory.decodeStream(in, null, options);
+    } catch (IOException e) {
+      return null;
+    }
+    if (bitmap == null) return null;
+    int w = bitmap.getWidth();
+    int h = bitmap.getHeight();
+    if (Math.max(w, h) > maxPx) {
+      double scale = (double) maxPx / Math.max(w, h);
+      bitmap =
+          Bitmap.createScaledBitmap(
+              bitmap,
+              Math.max(1, (int) Math.round(w * scale)),
+              Math.max(1, (int) Math.round(h * scale)),
+              true);
+    }
+    return Icon.createWithBitmap(bitmap);
   }
 
   /** The app's drawable or mipmap {@code name}, or null. */

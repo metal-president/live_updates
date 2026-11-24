@@ -25,6 +25,7 @@
 		97C146FE1CF9000F007C117D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FD1CF9000F007C117D /* Assets.xcassets */; };
 		97C147011CF9000F007C117D /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FF1CF9000F007C117D /* LaunchScreen.storyboard */; };
 		A3DB18101C35022B42BF698D /* LiveUpdatesWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 52503EE9724823FFA8750BEC /* LiveUpdatesWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		ED62ABB2597469CE14D31EC2 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 8687FAAE547DB73FE1D35B6D /* Assets.xcassets */; };
 		FA0AA39CE848A9A75FE3CA32 /* LiveUpdatesActionIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = D995BE158A968C649AC7DE1C /* LiveUpdatesActionIntent.swift */; };
 /* End PBXBuildFile section */
 
@@ -89,6 +90,7 @@
 		7AFA3C8E1D35360C0083082E /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = Release.xcconfig; path = Flutter/Release.xcconfig; sourceTree = "<group>"; };
 		83B865589589D3FDD0DA606D /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 		846C232AD8E7192F415CF900 /* Runner.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = Runner.entitlements; sourceTree = "<group>"; };
+		8687FAAE547DB73FE1D35B6D /* Assets.xcassets */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		8DF1D1706A81444FCC7F8270 /* LiveUpdatesWidgetLiveActivity.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LiveUpdatesWidgetLiveActivity.swift; sourceTree = "<group>"; };
 		9740EEB21CF90195004384FC /* Debug.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; name = Debug.xcconfig; path = Flutter/Debug.xcconfig; sourceTree = "<group>"; };
 		9740EEB31CF90195004384FC /* Generated.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; name = Generated.xcconfig; path = Flutter/Generated.xcconfig; sourceTree = "<group>"; };
@@ -150,6 +152,7 @@
 				B8567A12472CED2B5C540B81 /* LiveUpdatesWidget.entitlements */,
 				D995BE158A968C649AC7DE1C /* LiveUpdatesActionIntent.swift */,
 				79BDE6073B0179BA6AF799EE /* LiveUpdatesViews.swift */,
+				8687FAAE547DB73FE1D35B6D /* Assets.xcassets */,
 			);
 			name = LiveUpdatesWidget;
 			path = LiveUpdatesWidget;
@@ -337,6 +340,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				ED62ABB2597469CE14D31EC2 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

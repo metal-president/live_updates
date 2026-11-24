@@ -1,4 +1,5 @@
 import ActivityKit
+import CryptoKit
 import Foundation
 
 /// The single `ActivityAttributes` type used by live_updates.
@@ -12,7 +13,12 @@ public struct LiveUpdatesAttributes: ActivityAttributes {
     public var title: String
     public var body: String?
     public var progress: Double?
-    public var iconName: String?
+    /// `LiveUpdateContent.icon`.
+    public var icon: LiveUpdatesIcon?
+    /// `IosLiveUpdateOptions.icon`, used instead of `icon`.
+    public var iosIcon: LiveUpdatesIcon?
+    /// `IosLiveUpdateOptions.islandIcon`, the icon in the Dynamic Island.
+    public var islandIcon: LiveUpdatesIcon?
     public var route: String?
     /// File name of an image in `LiveUpdatesImages.directory` (App Group).
     public var image: String?
@@ -26,6 +32,9 @@ public struct LiveUpdatesAttributes: ActivityAttributes {
     /// What the compact Dynamic Island shows on the trailing side
     /// (`IosLiveUpdateOptions.compactTrailing`), or `nil` for the default.
     public var compactTrailing: String?
+    /// What the compact Dynamic Island shows on the leading side
+    /// (`IosLiveUpdateOptions.compactLeading`), or `nil` for the icon.
+    public var compactLeading: String?
     /// What the minimal Dynamic Island shows (`IosLiveUpdateOptions.minimal`).
     public var minimal: String?
     /// Accent color as ARGB (`IosLiveUpdateOptions.color`).
@@ -46,10 +55,11 @@ public struct LiveUpdatesAttributes: ActivityAttributes {
 
     public init(
       title: String, body: String? = nil, progress: Double? = nil,
-      iconName: String? = nil, route: String? = nil, image: String? = nil,
+      icon: LiveUpdatesIcon? = nil, iosIcon: LiveUpdatesIcon? = nil,
+      islandIcon: LiveUpdatesIcon? = nil, route: String? = nil, image: String? = nil,
       actions: [LiveUpdatesAction] = [], extra: [String: String] = [:],
       timerStart: Double? = nil, timerEnd: Double? = nil,
-      compactTrailing: String? = nil, minimal: String? = nil,
+      compactTrailing: String? = nil, compactLeading: String? = nil, minimal: String? = nil,
       tintArgb: Int? = nil, backgroundArgb: Int? = nil, foregroundArgb: Int? = nil,
       layout: String? = nil, metrics: [LiveUpdatesMetric] = [], steps: LiveUpdatesSteps? = nil,
       journey: LiveUpdatesJourney? = nil
@@ -57,7 +67,9 @@ public struct LiveUpdatesAttributes: ActivityAttributes {
       self.title = title
       self.body = body
       self.progress = progress
-      self.iconName = iconName
+      self.icon = icon
+      self.iosIcon = iosIcon
+      self.islandIcon = islandIcon
       self.route = route
       self.image = image
       self.actions = actions
@@ -65,6 +77,7 @@ public struct LiveUpdatesAttributes: ActivityAttributes {
       self.timerStart = timerStart
       self.timerEnd = timerEnd
       self.compactTrailing = compactTrailing
+      self.compactLeading = compactLeading
       self.minimal = minimal
       self.tintArgb = tintArgb
       self.backgroundArgb = backgroundArgb
@@ -81,7 +94,10 @@ public struct LiveUpdatesAttributes: ActivityAttributes {
       title = try c.decode(String.self, forKey: .title)
       body = try c.decodeIfPresent(String.self, forKey: .body)
       progress = try c.decodeIfPresent(Double.self, forKey: .progress)
-      iconName = try c.decodeIfPresent(String.self, forKey: .iconName)
+      // An icon that does not decode is left out (the default is shown).
+      icon = (try? c.decodeIfPresent(LiveUpdatesIcon.self, forKey: .icon)) ?? nil
+      iosIcon = (try? c.decodeIfPresent(LiveUpdatesIcon.self, forKey: .iosIcon)) ?? nil
+      islandIcon = (try? c.decodeIfPresent(LiveUpdatesIcon.self, forKey: .islandIcon)) ?? nil
       route = try c.decodeIfPresent(String.self, forKey: .route)
       image = try c.decodeIfPresent(String.self, forKey: .image)
       actions = try c.decodeIfPresent([LiveUpdatesAction].self, forKey: .actions) ?? []
@@ -89,6 +105,7 @@ public struct LiveUpdatesAttributes: ActivityAttributes {
       timerStart = try c.decodeIfPresent(Double.self, forKey: .timerStart)
       timerEnd = try c.decodeIfPresent(Double.self, forKey: .timerEnd)
       compactTrailing = try c.decodeIfPresent(String.self, forKey: .compactTrailing)
+      compactLeading = try c.decodeIfPresent(String.self, forKey: .compactLeading)
       minimal = try c.decodeIfPresent(String.self, forKey: .minimal)
       tintArgb = try c.decodeIfPresent(Int.self, forKey: .tintArgb)
       backgroundArgb = try c.decodeIfPresent(Int.self, forKey: .backgroundArgb)
@@ -208,24 +225,42 @@ public struct LiveUpdatesJourney: Codable, Hashable {
   }
 }
 
+/// An icon (`LiveUpdateIcon` in Dart): exactly one of an image in the widget
+/// extension's asset catalog (`native`), a Flutter asset copied into the App
+/// Group (`asset`) or an SF Symbols name (`symbol`).
+public struct LiveUpdatesIcon: Codable, Hashable {
+  public var native: String?
+  public var asset: String?
+  public var symbol: String?
+
+  public init(native: String? = nil, asset: String? = nil, symbol: String? = nil) {
+    self.native = native
+    self.asset = asset
+    self.symbol = symbol
+  }
+}
+
 /// A button on a Live Activity (`LiveUpdateAction` in Dart).
 public struct LiveUpdatesAction: Codable, Hashable, Identifiable {
   public var id: String
   public var title: String
-  /// SF Symbol name.
-  public var systemImage: String?
+  /// `LiveUpdateAction.icon`.
+  public var icon: LiveUpdatesIcon?
+  /// `LiveUpdateAction.iosIcon`, used instead of `icon`.
+  public var iosIcon: LiveUpdatesIcon?
   /// Opens the app instead of running in the background.
   public var opensApp: Bool
   /// Requires the device to be unlocked before the press is handled.
   public var requiresUnlock: Bool
 
   public init(
-    id: String, title: String, systemImage: String? = nil, opensApp: Bool = false,
-    requiresUnlock: Bool = false
+    id: String, title: String, icon: LiveUpdatesIcon? = nil, iosIcon: LiveUpdatesIcon? = nil,
+    opensApp: Bool = false, requiresUnlock: Bool = false
   ) {
     self.id = id
     self.title = title
-    self.systemImage = systemImage
+    self.icon = icon
+    self.iosIcon = iosIcon
     self.opensApp = opensApp
     self.requiresUnlock = requiresUnlock
   }
@@ -234,7 +269,8 @@ public struct LiveUpdatesAction: Codable, Hashable, Identifiable {
     let c = try decoder.container(keyedBy: CodingKeys.self)
     id = try c.decode(String.self, forKey: .id)
     title = try c.decode(String.self, forKey: .title)
-    systemImage = try c.decodeIfPresent(String.self, forKey: .systemImage)
+    icon = (try? c.decodeIfPresent(LiveUpdatesIcon.self, forKey: .icon)) ?? nil
+    iosIcon = (try? c.decodeIfPresent(LiveUpdatesIcon.self, forKey: .iosIcon)) ?? nil
     opensApp = try c.decodeIfPresent(Bool.self, forKey: .opensApp) ?? false
     requiresUnlock = try c.decodeIfPresent(Bool.self, forKey: .requiresUnlock) ?? false
   }
@@ -256,5 +292,14 @@ public enum LiveUpdatesImages {
   public static func url(_ name: String?) -> URL? {
     guard let name, !name.contains("/") else { return nil }
     return directory?.appendingPathComponent(name)
+  }
+
+  /// URL of the Flutter asset icon `asset` written by the app (at start,
+  /// update or `LiveUpdates.preloadIcons`): `icons/` plus the first 128 bits
+  /// of the SHA-256 of the asset name in hex, plus `.png`.
+  public static func iconURL(asset: String) -> URL? {
+    let hex = SHA256.hash(data: Data(asset.utf8)).map { String(format: "%02x", $0) }.joined()
+    return directory?.appendingPathComponent("icons", isDirectory: true)
+      .appendingPathComponent(String(hex.prefix(32)) + ".png")
   }
 }

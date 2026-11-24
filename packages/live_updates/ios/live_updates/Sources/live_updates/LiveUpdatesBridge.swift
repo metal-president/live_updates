@@ -15,8 +15,9 @@ import UIKit
 /// touching it. Handlers are Dart listener blocks, callable from any thread.
 ///
 /// The plugin builds for apps that target iOS 15.0, but Live Activities
-/// need iOS 17.2: below that every method is a no-op (`isAvailable` is
-/// `false`, and Dart then uses its no-op backend without calling the rest).
+/// need iOS 17.2. Below that, `isAvailable` is `false` and Dart uses its
+/// no-op backend without calling the rest; if called anyway, methods return
+/// empty results, and `start`, `startOrUpdate` and `update` report an error.
 @objc(LiveUpdatesBridge)
 public final class LiveUpdatesBridge: NSObject {
   private static var tokenTasks: [String: Task<Void, Never>] = [:]

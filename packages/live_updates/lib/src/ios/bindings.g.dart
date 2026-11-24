@@ -112,8 +112,9 @@ external ffi.Pointer<objc.ObjCBlockImpl> _1j14om6_wrapListenerBlock_xtuoz7(
 /// on the platform (main) thread, and Tasks hop to the main actor before
 /// touching it. Handlers are Dart listener blocks, callable from any thread.
 /// The plugin builds for apps that target iOS 15.0, but Live Activities
-/// need iOS 17.2: below that every method is a no-op (<code>isAvailable</code> is
-/// <code>false</code>, and Dart then uses its no-op backend without calling the rest).
+/// need iOS 17.2. Below that, <code>isAvailable</code> is <code>false</code> and Dart uses its
+/// no-op backend without calling the rest; if called anyway, methods return
+/// empty results, and <code>start</code>, <code>startOrUpdate</code> and <code>update</code> report an error.
 extension type LiveUpdatesBridge._(objc.ObjCObject object$)
     implements objc.ObjCObject, objc.NSObject {
   /// Constructs a [LiveUpdatesBridge] that points to the same underlying object as [other].

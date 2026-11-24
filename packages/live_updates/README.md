@@ -48,9 +48,8 @@ Screenshots of the example app in this repository.
 ## Platform support
 
 **Requirements:** Flutter 3.50+, iOS 15.0+, Android 7.0 (API 24)+. Live
-Activities need iOS 17.2: on iOS 15.0 to 17.1 the app builds and runs, and
-every call does nothing, as on other platforms (`isSupported()` returns
-`false`).
+Activities need iOS 17.2: on iOS 15.0 to 17.1 every call does nothing and
+`isSupported()` returns `false`.
 
 | | iOS 17.2+ | Android 16+ | Android 7–15 | iOS 15.0–17.1, other |
 | --- | --- | --- | --- | --- |
@@ -93,11 +92,8 @@ flutter pub add live_updates
    (included with CocoaPods) and offers to run
    `gem install --user-install xcodeproj` if it is missing.
 
-   - **Deployment target:** the app itself can target iOS 15.0 or later. If
-     you generated the widget with version 0.1.2 or earlier and your app
-     targets an iOS version below 17.0, run the command again: it updates
-     `LiveUpdatesActionIntent.swift`, which is also compiled into the app.
-
+   - **Deployment target:** only the widget extension needs iOS 17.2; the
+     app can target iOS 15.0 or later.
    - **Flavors:** every build configuration (for example `Debug-dev`,
      `Release-prod`) gets a widget bundle id and an App Group derived from
      its app bundle id (`LIVE_UPDATES_APP_GROUP` build setting). If the bundle

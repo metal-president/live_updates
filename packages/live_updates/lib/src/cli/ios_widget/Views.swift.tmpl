@@ -599,7 +599,7 @@ struct LiveUpdatesIconImage {
       if let image = UIImage(named: name) {
         return LiveUpdatesIconImage(view: Image(uiImage: image), isSymbol: false)
       }
-      log.warning("No image \(name, privacy: .public) in the widget extension's asset catalog")
+      log.warning("No image \(name) in the widget extension's asset catalog")
     } else if let asset = icon.asset {
       if let url = LiveUpdatesImages.iconURL(asset: asset),
         let image = UIImage(contentsOfFile: url.path)
@@ -607,13 +607,13 @@ struct LiveUpdatesIconImage {
         return LiveUpdatesIconImage(view: Image(uiImage: image), isSymbol: false)
       }
       log.warning(
-        "Icon asset \(asset, privacy: .public) was not stored by the app (see LiveUpdates.preloadIcons)"
+        "Icon asset \(asset) was not stored by the app (see LiveUpdates.preloadIcons)"
       )
     } else if let symbol = icon.symbol {
       if UIImage(systemName: symbol) != nil {
         return LiveUpdatesIconImage(view: Image(systemName: symbol), isSymbol: true)
       }
-      log.warning("No SF Symbols name \(symbol, privacy: .public)")
+      log.warning("No SF Symbols name \(symbol)")
     }
     return nil
   }

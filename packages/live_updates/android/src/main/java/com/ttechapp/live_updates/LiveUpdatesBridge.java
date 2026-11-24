@@ -1267,12 +1267,14 @@ public final class LiveUpdatesBridge {
     return iconOrDefault(c, content, "androidSmallIcon", "small icon");
   }
 
+  private static final String ACTION_ICON = "action icon";
+
   /**
    * An action's icon: {@code androidIcon}, else {@code icon}, else the default. Android 7.0+
    * templates do not show it, but it is required and passed on (for example to watches).
    */
   private static Icon actionIcon(Context c, JSONObject action) {
-    return iconOrDefault(c, action, "androidIcon", "action icon");
+    return iconOrDefault(c, action, "androidIcon", ACTION_ICON);
   }
 
   /**
@@ -1350,7 +1352,11 @@ public final class LiveUpdatesBridge {
       return icon;
     }
     if (optString(spec, "symbol") != null) {
-      Log.w(LOG_TAG, what + ": symbols are iOS only; using the default.");
+      // A symbol is fine for an action: Android 7.0+ does not show action icons, so the default
+      // passed on to other devices is enough. Elsewhere it is a mistake worth a warning.
+      if (!ACTION_ICON.equals(what)) {
+        Log.w(LOG_TAG, what + ": symbols are iOS only; using the default.");
+      }
       return null;
     }
     Log.w(LOG_TAG, what + ": expected \"native\", \"asset\" or \"symbol\".");
@@ -1391,7 +1397,8 @@ public final class LiveUpdatesBridge {
     Bitmap bitmap;
     try (InputStream in = c.getAssets().open(key)) {
       bitmap = BitmapFactory.decodeStream(in, null, options);
-    } catch (IOException e) {
+    } catch (IOException | RuntimeException | OutOfMemoryError e) {
+      // Fall back to the default icon rather than failing the post.
       return null;
     }
     if (bitmap == null) return null;

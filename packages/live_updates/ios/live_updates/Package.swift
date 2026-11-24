@@ -5,7 +5,7 @@ import PackageDescription
 let package = Package(
   name: "live_updates",
   platforms: [
-    .iOS("17.2")
+    .iOS("15.0")
   ],
   products: [
     .library(name: "live-updates", targets: ["live_updates"])

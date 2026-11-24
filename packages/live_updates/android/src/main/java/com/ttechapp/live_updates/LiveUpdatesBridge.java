@@ -1037,7 +1037,7 @@ public final class LiveUpdatesBridge {
       parts.add(clip(m.optString("label")) + ": " + text + (unit == null ? "" : " " + clip(unit)));
     }
     if (parts.isEmpty()) return null;
-    return String.join(" · ", parts);
+    return android.text.TextUtils.join(" · ", parts);
   }
 
   private static String clip(String text) {

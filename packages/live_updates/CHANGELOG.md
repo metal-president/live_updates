@@ -1,3 +1,13 @@
+## Unreleased
+
+- iOS: apps can target iOS 15.0 (was 17.2). Below iOS 17.2 every call does
+  nothing, as on other platforms, and `LiveUpdates.isSupported()` returns
+  `false`. The widget extension still targets iOS 17.2. If your app targets
+  iOS 16 or earlier, run `dart run live_updates:create_widget` again to update
+  `LiveUpdatesActionIntent.swift`.
+- Android: unit tests on Android 7.0, 8.0, 13 and 15 for the regular
+  notification fallback, and an Android Lint check (`NewApi`) in CI.
+
 ## 0.1.2
 
 - Docs: README adds a Platform limits section (Live Activity duration, 4 KB

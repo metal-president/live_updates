@@ -27,7 +27,7 @@ Future<void> main() async {
     '-sdk',
     sdk,
     '-target',
-    'arm64-apple-ios17.2',
+    'arm64-apple-ios15.0',
     '-module-name',
     'live_updates',
     '-parse-as-library',

@@ -79,7 +79,7 @@ abstract final class LiveUpdates {
   static LiveUpdatesPlatform get _platform => LiveUpdatesPlatform.instance;
 
   /// Whether live updates can be shown on this device right now. Always
-  /// `false` on platforms other than iOS and Android.
+  /// `false` below iOS 17.2 and on platforms other than iOS and Android.
   static Future<bool> isSupported() => _platform.isSupported();
 
   /// Asks for the permission needed to show live updates and returns whether

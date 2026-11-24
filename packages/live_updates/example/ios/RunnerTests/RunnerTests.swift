@@ -87,6 +87,12 @@ struct ContentStateDecodingTests {
     #expect(try decode(#"{"title":"T","publicContent":"x"}"#).publicContent == nil)
   }
 
+  @Test func aMalformedPublicBodyIsLeftOutNotThePublicContent() throws {
+    let state = try decode(
+      #"{"title":"T","publicContent":{"title":"Delivery","body":123,"keepTimer":"x"}}"#)
+    #expect(state.publicContent == LiveUpdatesPublicContent(title: "Delivery"))
+  }
+
   @Test func publicContentRoundTrips() throws {
     let state = LiveUpdatesAttributes.ContentState(
       title: "T", publicContent: LiveUpdatesPublicContent(title: "P", keepTimer: false))

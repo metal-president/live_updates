@@ -251,7 +251,9 @@ public struct LiveUpdatesPublicContent: Codable, Hashable {
   public init(from decoder: Decoder) throws {
     let c = try decoder.container(keyedBy: CodingKeys.self)
     title = try c.decode(String.self, forKey: .title)
-    body = try c.decodeIfPresent(String.self, forKey: .body)
+    // A body that does not decode is left out rather than the whole public
+    // content (which would show the full content instead).
+    body = (try? c.decodeIfPresent(String.self, forKey: .body)) ?? nil
     keepProgress = (try? c.decodeIfPresent(Bool.self, forKey: .keepProgress)) ?? true
     keepTimer = (try? c.decodeIfPresent(Bool.self, forKey: .keepTimer)) ?? true
   }

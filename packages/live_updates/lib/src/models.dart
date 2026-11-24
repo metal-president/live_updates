@@ -956,8 +956,7 @@ final class AndroidLiveUpdateOptions {
   /// update every 10 seconds (iOS: [IosLiveUpdateOptions.alert]).
   final bool alert;
 
-  /// How much of the notification the lock screen shows while the person
-  /// hides sensitive notification content there. See
+  /// How much of the notification a secure lock screen shows. See
   /// [AndroidLockScreenVisibility].
   final AndroidLockScreenVisibility lockScreenVisibility;
 
@@ -1002,8 +1001,7 @@ final class AndroidLiveUpdateOptions {
   );
 }
 
-/// What an Android lock screen shows of a notification while the person
-/// hides sensitive notification content there
+/// What a secure Android lock screen shows of a notification
 /// ([AndroidLiveUpdateOptions.lockScreenVisibility]).
 ///
 /// There is no option to always show the full content: it would override
@@ -1011,14 +1009,15 @@ final class AndroidLiveUpdateOptions {
 ///
 /// New values may be added in minor releases.
 enum AndroidLockScreenVisibility {
-  /// Shows [LiveUpdateContent.publicContent] when set; otherwise the system
-  /// shows the app name and icon without the content
-  /// (`Notification.VISIBILITY_PRIVATE`).
+  /// Shows the full notification unless the person hides sensitive
+  /// notification content on the lock screen; then
+  /// [LiveUpdateContent.publicContent] when set, otherwise the app name and
+  /// icon without the content (`Notification.VISIBILITY_PRIVATE`).
   private,
 
-  /// Shows nothing of the notification on a secure lock screen
-  /// (`Notification.VISIBILITY_SECRET`); [LiveUpdateContent.publicContent]
-  /// is not used there.
+  /// Always shows nothing of the notification on a secure lock screen,
+  /// whatever the person's setting (`Notification.VISIBILITY_SECRET`);
+  /// [LiveUpdateContent.publicContent] is not used there.
   secret,
 }
 

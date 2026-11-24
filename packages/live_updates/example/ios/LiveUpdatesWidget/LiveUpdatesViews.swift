@@ -69,7 +69,8 @@ struct LiveUpdatesLockScreen: View {
 /// system hides private data (`privacy` or `placeholder`): the icon, the
 /// public title and body, and the progress and timer unless `keepProgress` or
 /// `keepTimer` is false. No image, buttons or layout data. Without a
-/// `publicContent` it shows only the icon and the title.
+/// `publicContent` it shows only the icon and the title, which the system
+/// may still hide.
 ///
 /// A layout of your own can show it when
 /// `context.state.liveUpdatesShowsPublic(redactionReasons)` is true.
@@ -84,8 +85,9 @@ struct LiveUpdatesPublicLockScreen: View {
       .tint(palette.tint)
       .activityBackgroundTint(palette.background)
       .activitySystemActionForegroundColor(palette.tint)
-      // Public by definition: nothing in it is hidden by the system.
-      .unredacted()
+      // publicContent is public by definition: nothing in it is hidden. The
+      // title of the full content (without one) stays subject to redaction.
+      .liveUpdatesUnredacted(state.publicContent != nil)
   }
 }
 

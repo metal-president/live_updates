@@ -709,10 +709,10 @@ final class $LiveUpdatesBridge$RouteListener$Type$
 ///
 /// Content is exchanged as the same JSON used on iOS ({@code title, body,
 /// progress, icon, androidSmallIcon, route, image, actions, metrics, criticalMetric, steps,
-/// journey}) plus Android options: {@code channelId, channelName,
+/// journey, publicContent}) plus Android options: {@code channelId, channelName,
 /// shortCriticalText, colorArgb, whenEpochMillis, showChronometer, androidMode,
 /// bodySemanticStyle, progressSemanticStyle, progressSegments, progressPoints,
-/// progressTrackerIcon, timeoutAfterMillis, androidAlert} and the timer
+/// progressTrackerIcon, timeoutAfterMillis, androidAlert, androidLockScreenVisibility} and the timer
 /// ({@code timerStart} or {@code timerEnd}, seconds since 1970). On Android 16+ progress uses
 /// Notification.ProgressStyle and promotion to a Live Update is
 /// requested (shown on builds that support promoted notifications, Android 16
@@ -794,7 +794,7 @@ extension type LiveUpdatesBridge._(jni$_.JObject _$this)
 
   /// from: `static public boolean canPostPromotedNotifications()`
   ///
-  /// Whether this device shows Live Updates (Android 16+ promoted notifications).
+  /// Whether this app may post promoted notifications (Live Updates; the user can turn it off).
   static core$_.bool canPostPromotedNotifications() {
     final _$$classRef = _class.reference;
     return _canPostPromotedNotifications(
@@ -1028,9 +1028,9 @@ extension type LiveUpdatesBridge._(jni$_.JObject _$this)
 
   /// from: `static public void observeActions(com.ttechapp.live_updates.LiveUpdatesBridge$ActionListener listener, long engineId, java.lang.String[] updateIds)`
   ///
-  /// Calls {@code listener} with button presses. Presses made while no Dart
-  /// listener was attached (including while the app was not running) are
-  /// persisted and delivered first, in order.
+  /// Calls {@code listener} with presses of {@code updateIds} ({@code null}:
+  /// all) while the app is in the foreground, starting with queued ones in
+  /// order. Other presses stay queued for the background handler.
   static void observeActions(
     LiveUpdatesBridge$ActionListener listener,
     core$_.int engineId,
@@ -1526,7 +1526,8 @@ extension type LiveUpdatesBridge._(jni$_.JObject _$this)
   /// from: `static public void observeEvents(com.ttechapp.live_updates.LiveUpdatesBridge$EventListener listener, long engineId)`
   ///
   /// Calls {@code listener} with lifecycle events: {@code started} (new live
-  /// update, local or remote), {@code ended} (ended by the app or a payload)
+  /// update, local or remote), {@code ended} (ended by the app, a payload or a
+  /// timeout)
   /// and {@code dismissed} (swiped away by the user).
   static void observeEvents(
     LiveUpdatesBridge$EventListener listener,

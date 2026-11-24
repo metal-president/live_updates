@@ -603,7 +603,8 @@ pass `keepProgress: false` or `keepTimer: false`, the progress and the
 timer. Images, buttons, metrics, steps, the journey, `extra` values and
 Android's `shortCriticalText` are left out.
 
-To hide the whole notification on a locked Android device instead, pass
+To always hide the whole notification on a locked Android device, whatever
+the person's setting, pass
 `AndroidLiveUpdateOptions(lockScreenVisibility:
 AndroidLockScreenVisibility.secret)` ([`VISIBILITY_SECRET`][android-visibility-secret]).
 There is no option to always show the full content: it would override the

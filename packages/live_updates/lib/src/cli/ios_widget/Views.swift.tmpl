@@ -730,17 +730,25 @@ extension LiveUpdatesAttributes.ContentState {
   }
 
   /// The content to show while private data is hidden: `publicContent`'s
-  /// title and body with this content's icons, colors and tap route, and its
-  /// progress and timer unless `keepProgress` or `keepTimer` is false.
-  /// Without a `publicContent`, only the title, icons, colors and tap route.
+  /// title and body with this content's icons, colors and tap route, its
+  /// progress and timer unless `keepProgress` or `keepTimer` is false, and
+  /// its Dynamic Island choices except `extra` values ("title" and "body"
+  /// show the public text). Without a `publicContent`, only the title, icons,
+  /// colors and tap route.
   var liveUpdatesPublicState: Self {
     let p = publicContent
     let keepProgress = p?.keepProgress ?? false
     let keepTimer = p?.keepTimer ?? false
+    func island(_ choice: String?) -> String? {
+      guard p != nil, let choice, !choice.hasPrefix("extra:") else { return nil }
+      return choice
+    }
     return Self(
       title: p?.title ?? title, body: p?.body, progress: keepProgress ? progress : nil,
       icon: icon, iosIcon: iosIcon, islandIcon: islandIcon, route: route,
       timerStart: keepTimer ? timerStart : nil, timerEnd: keepTimer ? timerEnd : nil,
+      compactTrailing: island(compactTrailing), compactLeading: island(compactLeading),
+      minimal: island(minimal),
       tintArgb: tintArgb, backgroundArgb: backgroundArgb, foregroundArgb: foregroundArgb)
   }
 

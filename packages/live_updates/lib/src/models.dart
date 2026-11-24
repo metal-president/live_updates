@@ -108,6 +108,9 @@ final class LiveUpdateContent {
   ///
   /// Whether content is hidden depends on the person's device settings
   /// (see [LiveUpdatePublicContent]); the library never hides it on its own.
+  ///
+  /// [copyWith] keeps it when given `null`, as for the other fields: to
+  /// remove it, create a new [LiveUpdateContent] without it.
   final LiveUpdatePublicContent? publicContent;
 
   /// iOS-only options.
@@ -116,7 +119,9 @@ final class LiveUpdateContent {
   /// Android-only options.
   final AndroidLiveUpdateOptions? android;
 
-  /// Returns a copy with the given fields replaced.
+  /// Returns a copy with the given fields replaced. A `null` argument keeps
+  /// the current value, so a field such as [publicContent] cannot be removed
+  /// with it: create a new [LiveUpdateContent] instead.
   LiveUpdateContent copyWith({
     String? title,
     String? body,

@@ -41,10 +41,10 @@ import org.json.JSONObject;
  *
  * <p>Content is exchanged as the same JSON used on iOS ({@code title, body,
  * progress, icon, androidSmallIcon, route, image, actions, metrics, criticalMetric, steps,
- * journey}) plus Android options: {@code channelId, channelName,
+ * journey, publicContent}) plus Android options: {@code channelId, channelName,
  * shortCriticalText, colorArgb, whenEpochMillis, showChronometer, androidMode,
  * bodySemanticStyle, progressSemanticStyle, progressSegments, progressPoints,
- * progressTrackerIcon, timeoutAfterMillis, androidAlert} and the timer
+ * progressTrackerIcon, timeoutAfterMillis, androidAlert, androidLockScreenVisibility} and the timer
  * ({@code timerStart} or {@code timerEnd}, seconds since 1970). On Android 16+ progress uses
  * {@link Notification.ProgressStyle} and promotion to a Live Update is
  * requested (shown on builds that support promoted notifications, Android 16
@@ -634,10 +634,9 @@ public final class LiveUpdatesBridge {
     if (json != null && dismissAfterSeconds != 0) {
       JSONObject content = new JSONObject(json);
       Notification.Builder builder =
-          builder(c, content, remote).setOngoing(false).setAutoCancel(true);
+          builder(c, content, remote, true);
       if (dismissAfterSeconds > 0 && Build.VERSION.SDK_INT >= 26)
         builder.setTimeoutAfter((long) (dismissAfterSeconds * 1000));
-      requestPromotedOngoing(builder, false);
       manager(c).notify(TAG_PREFIX + id, NOTIFICATION_ID, builder.build());
     } else {
       manager(c).cancel(TAG_PREFIX + id, NOTIFICATION_ID);
@@ -883,6 +882,15 @@ public final class LiveUpdatesBridge {
    * exist, so a server cannot create arbitrary channels on the device.
    */
   private static Notification.Builder builder(Context c, JSONObject content, boolean remote) {
+    return builder(c, content, remote, false);
+  }
+
+  /**
+   * {@code ended}: final content of an ended update, no longer ongoing or promoted (its public
+   * version too).
+   */
+  private static Notification.Builder builder(
+      Context c, JSONObject content, boolean remote, boolean ended) {
     Notification.Builder b;
     if (Build.VERSION.SDK_INT >= 26) {
       String channelId = content.optString("channelId", DEFAULT_CHANNEL);
@@ -992,7 +1000,11 @@ public final class LiveUpdatesBridge {
         b.setStyle(new Notification.BigTextStyle().bigText(body + "\n" + detail));
       }
     }
-    lockScreen(c, b, content, remote);
+    if (ended) {
+      b.setOngoing(false).setAutoCancel(true);
+      requestPromotedOngoing(b, false);
+    }
+    lockScreen(c, b, content, remote, ended);
     return b;
   }
 
@@ -1003,13 +1015,13 @@ public final class LiveUpdatesBridge {
    * shows only the app name and icon).
    */
   private static void lockScreen(
-      Context c, Notification.Builder b, JSONObject content, boolean remote) {
+      Context c, Notification.Builder b, JSONObject content, boolean remote, boolean ended) {
     boolean secret = "secret".equals(optString(content, "androidLockScreenVisibility"));
     b.setVisibility(secret ? Notification.VISIBILITY_SECRET : Notification.VISIBILITY_PRIVATE);
     JSONObject pub = secret ? null : content.optJSONObject("publicContent");
     if (pub == null || optString(pub, "title") == null) return;
     try {
-      b.setPublicVersion(builder(c, publicContent(content, pub), remote).build());
+      b.setPublicVersion(builder(c, publicContent(content, pub), remote, ended).build());
     } catch (JSONException e) {
       // Cannot happen: only strings, numbers and parsed JSON values are put.
       Log.w(LOG_TAG, "publicContent: " + e.getMessage());

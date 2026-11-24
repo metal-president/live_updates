@@ -317,6 +317,21 @@ public class LiveUpdatesBridgeTest {
   }
 
   @Test
+  public void endedFinalContentHasAnEndedPublicVersion() throws Exception {
+    String id = LiveUpdatesBridge.start("{\"title\":\"Order\"}");
+    LiveUpdatesBridge.end(
+        id, "{\"title\":\"Delivered\",\"publicContent\":{\"title\":\"Done\"}}", 30);
+    Notification n = shown(id);
+    assertFalse((n.flags & Notification.FLAG_ONGOING_EVENT) != 0);
+    assertFalse(n.extras.getBoolean("android.requestPromotedOngoing"));
+    Notification p = n.publicVersion;
+    assertEquals("Done", p.extras.getString(Notification.EXTRA_TITLE));
+    assertFalse((p.flags & Notification.FLAG_ONGOING_EVENT) != 0);
+    assertTrue((p.flags & Notification.FLAG_AUTO_CANCEL) != 0);
+    assertFalse(p.extras.getBoolean("android.requestPromotedOngoing"));
+  }
+
+  @Test
   public void updateToABlockedChannelDoesNotThrow() throws Exception {
     // The user turned the channel off: the system never lists the posts.
     manager.createNotificationChannel(

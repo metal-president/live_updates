@@ -1011,8 +1011,8 @@ final class AndroidLiveUpdateOptions {
 enum AndroidLockScreenVisibility {
   /// Shows the full notification unless the person hides sensitive
   /// notification content on the lock screen; then
-  /// [LiveUpdateContent.publicContent] when set, otherwise the app name and
-  /// icon without the content (`Notification.VISIBILITY_PRIVATE`).
+  /// [LiveUpdateContent.publicContent] when set, otherwise only basic
+  /// information without the content (`Notification.VISIBILITY_PRIVATE`).
   private,
 
   /// Always shows nothing of the notification on a secure lock screen,

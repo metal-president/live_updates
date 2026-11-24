@@ -133,6 +133,19 @@ public class LiveUpdatesBridgeTest {
   }
 
   @Test
+  public void keepFlagsThatAreNotBooleansDropProgressAndTimer() throws Exception {
+    String id =
+        LiveUpdatesBridge.start(
+            "{\"title\":\"Order\",\"progress\":0.4,\"timerStart\":1893456000,"
+                + "\"showChronometer\":true,"
+                + "\"publicContent\":{\"title\":\"Delivery\","
+                + "\"keepProgress\":0,\"keepTimer\":\"false\"}}");
+    Notification p = shown(id).publicVersion;
+    assertEquals(0, p.extras.getInt(Notification.EXTRA_PROGRESS_MAX));
+    assertFalse(p.extras.getBoolean(Notification.EXTRA_SHOW_CHRONOMETER));
+  }
+
+  @Test
   public void secretVisibilityHidesTheNotification() throws Exception {
     String id =
         LiveUpdatesBridge.start(

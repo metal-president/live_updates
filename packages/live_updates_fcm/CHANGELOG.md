@@ -1,3 +1,9 @@
+## 0.2.1
+
+- Requires live_updates 0.2.1, so remote payloads can carry `publicContent`
+  (content for a locked device that hides sensitive content) and
+  `"androidLockScreenVisibility": "secret"` (see docs/server-fcm.md).
+
 ## 0.2.0
 
 - Requires live_updates 0.2.0, whose icons are `LiveUpdateIcon` values. In

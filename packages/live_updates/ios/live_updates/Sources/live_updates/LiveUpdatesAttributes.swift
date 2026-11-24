@@ -122,8 +122,15 @@ public struct LiveUpdatesAttributes: ActivityAttributes {
           ?? nil)?.compactMap(\.value) ?? []
       steps = (try? c.decodeIfPresent(LiveUpdatesSteps.self, forKey: .steps)) ?? nil
       journey = (try? c.decodeIfPresent(LiveUpdatesJourney.self, forKey: .journey)) ?? nil
-      publicContent =
-        (try? c.decodeIfPresent(LiveUpdatesPublicContent.self, forKey: .publicContent)) ?? nil
+      // A publicContent that does not decode still hides the full content
+      // (an empty title, no progress or timer) rather than showing it all.
+      if c.contains(.publicContent), (try? c.decodeNil(forKey: .publicContent)) == false {
+        publicContent =
+          (try? c.decode(LiveUpdatesPublicContent.self, forKey: .publicContent))
+          ?? LiveUpdatesPublicContent(title: "", keepProgress: false, keepTimer: false)
+      } else {
+        publicContent = nil
+      }
     }
   }
 
@@ -232,7 +239,7 @@ public struct LiveUpdatesJourney: Codable, Hashable {
 }
 
 /// `LiveUpdateContent.publicContent`: what the Lock Screen shows while the
-/// system hides private data (the `privacy` redaction reason).
+/// system hides private data (the `privacy` or `placeholder` redaction reason).
 public struct LiveUpdatesPublicContent: Codable, Hashable {
   public var title: String
   public var body: String?
@@ -240,6 +247,8 @@ public struct LiveUpdatesPublicContent: Codable, Hashable {
   public var keepProgress: Bool
   /// Whether the timer of the full content is still shown.
   public var keepTimer: Bool
+
+  enum CodingKeys: String, CodingKey { case title, body, keepProgress, keepTimer }
 
   public init(title: String, body: String? = nil, keepProgress: Bool = true, keepTimer: Bool = true) {
     self.title = title
@@ -254,8 +263,15 @@ public struct LiveUpdatesPublicContent: Codable, Hashable {
     // A body that does not decode is left out rather than the whole public
     // content (which would show the full content instead).
     body = (try? c.decodeIfPresent(String.self, forKey: .body)) ?? nil
-    keepProgress = (try? c.decodeIfPresent(Bool.self, forKey: .keepProgress)) ?? true
-    keepTimer = (try? c.decodeIfPresent(Bool.self, forKey: .keepTimer)) ?? true
+    keepProgress = Self.keep(c, .keepProgress)
+    keepTimer = Self.keep(c, .keepTimer)
+  }
+
+  /// `true` when the key is missing or null; otherwise only a real `true`
+  /// keeps the value (`"false"` or `0` hides it).
+  private static func keep(_ c: KeyedDecodingContainer<CodingKeys>, _ key: CodingKeys) -> Bool {
+    guard c.contains(key), (try? c.decodeNil(forKey: key)) == false else { return true }
+    return (try? c.decode(Bool.self, forKey: key)) ?? false
   }
 }
 

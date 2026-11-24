@@ -1,4 +1,4 @@
-## Unreleased
+## 0.2.1
 
 - `LiveUpdateContent.publicContent` (`LiveUpdatePublicContent`): content shown
   on the Lock Screen while the system hides sensitive content, which depends

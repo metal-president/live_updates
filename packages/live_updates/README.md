@@ -125,11 +125,11 @@ With `--no-xcode` only the widget sources are written. Then, in Xcode:
 
 ### Android
 
-Nothing is required. The plugin declares `POST_NOTIFICATIONS` and
+No native setup is required: the plugin declares `POST_NOTIFICATIONS` and
 `POST_PROMOTED_NOTIFICATIONS`. Call `LiveUpdates.requestPermission()` before
-starting on Android 13+. Add a single-color status bar icon, though, and
-make it the default icon (see [Icons](#icons)): without one, Android shows
-the app icon as a solid shape.
+starting on Android 13+. Also add a single-color status bar icon and make it
+the default icon (see [Icons](#icons)); without one, Android shows the app
+icon as a solid shape.
 
 Android only promotes a notification to a Live Update when the build supports
 it, the user allows it (`LiveUpdates.canPostPromotedNotifications()`), and the
@@ -566,7 +566,7 @@ await LiveUpdates.start(
   const LiveUpdateContent(
     title: 'Order #1234',
     body: 'Courier at the door, gate code 4321',
-    progress: .6,
+    progress: 0.6,
     publicContent: LiveUpdatePublicContent(
       title: 'Delivery',
       body: 'On the way',
@@ -580,44 +580,52 @@ The library never hides content on its own; the person's settings decide:
 - **Android:** when the person hides sensitive notification content on the
   lock screen, Android shows the public version of the notification
   ([`setPublicVersion`][android-public-version]) while the device is locked.
-  live_updates posts every notification as
-  [`VISIBILITY_PRIVATE`][android-visibility] (Android's default): without
-  `publicContent`, a locked device shows only the app name and icon. People
-  can also change lock screen visibility per notification channel
-  ([lock screen visibility][android-lock-screen]).
+  By default, live_updates posts notifications as
+  [`VISIBILITY_PRIVATE`][android-visibility] (Android's default). Without
+  `publicContent`, a secure lock screen then shows only basic information
+  without the content. People can also change lock screen visibility per
+  notification channel ([lock screen visibility][android-lock-screen]).
 - **iOS:** when the system hides private data, the widget sees the
   [`privacy`][ios-privacy] or [`placeholder`][ios-placeholder] redaction
-  reason, and the generated widget shows `publicContent`. For widgets, Apple
-  documents that people control this with the Lock Screen items under
-  Settings > Face ID & Passcode > Allow Access When Locked, and that the
-  system then renders a placeholder or the redactions the app configures
-  ([hide sensitive content][ios-hide-sensitive]). Apple does not describe
-  it for Live Activities; in tests on iOS 27 the Live Activity got one of
-  these reasons while the device was locked with Live Activities turned off
-  there, and neither after unlocking with Face ID. Without `publicContent`
-  the widget shows the full content as before (the system may then draw it
-  as a placeholder).
+  reason, and the generated widget shows `publicContent`. Without
+  `publicContent`, the widget shows the full content, and the system may
+  draw it as a placeholder.
+
+  For widgets, Apple says people control this with Lock Screen widgets under
+  Settings > Face ID & Passcode > Allow Access When Locked
+  ([hide sensitive content][ios-hide-sensitive]). Apple does not document it
+  for Live Activities. In tests on iOS 27, the Live Activity showed
+  `publicContent` while the device was locked with Live Activities turned
+  off under that setting, and the full content after unlocking.
 
 The public version keeps the icon, the colors, the tap route and, unless you
 pass `keepProgress: false` or `keepTimer: false`, the progress and the
 timer. Images, buttons, metrics, steps, the journey, `extra` values and
 Android's `shortCriticalText` are left out.
 
-To always hide the whole notification on a locked Android device, whatever
-the person's setting, pass
-`AndroidLiveUpdateOptions(lockScreenVisibility:
-AndroidLockScreenVisibility.secret)` ([`VISIBILITY_SECRET`][android-visibility-secret]).
+To always hide the whole notification on a secure Android lock screen,
+whatever the person's setting, use
+[`VISIBILITY_SECRET`][android-visibility-secret]. `publicContent` is then
+not used on Android:
+
+```dart
+android: const AndroidLiveUpdateOptions(
+  lockScreenVisibility: AndroidLockScreenVisibility.secret,
+),
+```
+
 There is no option to always show the full content: it would override the
 person's choice.
 
-In remote payloads, the keys are `publicContent` (an object with `title`,
-optional `body`, and `keepProgress` / `keepTimer`, which default to `true`)
-and, for Android, `"androidLockScreenVisibility": "secret"`.
+In remote payloads, put `publicContent` in the content (`content-state` on
+iOS, `live_updates_content` on Android). It is an object with `title`,
+optional `body`, and `keepProgress` / `keepTimer`, which default to `true`.
+For Android, add `"androidLockScreenVisibility": "secret"` to the content.
 
 [android-public-version]: https://developer.android.com/reference/android/app/Notification.Builder#setPublicVersion(android.app.Notification)
-[android-visibility]: https://developer.android.com/reference/android/app/Notification#VISIBILITY_PRIVATE
+[android-visibility]: https://developer.android.com/reference/android/app/Notification#visibility
 [android-visibility-secret]: https://developer.android.com/reference/android/app/Notification#VISIBILITY_SECRET
-[android-lock-screen]: https://developer.android.com/develop/ui/views/notifications/build-notification
+[android-lock-screen]: https://developer.android.com/develop/ui/compose/notifications/create-notification#lockscreenNotification
 [ios-privacy]: https://developer.apple.com/documentation/swiftui/redactionreasons/privacy
 [ios-placeholder]: https://developer.apple.com/documentation/swiftui/redactionreasons/placeholder
 [ios-hide-sensitive]: https://developer.apple.com/documentation/widgetkit/creating-a-widget-extension#Hide-sensitive-content
@@ -920,13 +928,16 @@ It replaces the plugin-owned Swift files (`LiveUpdatesAttributes.swift`,
 `LiveUpdatesViews.swift`, `LiveUpdatesActionIntent.swift`), which brings new
 built-in layouts and button handling, and keeps your layout file.
 
-A layout file generated by an older version can miss newer features: the
-layout switch for [custom layouts](#custom-layouts), and the Dynamic Island
-options, which need `LiveUpdatesCompactLeading`, `LiveUpdatesCompactTrailing`,
-`LiveUpdatesMinimal` and `LiveUpdatesIslandIcon` (in the expanded leading
-region), and `LiveUpdatesExpandedCenter` (in the expanded center region,
-so the title follows `publicContent`). Add them yourself, or copy your changes aside, run
-`create_widget --force` and apply them again.
+A layout file generated by an older version can miss newer features. Add
+these yourself, or copy your changes aside, run `create_widget --force` and
+apply them again:
+
+- the layout switch for [custom layouts](#custom-layouts);
+- `LiveUpdatesCompactLeading`, `LiveUpdatesCompactTrailing`,
+  `LiveUpdatesMinimal` and `LiveUpdatesIslandIcon` (in the expanded leading
+  region), for the Dynamic Island options;
+- `LiveUpdatesExpandedCenter` (in the expanded center region), so the title
+  follows `publicContent`.
 
 ### From 0.1.x to 0.2.0
 

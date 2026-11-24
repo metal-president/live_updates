@@ -1012,7 +1012,7 @@ public final class LiveUpdatesBridge {
    * Visibility on a secure lock screen while the user hides sensitive content there: {@code
    * androidLockScreenVisibility} {@code secret} hides the notification; otherwise it is private,
    * with a public version made from {@code publicContent} when present (without it the system
-   * shows only the app name and icon).
+   * shows only basic information without the content).
    */
   private static void lockScreen(
       Context c, Notification.Builder b, JSONObject content, boolean remote, boolean ended) {
@@ -1051,12 +1051,20 @@ public final class LiveUpdatesBridge {
   static JSONObject publicContent(JSONObject content, JSONObject pub) throws JSONException {
     JSONObject out = new JSONObject();
     copy(content, out, PUBLIC_KEYS);
-    if (pub.optBoolean("keepProgress", true)) copy(content, out, PUBLIC_PROGRESS_KEYS);
-    if (pub.optBoolean("keepTimer", true)) copy(content, out, PUBLIC_TIMER_KEYS);
+    if (keep(pub, "keepProgress")) copy(content, out, PUBLIC_PROGRESS_KEYS);
+    if (keep(pub, "keepTimer")) copy(content, out, PUBLIC_TIMER_KEYS);
     out.put("title", optString(pub, "title"));
     String body = optString(pub, "body");
     if (body != null) out.put("body", body);
     return out;
+  }
+
+  /**
+   * {@code true} when the key is missing or null; otherwise only a real {@code true} keeps the
+   * value ({@code "false"} or {@code 0} hides it).
+   */
+  private static boolean keep(JSONObject pub, String key) {
+    return !present(pub, key) || Boolean.TRUE.equals(pub.opt(key));
   }
 
   private static void copy(JSONObject from, JSONObject to, String[] keys) throws JSONException {

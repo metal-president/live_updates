@@ -80,17 +80,27 @@ struct ContentStateDecodingTests {
     #expect(try decode(#"{"title":"T"}"#).publicContent == nil)
   }
 
-  @Test func aMalformedPublicContentIsLeftOut() throws {
+  @Test func aMalformedPublicContentStillHidesTheFullContent() throws {
+    let hidden = LiveUpdatesPublicContent(title: "", keepProgress: false, keepTimer: false)
     let state = try decode(#"{"title":"T","publicContent":{"body":"no title"}}"#)
     #expect(state.title == "T")
-    #expect(state.publicContent == nil)
-    #expect(try decode(#"{"title":"T","publicContent":"x"}"#).publicContent == nil)
+    #expect(state.publicContent == hidden)
+    #expect(try decode(#"{"title":"T","publicContent":"x"}"#).publicContent == hidden)
+    #expect(try decode(#"{"title":"T","publicContent":null}"#).publicContent == nil)
   }
 
   @Test func aMalformedPublicBodyIsLeftOutNotThePublicContent() throws {
     let state = try decode(
-      #"{"title":"T","publicContent":{"title":"Delivery","body":123,"keepTimer":"x"}}"#)
+      #"{"title":"T","publicContent":{"title":"Delivery","body":123,"keepProgress":null}}"#)
     #expect(state.publicContent == LiveUpdatesPublicContent(title: "Delivery"))
+  }
+
+  @Test func keepFlagsThatAreNotBooleansHideProgressAndTimer() throws {
+    let state = try decode(
+      #"{"title":"T","publicContent":{"title":"P","keepProgress":0,"keepTimer":"false"}}"#)
+    #expect(
+      state.publicContent
+        == LiveUpdatesPublicContent(title: "P", keepProgress: false, keepTimer: false))
   }
 
   @Test func publicContentRoundTrips() throws {

@@ -1294,7 +1294,9 @@ public final class LiveUpdatesBridge {
   }
 
   /**
-   * The drawable named by the {@link #DEFAULT_ICON_META} meta-data, else the app icon.
+   * The drawable named by the {@link #DEFAULT_ICON_META} meta-data, else the app icon. A
+   * meta-data value that is not a drawable or mipmap is ignored with a warning: the system rejects
+   * a notification whose small icon cannot be loaded.
    */
   static Icon defaultIcon(Context c) {
     int res = defaultIconRes;
@@ -1303,14 +1305,37 @@ public final class LiveUpdatesBridge {
         ApplicationInfo info =
             c.getPackageManager()
                 .getApplicationInfo(c.getPackageName(), PackageManager.GET_META_DATA);
-        res = info.metaData == null ? 0 : info.metaData.getInt(DEFAULT_ICON_META, 0);
+        if (info.metaData != null && info.metaData.containsKey(DEFAULT_ICON_META)) {
+          res = info.metaData.getInt(DEFAULT_ICON_META, 0);
+          if (!isDrawable(c, res)) {
+            Log.w(
+                LOG_TAG,
+                DEFAULT_ICON_META
+                    + " must be android:resource=\"@drawable/...\"; using the app icon.");
+            res = 0;
+          }
+        }
       } catch (PackageManager.NameNotFoundException e) {
         // Our own package: cannot happen.
       }
       if (res == 0) res = c.getApplicationInfo().icon;
+      // An app without an icon: a system drawable, so the notification is still valid.
+      if (res == 0) res = android.R.drawable.sym_def_app_icon;
       defaultIconRes = res;
     }
     return Icon.createWithResource(c, res);
+  }
+
+  /** Whether {@code res} is a drawable or mipmap resource. */
+  private static boolean isDrawable(Context c, int res) {
+    if (res == 0) return false;
+    try {
+      String type = c.getResources().getResourceTypeName(res);
+      return "drawable".equals(type) || "mipmap".equals(type);
+    } catch (RuntimeException e) {
+      // Resources.NotFoundException: no such resource.
+      return false;
+    }
   }
 
   /** The icon object under {@code key}, or null (with a warning if it is not an object). */

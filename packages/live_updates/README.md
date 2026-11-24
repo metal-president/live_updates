@@ -616,8 +616,9 @@ Each place shows the first icon that is set:
 | Buttons | `iosIcon` or `androidIcon`, `icon`; else none on iOS and the default on Android |
 
 - **Default:** on Android, the drawable named by this meta-data in
-  `AndroidManifest.xml` (inside `<application>`), else the app icon. It also
-  covers remote updates that name no icon. On iOS, a system symbol, which
+  `AndroidManifest.xml` (inside `<application>`), else the app icon (also
+  when the meta-data is not a drawable, with a warning). It also covers
+  remote updates that name no icon. On iOS, a system symbol, which
   you can change in your layout file.
 
   ```xml

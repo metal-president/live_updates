@@ -1,3 +1,9 @@
+## 0.1.3
+
+- Requires live_updates 0.1.3, so apps can target iOS 15.0. Below iOS 17.2,
+  `tokens()` reports only the Firebase tokens (no Live Activity tokens).
+- Docs: the token table marks the `activity` token as iOS 17.2+.
+
 ## 0.1.2
 
 - Docs: Firebase does not issue registration tokens while installation IDs

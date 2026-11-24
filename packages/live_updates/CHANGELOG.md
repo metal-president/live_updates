@@ -1,4 +1,4 @@
-## Unreleased
+## 0.1.3
 
 - iOS: apps can target iOS 15.0 (was 17.2). Below iOS 17.2 every call does
   nothing, as on other platforms, and `LiveUpdates.isSupported()` returns

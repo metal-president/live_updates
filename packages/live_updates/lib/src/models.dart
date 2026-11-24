@@ -40,8 +40,8 @@ final class LiveUpdateContent {
 
   /// Icon of the update on both platforms: the small icon of the Android
   /// notification (status bar, Live Update chip) and the icon of the iOS
-  /// widget template (thumbnail when there is no [image], minimal Dynamic
-  /// Island).
+  /// widget template (thumbnail when there is no [image], and the Dynamic
+  /// Island unless [IosLiveUpdateOptions.islandIcon] or [image] is set).
   ///
   /// [AndroidLiveUpdateOptions.smallIcon] and [IosLiveUpdateOptions.icon]
   /// take precedence on their platform. Without any icon, or when the icon
@@ -600,7 +600,8 @@ final class IosLiveUpdateOptions {
 
   /// Icon of the generated widget on iOS, used instead of
   /// [LiveUpdateContent.icon]: the thumbnail when there is no
-  /// [LiveUpdateContent.image], and [IosIslandContent.icon]. `null` uses
+  /// [LiveUpdateContent.image], and the Dynamic Island when neither
+  /// [islandIcon] nor [LiveUpdateContent.image] is set. `null` uses
   /// [LiveUpdateContent.icon]. See [LiveUpdateIcon] for the order and the
   /// default.
   final LiveUpdateIcon? icon;
@@ -608,8 +609,9 @@ final class IosLiveUpdateOptions {
   /// Icon of the generated widget in the Dynamic Island (the leading side of
   /// the compact and expanded presentations, and [IosIslandContent.icon]),
   /// so that a photo [LiveUpdateContent.image] can stay on the Lock Screen
-  /// while the island shows a simple shape. Apple recommends compact and
-  /// minimal content that fits a 28-point circle.
+  /// while the island shows a simple shape. Apple recommends that compact
+  /// and minimal content fits a 28-point circle when the island is limited in
+  /// width (for example in landscape).
   ///
   /// The island shows the first that is set: [islandIcon],
   /// [LiveUpdateContent.image], [icon], [LiveUpdateContent.icon], the
@@ -807,7 +809,8 @@ final class AndroidLiveUpdateOptions {
   final LiveUpdateIcon? smallIcon;
 
   /// Short text for the status bar chip of a promoted Live Update, such as
-  /// "5 min". Android suggests at most 7 characters and may truncate it.
+  /// "5 min". Android shows it in full only when it is shorter than 7
+  /// characters; longer text may be cut.
   final String? shortCriticalText;
 
   /// Accent color.

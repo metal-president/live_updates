@@ -426,6 +426,34 @@ public class LiveUpdatesBridgeTest {
   }
 
   @Test
+  public void defaultIconMetaDataThatIsNotADrawableFallsBackToTheAppIcon() throws Exception {
+    android.os.Bundle meta = new android.os.Bundle();
+    // A string resource, not a drawable.
+    meta.putInt(LiveUpdatesBridge.DEFAULT_ICON_META, android.R.string.ok);
+    shadowOf(app.getPackageManager())
+        .getInternalMutablePackageInfo(app.getPackageName())
+        .applicationInfo
+        .metaData = meta;
+    String id = LiveUpdatesBridge.start("{\"title\":\"A\"}");
+    assertEquals(android.R.drawable.ic_dialog_info, shown(id).getSmallIcon().getResId());
+
+    // A plain value instead of android:resource, and an id that does not exist.
+    android.os.Bundle string = new android.os.Bundle();
+    string.putString(LiveUpdatesBridge.DEFAULT_ICON_META, "ic_stat");
+    android.os.Bundle missing = new android.os.Bundle();
+    missing.putInt(LiveUpdatesBridge.DEFAULT_ICON_META, 0x7f7f7f7f);
+    for (android.os.Bundle bad : new android.os.Bundle[] {string, missing}) {
+      shadowOf(app.getPackageManager())
+          .getInternalMutablePackageInfo(app.getPackageName())
+          .applicationInfo
+          .metaData = bad;
+      LiveUpdatesBridge.engineAttached(app); // Reads the meta-data again.
+      id = LiveUpdatesBridge.start("{\"title\":\"B\"}");
+      assertEquals(android.R.drawable.ic_dialog_info, shown(id).getSmallIcon().getResId());
+    }
+  }
+
+  @Test
   public void progressSegmentsAndPoints() throws Exception {
     String id =
         LiveUpdatesBridge.start(

@@ -23,7 +23,7 @@ iOS **Live Activities** and Android **Live Update** notifications with one Dart 
 In this README, a *live update* is either a Live Activity (iOS) or a Live
 Update notification (Android).
 
-> **Status:** 0.1.x. Breaking changes come with a new minor version (0.2.0); pin the version you test with.
+> **Status:** 0.2.x. Breaking changes come with a new minor version (0.3.0); pin the version you test with.
 
 | iOS Lock Screen | iOS Dynamic Island |
 | --- | --- |
@@ -127,9 +127,9 @@ With `--no-xcode` only the widget sources are written. Then, in Xcode:
 
 Nothing is required. The plugin declares `POST_NOTIFICATIONS` and
 `POST_PROMOTED_NOTIFICATIONS`. Call `LiveUpdates.requestPermission()` before
-starting on Android 13+. Add a single-color status bar icon, though:
-without one, Android shows the app icon as a solid shape (see
-[Icons](#icons)).
+starting on Android 13+. Add a single-color status bar icon, though, and
+make it the default icon (see [Icons](#icons)): without one, Android shows
+the app icon as a solid shape.
 
 Android only promotes a notification to a Live Update when the build supports
 it, the user allows it (`LiveUpdates.canPostPromotedNotifications()`), and the
@@ -469,7 +469,7 @@ on Android.
   The Dynamic Island is always black. Choose an accent that reads well on
   dark and on light backgrounds.
 - With a custom background, set the text color too, for example
-  `backgroundColor: Colors.white, foregroundColor: Colors.black`.
+  `backgroundColor: Color(0xFFFFFFFF), foregroundColor: Color(0xFF000000)`.
 - While the Always-On display dims the Lock Screen, the system colors are
   used.
 
@@ -616,8 +616,9 @@ Each place shows the first icon that is set:
 | Buttons | `iosIcon` or `androidIcon`, `icon`; else none on iOS and the default on Android |
 
 - **Default:** on Android, the drawable named by this meta-data in
-  `AndroidManifest.xml` (inside `<application>`), else the app icon. It also
-  covers remote updates that name no icon. On iOS, a system symbol, which
+  `AndroidManifest.xml` (inside `<application>`), else the app icon (also
+  when the meta-data is not a drawable, with a warning). It also covers
+  remote updates that name no icon. On iOS, a system symbol, which
   you can change in your layout file.
 
   ```xml
@@ -627,7 +628,8 @@ Each place shows the first icon that is set:
   ```
 
 - **Not found:** an icon that cannot be shown (a missing resource or asset,
-  a symbol on Android, or an asset a push names before the app stored it)
+  a symbol as the Android small icon, or an asset a push names before the
+  app stored it)
   is replaced by the default, not by the next icon of the list, and a
   warning is logged with the tag `live_updates` (Android) or by the widget
   (iOS). Debug builds also print obvious mistakes, such as `ic_stat.png`
@@ -637,13 +639,14 @@ Each place shows the first icon that is set:
 
 - **Small icon:** Android draws it in one color: the shape is stenciled in
   white over the accent color, and it appears in monochrome in the status
-  bar. From Android 12 its color comes from `AndroidLiveUpdateOptions.color`
-  (else the system theme). Use a single-color image with transparency; a
+  bar. From Android 12 the system derives its color from
+  `AndroidLiveUpdateOptions.color` (else the system theme). Use a single-color image with transparency; a
   full-color picture such as the app icon becomes a solid shape.
   ([source][android-notification-color], [source][android-notification-header],
   [source][android-icon-color])
 - **Release builds:** R8 resource shrinking removes drawables that only Dart
-  names. List them in a keep file such as `android/app/src/main/res/raw/keep.xml`
+  names. List them in a keep file with a unique name, such as
+  `android/app/src/main/res/raw/keep_<your app>.xml`
   ([source][android-keep-resources]); drawables referenced from the manifest
   are kept anyway.
 
@@ -665,14 +668,16 @@ Each place shows the first icon that is set:
 
 - **Asset catalog:** `create_widget` creates `Assets.xcassets` in the widget
   folder (`ios/LiveUpdatesWidget/`). Add `LiveUpdateIcon.native` images
-  there; the widget cannot see images in the Runner asset catalog.
+  there: the widget extension is a separate target and loads images from
+  its own bundle, not from the Runner asset catalog.
 - **Size:** the widget template shows icons at up to 40 points. ActivityKit
   may fail to start an activity whose images are larger than its
   presentation, so asset icons are scaled to 120 pixels (40 points at 3x);
   size asset catalog images the same way. ([source][ios-activitykit-assets])
 - **Dynamic Island:** Apple recommends compact and minimal content that
-  fits a 28-point circle, and a logo without a container rather than the
-  whole app icon. `islandIcon` keeps a photo `image` on the Lock Screen
+  fits a 28-point circle when the island is limited in width (for example
+  in landscape), and a logo without a container rather than the whole app
+  icon. `islandIcon` keeps a photo `image` on the Lock Screen
   while the island shows a simple shape. ([source][ios-hig-layouts],
   [source][ios-hig-best-practices])
 - **Color:** symbols take `IosLiveUpdateOptions.color` (else the text
@@ -694,7 +699,7 @@ Each place shows the first icon that is set:
 [android-keep-resources]: https://developer.android.com/topic/performance/app-optimization/customize-which-resources-to-keep
 [android-tracker-icon]: https://developer.android.com/reference/android/app/Notification.ProgressStyle#setProgressTrackerIcon(android.graphics.drawable.Icon)
 [android-action-icons]: https://developer.android.com/design/ui/mobile/guides/home-screen/notifications#notification-actions
-[android-large-icon]: https://developer.android.com/develop/ui/compose/notifications#Templates
+[android-large-icon]: https://developer.android.com/design/ui/mobile/guides/home-screen/notifications#large-icon
 [ios-activitykit-assets]: https://developer.apple.com/documentation/activitykit/displaying-live-data-with-live-activities#Plan-for-Live-Activity-duration-and-asset-constraints
 [ios-hig-layouts]: https://developer.apple.com/design/human-interface-guidelines/live-activities#Creating-Live-Activity-layouts
 [ios-hig-best-practices]: https://developer.apple.com/design/human-interface-guidelines/live-activities#Best-practices
@@ -850,8 +855,8 @@ In remote payloads, `"iconName": "ic_stat"` becomes
 `"icon": {"native": "ic_stat"}`, and so on for `progressTrackerIcon` and the
 button keys (`systemImage` becomes `"icon": {"symbol": ...}`). Run
 `create_widget` again so the widget reads the new keys and gets its asset
-catalog. Updates started before the upgrade show the default icon until
-their next update.
+catalog. On iOS, activities started before the upgrade show the default
+icon until their next update.
 
 ## How it works
 

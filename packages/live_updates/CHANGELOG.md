@@ -7,7 +7,7 @@
   buttons, metrics, steps, the journey and `extra` are left out.
   - Android: the notification's public version (`setPublicVersion`).
   - iOS: the generated widget's building blocks show it when the widget sees
-    the `privacy` redaction reason. New building blocks
+    the `privacy` or `placeholder` redaction reason. New building blocks
     `LiveUpdatesPublicLockScreen` (for layouts of your own, with
     `state.liveUpdatesShowsPublic(redactionReasons)`) and
     `LiveUpdatesExpandedCenter` (the expanded Dynamic Island title). Run

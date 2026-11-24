@@ -44,6 +44,9 @@ void main() {
     expect(views, contains('struct LiveUpdatesPublicLockScreen'));
     expect(views, contains('struct LiveUpdatesExpandedCenter'));
     expect(views, contains('func liveUpdatesShowsPublic('));
+    // The system uses either reason while it hides private data.
+    expect(views, contains('reasons.contains(.privacy)'));
+    expect(views, contains('reasons.contains(.placeholder)'));
     for (final block in [
       'LiveUpdatesLockScreen',
       'LiveUpdatesExpandedCenter',

@@ -586,14 +586,17 @@ The library never hides content on its own; the person's settings decide:
   can also change lock screen visibility per notification channel
   ([lock screen visibility][android-lock-screen]).
 - **iOS:** when the system hides private data, the widget sees the
-  [`privacy`][ios-privacy] redaction reason, and the generated widget shows
-  `publicContent`. For widgets, Apple documents that people control this
-  with the Lock Screen items under Settings > Face ID & Passcode > Allow
-  Access When Locked ([hide sensitive content][ios-hide-sensitive]). Apple
-  does not describe it for Live Activities; in tests on iOS 27 the Live
-  Activity got the `privacy` reason while the device was locked with Live
-  Activities turned off there, and not after unlocking with Face ID.
-  Without `publicContent` the widget shows the full content as before.
+  [`privacy`][ios-privacy] or [`placeholder`][ios-placeholder] redaction
+  reason, and the generated widget shows `publicContent`. For widgets, Apple
+  documents that people control this with the Lock Screen items under
+  Settings > Face ID & Passcode > Allow Access When Locked, and that the
+  system then renders a placeholder or the redactions the app configures
+  ([hide sensitive content][ios-hide-sensitive]). Apple does not describe
+  it for Live Activities; in tests on iOS 27 the Live Activity got one of
+  these reasons while the device was locked with Live Activities turned off
+  there, and neither after unlocking with Face ID. Without `publicContent`
+  the widget shows the full content as before (the system may then draw it
+  as a placeholder).
 
 The public version keeps the icon, the colors, the tap route and, unless you
 pass `keepProgress: false` or `keepTimer: false`, the progress and the
@@ -615,6 +618,7 @@ and, for Android, `"androidLockScreenVisibility": "secret"`.
 [android-visibility-secret]: https://developer.android.com/reference/android/app/Notification#VISIBILITY_SECRET
 [android-lock-screen]: https://developer.android.com/develop/ui/views/notifications/build-notification
 [ios-privacy]: https://developer.apple.com/documentation/swiftui/redactionreasons/privacy
+[ios-placeholder]: https://developer.apple.com/documentation/swiftui/redactionreasons/placeholder
 [ios-hide-sensitive]: https://developer.apple.com/documentation/widgetkit/creating-a-widget-extension#Hide-sensitive-content
 
 ### Images

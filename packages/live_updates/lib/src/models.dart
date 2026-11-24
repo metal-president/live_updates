@@ -210,10 +210,11 @@ final class LiveUpdateContent {
 ///   on the lock screen, the system shows this version of the notification
 ///   (`Notification.Builder.setPublicVersion`) while the device is locked.
 /// * iOS: when the system hides private data of the Live Activity on the
-///   Lock Screen (the widget sees the `privacy` redaction reason), the
-///   generated widget shows this content. In tests on iOS 27 this happened
-///   while the device was locked with Live Activities turned off under
-///   Settings > Face ID & Passcode > Allow Access When Locked.
+///   Lock Screen (the widget sees the `privacy` or `placeholder` redaction
+///   reason), the generated widget shows this content. In tests on iOS 27
+///   this happened while the device was locked with Live Activities turned
+///   off under Settings > Face ID & Passcode > Allow Access When Locked;
+///   the system used either reason.
 ///
 /// Only [title], [body], the icon, the colors and, as chosen with
 /// [keepProgress] and [keepTimer], the progress and the timer are shown.

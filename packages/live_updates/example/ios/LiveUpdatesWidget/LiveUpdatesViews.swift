@@ -13,8 +13,8 @@ import os
 /// "stepper" or "journey". Patterns whose data is missing fall back to the
 /// standard one.
 ///
-/// While the system hides private data on the Lock Screen (the `privacy`
-/// redaction reason) and the content has a `publicContent`, it shows
+/// While the system hides private data on the Lock Screen (the `privacy` or
+/// `placeholder` redaction reason) and the content has a `publicContent`, it shows
 /// `LiveUpdatesPublicLockScreen` instead.
 struct LiveUpdatesLockScreen: View {
   let state: LiveUpdatesAttributes.ContentState
@@ -66,7 +66,7 @@ struct LiveUpdatesLockScreen: View {
 }
 
 /// The Lock Screen view of `LiveUpdateContent.publicContent`, for while the
-/// system hides private data (the `privacy` redaction reason): the icon, the
+/// system hides private data (`privacy` or `placeholder`): the icon, the
 /// public title and body, and the progress and timer unless `keepProgress` or
 /// `keepTimer` is false. No image, buttons or layout data. Without a
 /// `publicContent` it shows only the icon and the title.
@@ -723,10 +723,11 @@ extension LiveUpdatesAttributes.ContentState {
 
   /// Whether to show `publicContent` instead of the full content: the system
   /// hides private data (the `privacy` redaction reason, for example on a
-  /// locked Lock Screen, depending on the person's settings) and there is a
+  /// locked Lock Screen, depending on the person's settings) or renders the
+  /// activity as a placeholder (`placeholder`), and there is a
   /// `publicContent`.
   func liveUpdatesShowsPublic(_ reasons: RedactionReasons) -> Bool {
-    reasons.contains(.privacy) && publicContent != nil
+    (reasons.contains(.privacy) || reasons.contains(.placeholder)) && publicContent != nil
   }
 
   /// The content to show while private data is hidden: `publicContent`'s

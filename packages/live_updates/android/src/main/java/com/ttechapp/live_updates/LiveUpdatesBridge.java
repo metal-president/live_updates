@@ -1385,6 +1385,7 @@ public final class LiveUpdatesBridge {
     }
     if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null;
     BitmapFactory.Options options = new BitmapFactory.Options();
+    options.inSampleSize = 1; // The default is 0.
     int longest = Math.max(bounds.outWidth, bounds.outHeight);
     while (longest / (options.inSampleSize * 2) >= maxPx) options.inSampleSize *= 2;
     Bitmap bitmap;

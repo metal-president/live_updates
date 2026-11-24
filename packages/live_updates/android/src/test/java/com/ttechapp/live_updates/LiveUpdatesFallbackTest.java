@@ -135,6 +135,7 @@ public class LiveUpdatesFallbackTest {
     assertNotNull(n);
     assertEquals("Delivered", n.extras.getString(Notification.EXTRA_TITLE));
     assertEquals(0, n.flags & Notification.FLAG_ONGOING_EVENT);
+    assertFalse(n.extras.containsKey("android.requestPromotedOngoing"));
     if (Build.VERSION.SDK_INT >= 26) assertEquals(300_000, n.getTimeoutAfter());
     assertFalse(Arrays.asList(LiveUpdatesBridge.activeIds()).contains(id));
   }

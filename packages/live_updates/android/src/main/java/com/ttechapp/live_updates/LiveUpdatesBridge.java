@@ -1199,9 +1199,11 @@ public final class LiveUpdatesBridge {
 
   /**
    * Same as {@code Notification.Builder#setRequestPromotedOngoing}, which is
-   * not in the API 36 stubs; the extra is honored from Android 16 on.
+   * not in the API 36 stubs; the extra is honored from Android 16 on and is
+   * not written on older versions.
    */
   private static void requestPromotedOngoing(Notification.Builder b, boolean value) {
+    if (Build.VERSION.SDK_INT < 36) return;
     b.getExtras().putBoolean(EXTRA_REQUEST_PROMOTED_ONGOING, value);
   }
 

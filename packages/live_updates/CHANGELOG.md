@@ -1,3 +1,25 @@
+## Unreleased
+
+- `LiveUpdateContent.publicContent` (`LiveUpdatePublicContent`): content shown
+  on the Lock Screen while the system hides sensitive content, which depends
+  on the person's settings. It keeps the icon, colors and tap route and, unless
+  `keepProgress` / `keepTimer` is false, the progress and timer; images,
+  buttons, metrics, steps, the journey and `extra` are left out.
+  - Android: the notification's public version (`setPublicVersion`).
+  - iOS: the generated widget's building blocks show it when the widget sees
+    the `privacy` or `placeholder` redaction reason. New building blocks
+    `LiveUpdatesPublicLockScreen` (for layouts of your own, with
+    `state.liveUpdatesShowsPublic(redactionReasons)`) and
+    `LiveUpdatesExpandedCenter` (the expanded Dynamic Island title). Run
+    `dart run live_updates:create_widget` again; a layout file generated
+    before should use `LiveUpdatesExpandedCenter` in its expanded center
+    region (see Upgrading in the README).
+- `AndroidLiveUpdateOptions.lockScreenVisibility`:
+  `AndroidLockScreenVisibility.private` (default, now set explicitly) or
+  `secret`, which hides the notification on a secure lock screen.
+- Remote payloads: `publicContent` (`title`, `body`, `keepProgress`,
+  `keepTimer`) and `"androidLockScreenVisibility": "secret"`.
+
 ## 0.2.0
 
 Breaking: icons are `LiveUpdateIcon` values. See "From 0.1.x to 0.2.0" in

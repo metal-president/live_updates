@@ -12,15 +12,28 @@ import os
 /// `IosLiveUpdateOptions.layout`: "standard" (default), "timer", "metrics",
 /// "stepper" or "journey". Patterns whose data is missing fall back to the
 /// standard one.
+///
+/// While the system hides private data on the Lock Screen (the `privacy` or
+/// `placeholder` redaction reason) and the content has a `publicContent`, it shows
+/// `LiveUpdatesPublicLockScreen` instead.
 struct LiveUpdatesLockScreen: View {
   let state: LiveUpdatesAttributes.ContentState
   let activityID: String
   @Environment(\.isLuminanceReduced) private var luminanceReduced
+  @Environment(\.redactionReasons) private var redactionReasons
   private var palette: LiveUpdatesPalette {
     LiveUpdatesPalette(state, luminanceReduced: luminanceReduced)
   }
 
   var body: some View {
+    if state.liveUpdatesShowsPublic(redactionReasons) {
+      LiveUpdatesPublicLockScreen(state: state)
+    } else {
+      full
+    }
+  }
+
+  private var full: some View {
     VStack(spacing: 10) {
       switch state.liveUpdatesLayout {
       case "timer":
@@ -42,33 +55,70 @@ struct LiveUpdatesLockScreen: View {
         LiveUpdatesHeader(state: state, palette: palette)
         LiveUpdatesJourneyRow(state: state, palette: palette)
       default:
-        HStack(alignment: .center, spacing: 12) {
-          LiveUpdatesThumbnail(state: state).frame(width: 40, height: 40)
-          VStack(alignment: .leading, spacing: 4) {
-            HStack {
-              Text(state.title).font(.headline).lineLimit(1)
-                .foregroundStyle(palette.foreground ?? .primary)
-              if state.liveUpdatesHasTimer {
-                Spacer()
-                LiveUpdatesTimerText(state: state).font(.headline)
-                  .foregroundStyle(palette.tint ?? palette.foreground ?? .primary)
-              }
-            }
-            if let body = state.body {
-              Text(body).font(.subheadline).lineLimit(2)
-                .foregroundStyle(palette.secondaryText)
-            }
-            if let progress = state.progress {
-              ProgressView(value: progress)
-            }
-          }
-        }
+        LiveUpdatesStandardRow(state: state, palette: palette)
       }
       LiveUpdatesActionButtons(actions: state.actions, activityID: activityID)
     }
     .tint(palette.tint)
     .activityBackgroundTint(palette.background)
     .activitySystemActionForegroundColor(palette.tint)
+  }
+}
+
+/// The Lock Screen view of `LiveUpdateContent.publicContent`, for while the
+/// system hides private data (`privacy` or `placeholder`): the icon, the
+/// public title and body, and the progress and timer unless `keepProgress` or
+/// `keepTimer` is false. No image, buttons or layout data. Without a
+/// `publicContent` it shows only the icon and the title, which the system
+/// may still hide.
+///
+/// A layout of your own can show it when
+/// `context.state.liveUpdatesShowsPublic(redactionReasons)` is true.
+struct LiveUpdatesPublicLockScreen: View {
+  let state: LiveUpdatesAttributes.ContentState
+  @Environment(\.isLuminanceReduced) private var luminanceReduced
+
+  var body: some View {
+    let shown = state.liveUpdatesPublicState
+    let palette = LiveUpdatesPalette(shown, luminanceReduced: luminanceReduced)
+    LiveUpdatesStandardRow(state: shown, palette: palette)
+      .tint(palette.tint)
+      .activityBackgroundTint(palette.background)
+      .activitySystemActionForegroundColor(palette.tint)
+      // publicContent is public by definition: nothing in it is hidden. The
+      // title of the full content (without one) stays subject to redaction.
+      .liveUpdatesUnredacted(state.publicContent != nil)
+  }
+}
+
+/// Image, title, timer, body and progress bar (the standard layout without
+/// buttons).
+struct LiveUpdatesStandardRow: View {
+  let state: LiveUpdatesAttributes.ContentState
+  let palette: LiveUpdatesPalette
+
+  var body: some View {
+    HStack(alignment: .center, spacing: 12) {
+      LiveUpdatesThumbnail(state: state).frame(width: 40, height: 40)
+      VStack(alignment: .leading, spacing: 4) {
+        HStack {
+          Text(state.title).font(.headline).lineLimit(1)
+            .foregroundStyle(palette.foreground ?? .primary)
+          if state.liveUpdatesHasTimer {
+            Spacer()
+            LiveUpdatesTimerText(state: state).font(.headline)
+              .foregroundStyle(palette.tint ?? palette.foreground ?? .primary)
+          }
+        }
+        if let body = state.body {
+          Text(body).font(.subheadline).lineLimit(2)
+            .foregroundStyle(palette.secondaryText)
+        }
+        if let progress = state.progress {
+          ProgressView(value: progress)
+        }
+      }
+    }
   }
 }
 
@@ -223,15 +273,32 @@ struct LiveUpdatesJourneyRow: View {
   }
 }
 
+/// Expanded Dynamic Island, center region: the title (the public one while
+/// the system hides private data).
+struct LiveUpdatesExpandedCenter: View {
+  let state: LiveUpdatesAttributes.ContentState
+  @Environment(\.redactionReasons) private var redactionReasons
+
+  var body: some View {
+    let isPublic = self.state.liveUpdatesShowsPublic(redactionReasons)
+    Text(isPublic ? state.liveUpdatesPublicState.title : state.title)
+      .font(.headline).lineLimit(1)
+      .liveUpdatesUnredacted(isPublic)
+  }
+}
+
 /// Expanded Dynamic Island, trailing region: the timer, else the progress.
 struct LiveUpdatesExpandedTrailing: View {
   let state: LiveUpdatesAttributes.ContentState
   @Environment(\.isLuminanceReduced) private var luminanceReduced
+  @Environment(\.redactionReasons) private var redactionReasons
   private var palette: LiveUpdatesPalette {
     LiveUpdatesPalette(state, luminanceReduced: luminanceReduced)
   }
 
   var body: some View {
+    let isPublic = self.state.liveUpdatesShowsPublic(redactionReasons)
+    let state = isPublic ? self.state.liveUpdatesPublicState : self.state
     Group {
       if state.liveUpdatesHasTimer {
         LiveUpdatesTimerText(state: state).font(.headline)
@@ -240,6 +307,7 @@ struct LiveUpdatesExpandedTrailing: View {
       }
     }
     .foregroundStyle(palette.tint ?? .primary)
+    .liveUpdatesUnredacted(isPublic)
   }
 }
 
@@ -249,11 +317,15 @@ struct LiveUpdatesExpandedBottom: View {
   let state: LiveUpdatesAttributes.ContentState
   let activityID: String
   @Environment(\.isLuminanceReduced) private var luminanceReduced
+  @Environment(\.redactionReasons) private var redactionReasons
   private var palette: LiveUpdatesPalette {
     LiveUpdatesPalette(state, luminanceReduced: luminanceReduced)
   }
 
   var body: some View {
+    let isPublic = self.state.liveUpdatesShowsPublic(redactionReasons)
+    // The public state has no layout data and no buttons.
+    let state = isPublic ? self.state.liveUpdatesPublicState : self.state
     // The Dynamic Island keeps its own dark colors: only the accent applies.
     let island = palette.islandOnly
     VStack(alignment: .leading, spacing: 6) {
@@ -276,6 +348,7 @@ struct LiveUpdatesExpandedBottom: View {
       LiveUpdatesActionButtons(actions: state.actions, activityID: activityID)
     }
     .tint(palette.tint)
+    .liveUpdatesUnredacted(isPublic)
   }
 }
 
@@ -285,17 +358,21 @@ struct LiveUpdatesExpandedBottom: View {
 struct LiveUpdatesCompactLeading: View {
   let state: LiveUpdatesAttributes.ContentState
   @Environment(\.isLuminanceReduced) private var luminanceReduced
+  @Environment(\.redactionReasons) private var redactionReasons
   private var palette: LiveUpdatesPalette {
     LiveUpdatesPalette(state, luminanceReduced: luminanceReduced)
   }
 
   var body: some View {
+    let isPublic = self.state.liveUpdatesShowsPublic(redactionReasons)
+    let state = isPublic ? self.state.liveUpdatesPublicState : self.state
     LiveUpdatesIslandItem(
       state: state,
       content: state.liveUpdatesPick(state.compactLeading, fallback: ["icon"])
     )
     .tint(palette.tint)
     .foregroundStyle(palette.tint ?? .primary)
+    .liveUpdatesUnredacted(isPublic)
   }
 }
 
@@ -306,17 +383,21 @@ struct LiveUpdatesCompactLeading: View {
 struct LiveUpdatesCompactTrailing: View {
   let state: LiveUpdatesAttributes.ContentState
   @Environment(\.isLuminanceReduced) private var luminanceReduced
+  @Environment(\.redactionReasons) private var redactionReasons
   private var palette: LiveUpdatesPalette {
     LiveUpdatesPalette(state, luminanceReduced: luminanceReduced)
   }
 
   var body: some View {
+    let isPublic = self.state.liveUpdatesShowsPublic(redactionReasons)
+    let state = isPublic ? self.state.liveUpdatesPublicState : self.state
     LiveUpdatesIslandItem(
       state: state,
       content: state.liveUpdatesPick(state.compactTrailing, fallback: ["progress", "timer", "title"])
     )
     .tint(palette.tint)
     .foregroundStyle(palette.tint ?? .primary)
+    .liveUpdatesUnredacted(isPublic)
   }
 }
 
@@ -326,17 +407,21 @@ struct LiveUpdatesCompactTrailing: View {
 struct LiveUpdatesMinimal: View {
   let state: LiveUpdatesAttributes.ContentState
   @Environment(\.isLuminanceReduced) private var luminanceReduced
+  @Environment(\.redactionReasons) private var redactionReasons
   private var palette: LiveUpdatesPalette {
     LiveUpdatesPalette(state, luminanceReduced: luminanceReduced)
   }
 
   var body: some View {
+    let isPublic = self.state.liveUpdatesShowsPublic(redactionReasons)
+    let state = isPublic ? self.state.liveUpdatesPublicState : self.state
     LiveUpdatesIslandItem(
       state: state,
       content: state.liveUpdatesPick(state.minimal, fallback: ["progress", "icon"])
     )
     .tint(palette.tint)
     .foregroundStyle(palette.tint ?? .primary)
+    .liveUpdatesUnredacted(isPublic)
   }
 }
 
@@ -534,16 +619,23 @@ struct LiveUpdatesThumbnail: View {
 struct LiveUpdatesIslandIcon: View {
   let state: LiveUpdatesAttributes.ContentState
   @Environment(\.isLuminanceReduced) private var luminanceReduced
+  @Environment(\.redactionReasons) private var redactionReasons
 
   var body: some View {
+    let isPublic = self.state.liveUpdatesShowsPublic(redactionReasons)
+    // The public state has no image.
+    let state = isPublic ? self.state.liveUpdatesPublicState : self.state
     let tint = LiveUpdatesPalette(state, luminanceReduced: luminanceReduced).tint
-    if let islandIcon = state.islandIcon {
-      LiveUpdatesIconView(icon: islandIcon, tint: tint)
-    } else if let image = LiveUpdatesPhoto(name: state.image) {
-      image
-    } else {
-      LiveUpdatesIconView(icon: state.iosIcon ?? state.icon, tint: tint)
+    Group {
+      if let islandIcon = state.islandIcon {
+        LiveUpdatesIconView(icon: islandIcon, tint: tint)
+      } else if let image = LiveUpdatesPhoto(name: state.image) {
+        image
+      } else {
+        LiveUpdatesIconView(icon: state.iosIcon ?? state.icon, tint: tint)
+      }
     }
+    .liveUpdatesUnredacted(isPublic)
   }
 }
 
@@ -631,6 +723,38 @@ extension LiveUpdatesAttributes.ContentState {
   var liveUpdatesTimerStart: Date? { Self.liveUpdatesDate(timerStart) }
   var liveUpdatesHasTimer: Bool { liveUpdatesTimerEnd != nil || liveUpdatesTimerStart != nil }
 
+  /// Whether to show `publicContent` instead of the full content: the system
+  /// hides private data (the `privacy` redaction reason, for example on a
+  /// locked Lock Screen, depending on the person's settings) or renders the
+  /// activity as a placeholder (`placeholder`), and there is a
+  /// `publicContent`.
+  func liveUpdatesShowsPublic(_ reasons: RedactionReasons) -> Bool {
+    (reasons.contains(.privacy) || reasons.contains(.placeholder)) && publicContent != nil
+  }
+
+  /// The content to show while private data is hidden: `publicContent`'s
+  /// title and body with this content's icons, colors and tap route, its
+  /// progress and timer unless `keepProgress` or `keepTimer` is false, and
+  /// its Dynamic Island choices except `extra` values ("title" and "body"
+  /// show the public text). Without a `publicContent`, only the title, icons,
+  /// colors and tap route.
+  var liveUpdatesPublicState: Self {
+    let p = publicContent
+    let keepProgress = p?.keepProgress ?? false
+    let keepTimer = p?.keepTimer ?? false
+    func island(_ choice: String?) -> String? {
+      guard p != nil, let choice, !choice.hasPrefix("extra:") else { return nil }
+      return choice
+    }
+    return Self(
+      title: p?.title ?? title, body: p?.body, progress: keepProgress ? progress : nil,
+      icon: icon, iosIcon: iosIcon, islandIcon: islandIcon, route: route,
+      timerStart: keepTimer ? timerStart : nil, timerEnd: keepTimer ? timerEnd : nil,
+      compactTrailing: island(compactTrailing), compactLeading: island(compactLeading),
+      minimal: island(minimal),
+      tintArgb: tintArgb, backgroundArgb: backgroundArgb, foregroundArgb: foregroundArgb)
+  }
+
   /// `IosLiveUpdateOptions.color` for the Dynamic Island keyline.
   var liveUpdatesKeylineTint: Color? { LiveUpdatesPalette.color(tintArgb) }
 
@@ -676,6 +800,18 @@ extension LiveUpdatesAttributes.ContentState {
   private static func liveUpdatesDate(_ seconds: Double?) -> Date? {
     guard let seconds, seconds.isFinite, abs(seconds) < 1e11 else { return nil }
     return Date(timeIntervalSince1970: seconds)
+  }
+}
+
+extension View {
+  /// `unredacted()` when `isPublic`: public content stays visible while the
+  /// system hides private data.
+  @ViewBuilder func liveUpdatesUnredacted(_ isPublic: Bool) -> some View {
+    if isPublic {
+      unredacted()
+    } else {
+      self
+    }
   }
 }
 

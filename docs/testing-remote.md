@@ -176,7 +176,8 @@ Notifications). It cannot be enabled from Xcode.
 4. Check both rendering paths:
    - Android 16 QPR1 and later: the notification is promoted to a Live Update
      (status bar chip, top of the shade and Lock Screen) when
-     `LiveUpdates.canPostPromotedNotifications()` is `true`. Users can turn
+     `LiveUpdates.canPostPromotedNotifications()` is `true`;
+     `LiveUpdate.isPromoted()` confirms it for one update. Users can turn
      promotion off per app in system settings. Android 16 builds without
      promoted notification support show `ProgressStyle` without the chip.
    - Android 15 or lower: a regular ongoing notification with a progress bar.

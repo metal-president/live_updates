@@ -213,10 +213,11 @@ abstract final class LiveUpdates {
   /// activity's attributes; push-to-start can set it with
   /// `"attributes": {"key": "..."}`.
   ///
-  /// A live update with this key that the user dismissed is not shown again
-  /// (platform guidance); on Android it comes back only after [LiveUpdate.end]
-  /// for that key, on iOS once the system no longer lists the ended activity.
-  /// Use a new key for a new activity.
+  /// A live update with this key that ended ([LiveUpdate.end]) and is still
+  /// visible is replaced by the new one. One that the user dismissed is not
+  /// shown again (platform guidance); on Android it comes back only after
+  /// [LiveUpdate.end] for that key, on iOS once the system no longer lists
+  /// the dismissed activity. Use a new key for a new activity.
   ///
   /// [pushUpdates] and [iosChannelId] only apply when a new activity is
   /// started: an existing activity keeps the push setting it was started

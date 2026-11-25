@@ -11,6 +11,10 @@
   timer or stopwatch metrics are left out of the ended notification, also
   from `finalContent`. `endAll()` removes ended notifications too. See
   Upgrading in the README.
+- iOS: `startOrUpdate` with the key of an activity that ended but is still
+  on the Lock Screen now starts a new activity (and removes the ended one),
+  as on Android. Before, it did nothing for up to four hours after `end`.
+  Only an activity the user dismissed still keeps the key from starting.
 
 ## 0.3.0
 

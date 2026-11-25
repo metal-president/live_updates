@@ -107,9 +107,10 @@ public final class LiveUpdatesBridge: NSObject {
   }
 
   /// Updates the activity whose key is `key`, or requests a new one with that
-  /// key. An activity with the key that has ended or was dismissed is not
-  /// replaced while the system still lists it, so the user does not get it
-  /// back. `completion` receives the activity id, or an error.
+  /// key. An activity with the key that the user dismissed is not replaced
+  /// while the system still lists it, so the user does not get it back; one
+  /// that ended is replaced. `completion` receives the activity id, or an
+  /// error.
   ///
   /// Runs on the main actor so that concurrent calls for one key cannot both
   /// request an activity (the lookup and `request` happen without suspending).
@@ -136,13 +137,20 @@ public final class LiveUpdatesBridge: NSObject {
     }
     if let activity = withKey.first(where: {
       $0.activityState == .active || $0.activityState == .stale
-    }) ?? withKey.first {
-      if activity.activityState == .active || activity.activityState == .stale {
-        await activity.update(payload.content, alertConfiguration: payload.alertConfiguration)
-      }
+    }) {
+      await activity.update(payload.content, alertConfiguration: payload.alertConfiguration)
       return activity.id
     }
-    return try request(payload, key: key).id
+    // One the user dismissed is not brought back while the system lists it.
+    if let dismissed = withKey.first(where: { $0.activityState == .dismissed }) {
+      return dismissed.id
+    }
+    // One that ended (and may still be on the Lock Screen) is replaced, as on
+    // Android: removed first, so the key shows only the new activity.
+    let ended = withKey.filter { $0.activityState == .ended }
+    let activity = try request(payload, key: key)
+    for old in ended { await old.end(nil, dismissalPolicy: .immediate) }
+    return activity.id
   }
 
   /// Whether `activity` is scheduled and has not started yet (iOS 26+).

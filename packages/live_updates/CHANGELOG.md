@@ -48,8 +48,8 @@
 - **Breaking (Android):** a notification with a countdown
   (`LiveUpdateTimer.countdown`) is removed when the countdown ends, exactly
   and even if the app is not running, instead of counting below zero (iOS
-  stops at zero); the update reports `ended`. A countdown that is already
-  over is not shown. `AndroidLiveUpdateOptions.removeAtCountdownEnd: false`
+  stops at zero); the update reports `ended`. The timer of a countdown that
+  is already over is left out. `AndroidLiveUpdateOptions.removeAtCountdownEnd: false`
   (remote: `"removeAtCountdownEnd": false`) keeps the notification.
 
 ## 0.3.0

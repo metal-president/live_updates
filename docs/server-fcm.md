@@ -53,7 +53,10 @@ Ending at a time: on Android, the update becomes stale at `endAt` and
 shows `endedContent` if it is set; `"removeAtEnd": true` removes it then
 instead. `maxDurationMillis` limits how long an Android live
 update is shown, counted from its start: without the key the default of
-8 hours applies, and `0` means no limit. On iOS the widget shows
+8 hours applies, and `0` means no limit. An Android update with a
+countdown (`timerEnd`) is removed when the countdown ends, as a
+notification's countdown would run below zero; `"removeAtCountdownEnd":
+false` keeps it. On iOS the widget shows
 `endedContent` once the activity is stale: send `stale-date` (the `endAt`
 time) next to `content-state`, as `endAt` inside `content-state` does not
 set it.

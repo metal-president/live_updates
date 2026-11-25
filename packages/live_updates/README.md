@@ -278,7 +278,8 @@ differently.
   user can swipe it away. Running timers (and timer or stopwatch metrics)
   are left out of it, so a countdown does not run past zero. This applies to
   `end` and remote `end` payloads; an update removed by `maxDuration`,
-  `timeoutAfter` or `removeAtEnd` is removed at once. Unlike iOS, Android
+  `timeoutAfter`, `removeAtEnd` or at the end of a countdown is removed at
+  once. Unlike iOS, Android
   does not report `dismissed` when the ended notification goes away.
   `dismissAfter` longer than 4 hours is capped at 4 hours; `Duration.zero`
   removes it at once. Below Android 8.0 the system cannot remove a
@@ -610,10 +611,13 @@ When a countdown ends, iOS stops it at zero and keeps showing the activity.
 An Android notification's countdown cannot stop and would count below zero,
 so from 0.4.0 Android removes the notification when the countdown ends:
 exactly, even if the app is not running, with no extra permission
-([source][android-timeout-after]). The update then reports `ended`. A
-countdown that is already over is not shown. With `endedContent` at an
-`endAt` up to the countdown's end (see [Ending at a time](#ending-at-a-time)),
-the ended content replaces it instead.
+([source][android-timeout-after]). The update then reports `ended`. Content
+whose countdown is already over is still shown, without the timer. With
+`endedContent` at an `endAt` up to the countdown's end (see
+[Ending at a time](#ending-at-a-time)), the ended content replaces it instead
+when the app may set exact alarms; otherwise the removal wins, as the
+replacement could come up to 10 minutes late. Timer metrics
+(`LiveUpdateMetric.timer`) are not covered.
 
 To show something else at that time on both platforms, update the content
 from your server, for example to "Arrived", before the countdown ends. To
@@ -1214,8 +1218,8 @@ apply them again:
   has passed). Before, they returned as if the update were
   shown. Check `isSupported()` first, or catch the exception.
 - **Android removes a notification when its countdown ends** (a
-  notification's countdown cannot stop at zero), and leaves out a countdown
-  that is already over. Pass
+  notification's countdown cannot stop at zero), and leaves out the timer of
+  a countdown that is already over. Pass
   `AndroidLiveUpdateOptions(removeAtCountdownEnd: false)` to keep it.
 - **What stays after `end` has no buttons or running timers** on either
   platform (the final content, or the content shown last).

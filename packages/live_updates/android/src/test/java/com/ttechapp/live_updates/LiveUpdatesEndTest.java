@@ -138,6 +138,31 @@ public class LiveUpdatesEndTest {
   }
 
   @Test
+  public void withoutExactAlarmsTheCountdownRemovalWins() throws Exception {
+    ShadowAlarmManager.setCanScheduleExactAlarms(false);
+    long eta = System.currentTimeMillis() + 20 * MINUTE;
+    LiveUpdatesBridge.startOrUpdate(
+        "order",
+        "{\"title\":\"Order\",\"timerEnd\":" + seconds(eta) + ",\"endAt\":" + seconds(eta)
+            + ",\"endedContent\":{\"title\":\"Delivered\"}}");
+    // The ended content could come up to 10 minutes late.
+    assertAbout(20 * MINUTE, shown("order").getTimeoutAfter());
+  }
+
+  @Test
+  public void aRemoteCountdownCannotRemoveTheUpdateAtOnce() throws Exception {
+    JSONObject data =
+        new JSONObject()
+            .put("live_updates_event", "start")
+            .put("live_updates_id", "r")
+            .put(
+                "live_updates_content",
+                "{\"title\":\"R\",\"timerEnd\":" + seconds(System.currentTimeMillis() + 50) + "}");
+    assertTrue(LiveUpdatesBridge.handleRemotePayload(data.toString()));
+    assertAbout(MINUTE, shown("r").getTimeoutAfter());
+  }
+
+  @Test
   public void removeAtCountdownEndFalseKeepsTheUpdate() throws Exception {
     long eta = System.currentTimeMillis() + 20 * MINUTE;
     LiveUpdatesBridge.startOrUpdate(

@@ -817,6 +817,7 @@ public final class LiveUpdatesBridge {
   private static final String[] RUNNING_ONLY_KEYS = {
     "timerStart", "timerEnd", "showChronometer", "actions", "endAt", "endedContent",
     "removeAtEnd", "maxDurationMillis", "timeoutAfterMillis", "androidAlert", "alert",
+    "removeAtCountdownEnd",
   };
 
   /**
@@ -1288,14 +1289,19 @@ public final class LiveUpdatesBridge {
     // A notification's countdown cannot stop at zero and would run below it
     // (iOS stops at zero): the update is removed when it ends, unless
     // removeAtCountdownEnd is false, or endedContent replaces it by then
-    // (without the timer).
+    // (without the timer) on time, which needs exact alarms.
     double countdownEnd = content.optDouble("timerEnd", Double.NaN);
     if (!stale && isTime(countdownEnd) && content.optBoolean("removeAtCountdownEnd", true)) {
       long end = (long) (countdownEnd * 1000);
-      boolean replacedFirst = staleAtEnd && endedContent != null && endAt <= end;
-      if (!replacedFirst && end > now && (timeout <= 0 || end - now < timeout)) {
-        timeout = end - now;
-      }
+      boolean replacedFirst =
+          staleAtEnd
+              && endedContent != null
+              && endAt <= end
+              && LiveUpdatesScheduler.canScheduleExactly(c);
+      long left = end - now;
+      // A payload cannot make an update vanish at once (as timeoutAfter).
+      if (remote) left = Math.max(left, MIN_TIMEOUT_MS);
+      if (!replacedFirst && end > now && (timeout <= 0 || left < timeout)) timeout = left;
     }
     long deadline = 0;
     if (timeout > 0 && Build.VERSION.SDK_INT >= 26) {

@@ -1121,11 +1121,14 @@ final class AndroidLiveUpdateOptions {
   /// ends (exactly, even if the app is not running), because an Android
   /// notification's countdown cannot stop at zero and would count below it.
   /// iOS stops the countdown at zero and keeps showing the activity. The
-  /// update then reports [LiveUpdateState.ended]. A countdown that is already
-  /// over is not shown. Not when [LiveUpdateContent.endedContent] replaces
-  /// the content at an [LiveUpdateContent.endAt] up to that time. Pass
-  /// `false` to keep the notification, for example when your server updates
-  /// it at that time. Android 8+.
+  /// update then reports [LiveUpdateState.ended]. Content whose countdown is
+  /// already over is still shown, without the timer. When
+  /// [LiveUpdateContent.endedContent] replaces the content at an
+  /// [LiveUpdateContent.endAt] up to that time, it does so instead, if the
+  /// app may set exact alarms (else the removal wins, as the replacement
+  /// could come late). Only [LiveUpdateTimer.countdown] is covered, not
+  /// timer metrics. Pass `false` to keep the notification, for example when
+  /// your server updates it at that time. Android 8+.
   final bool removeAtCountdownEnd;
 
   @override
@@ -1438,8 +1441,9 @@ enum LiveUpdateState {
   stale,
 
   /// Ended by the app or a remote update (on Android also removed by
-  /// [AndroidLiveUpdateOptions.timeoutAfter], [AndroidLiveUpdateOptions.maxDuration]
-  /// or [AndroidLiveUpdateOptions.removeAtEnd]); may still be visible until
+  /// [AndroidLiveUpdateOptions.timeoutAfter], [AndroidLiveUpdateOptions.maxDuration],
+  /// [AndroidLiveUpdateOptions.removeAtEnd] or at the end of a countdown); may
+  /// still be visible until
   /// its dismissal time (see [LiveUpdate.end]).
   ended,
 

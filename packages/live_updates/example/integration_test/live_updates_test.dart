@@ -231,6 +231,35 @@ void main() {
     expect(await LiveUpdates.find('order-it'), isNull);
   });
 
+  testWidgets('a key starts again after end, also after an immediate end', (
+    tester,
+  ) async {
+    if (!await LiveUpdates.isSupported()) return;
+    const key = 'order-restart-it';
+    // end() keeps the ended update visible; startOrUpdate replaces it.
+    // Twice, so an update this test ended at once does not block the key.
+    for (final dismissAfter in [null, Duration.zero, null]) {
+      final a = await LiveUpdates.startOrUpdate(
+        key,
+        const LiveUpdateContent(title: 'Before'),
+      );
+      await a.end(dismissAfter: dismissAfter);
+      await Future<void>.delayed(const Duration(seconds: 1));
+      final b = await LiveUpdates.startOrUpdate(
+        key,
+        const LiveUpdateContent(title: 'After'),
+      );
+      expect((await LiveUpdates.find(key))?.id, b.id);
+      expect(
+        (await LiveUpdates.active()).where((u) => u.key == key),
+        hasLength(1),
+      );
+      await b.end();
+      await Future<void>.delayed(const Duration(seconds: 1));
+    }
+    await LiveUpdates.endAll(includeScheduled: false);
+  });
+
   testWidgets('Android options do not affect iOS push settings', (
     tester,
   ) async {

@@ -107,9 +107,10 @@ public final class LiveUpdatesBridge: NSObject {
   }
 
   /// Updates the activity whose key is `key`, or requests a new one with that
-  /// key. An activity with the key that has ended or was dismissed is not
-  /// replaced while the system still lists it, so the user does not get it
-  /// back. `completion` receives the activity id, or an error.
+  /// key. An activity with the key that the user dismissed is not replaced
+  /// while the system still lists it, so the user does not get it back; one
+  /// that ended is replaced. `completion` receives the activity id, or an
+  /// error.
   ///
   /// Runs on the main actor so that concurrent calls for one key cannot both
   /// request an activity (the lookup and `request` happen without suspending).
@@ -136,13 +137,56 @@ public final class LiveUpdatesBridge: NSObject {
     }
     if let activity = withKey.first(where: {
       $0.activityState == .active || $0.activityState == .stale
-    }) ?? withKey.first {
-      if activity.activityState == .active || activity.activityState == .stale {
-        await activity.update(payload.content, alertConfiguration: payload.alertConfiguration)
-      }
+    }) {
+      await activity.update(payload.content, alertConfiguration: payload.alertConfiguration)
       return activity.id
     }
-    return try request(payload, key: key).id
+    // One the user dismissed is not brought back while the system lists it.
+    // Dismissed also covers activities this app ended with an immediate
+    // dismissal (or whose dismissal time passed): those do not count.
+    if let dismissed = withKey.first(where: {
+      $0.activityState == .dismissed && !endedByApp($0.id)
+    }) {
+      return dismissed.id
+    }
+    // One that ended (and may still be on the Lock Screen) is replaced, as on
+    // Android. The new one is requested first, so a refused request keeps
+    // the ended one; then the ended ones are removed.
+    let ended = withKey.filter { $0.activityState == .ended }
+    let activity = try request(payload, key: key)
+    for old in ended { await endNow(old) }
+    return activity.id
+  }
+
+  /// UserDefaults key with the ids of activities this app ended, so a later
+  /// `dismissed` state is not mistaken for the user's dismissal (kept across
+  /// launches, pruned to the activities the system still lists).
+  static let endedIdsKey = "live_updates.endedIds"
+  private static let endedLock = NSLock()
+
+  static func noteEndedByApp(_ id: String) {
+    endedLock.lock()
+    defer { endedLock.unlock() }
+    var ids = Set(UserDefaults.standard.stringArray(forKey: endedIdsKey) ?? [])
+    if #available(iOS 17.2, *) {
+      let listed = Set(Activity<LiveUpdatesAttributes>.activities.map(\.id))
+      ids = ids.filter { listed.contains($0) }
+    }
+    ids.insert(id)
+    UserDefaults.standard.set(Array(ids), forKey: endedIdsKey)
+  }
+
+  static func endedByApp(_ id: String) -> Bool {
+    endedLock.lock()
+    defer { endedLock.unlock() }
+    return UserDefaults.standard.stringArray(forKey: endedIdsKey)?.contains(id) ?? false
+  }
+
+  /// Ends `activity` and removes it from the screen at once.
+  @available(iOS 17.2, *)
+  static func endNow(_ activity: Activity<LiveUpdatesAttributes>) async {
+    noteEndedByApp(activity.id)
+    await activity.end(nil, dismissalPolicy: .immediate)
   }
 
   /// Whether `activity` is scheduled and has not started yet (iOS 26+).
@@ -242,6 +286,7 @@ public final class LiveUpdatesBridge: NSObject {
           dismissAfter < 0
           ? .default
           : dismissAfter == 0 ? .immediate : .after(Date().addingTimeInterval(dismissAfter))
+        noteEndedByApp(activity.id)
         await activity.end(content, dismissalPolicy: policy)
         await MainActor.run { tokenTasks.removeValue(forKey: id)?.cancel() }
         completion(nil)
@@ -299,7 +344,7 @@ public final class LiveUpdatesBridge: NSObject {
     guard #available(iOS 17.2, *) else { return completion() }
     Task {
       for activity in Activity<LiveUpdatesAttributes>.activities where !isPending(activity) {
-        await activity.end(nil, dismissalPolicy: .immediate)
+        await endNow(activity)
       }
       completion()
     }

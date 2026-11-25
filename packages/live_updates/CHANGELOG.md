@@ -1,3 +1,24 @@
+## 0.4.0
+
+- **Breaking (Android):** an ended live update stays visible for up to four
+  hours by default, like iOS keeps an ended Live Activity on the Lock
+  Screen. `LiveUpdate.end()` without `finalContent` keeps the content shown
+  last as a regular notification (no longer ongoing or promoted, without
+  buttons) instead of removing it at once, and `dismissAfter: null` (or a
+  remote `end` without `live_updates_dismiss_after`) means four hours
+  instead of until the user dismisses it. `dismissAfter` is capped at four
+  hours. Pass `Duration.zero` to remove it at once. Running timers and
+  timer or stopwatch metrics are left out of the ended notification, also
+  from `finalContent`. `endAll()` removes ended notifications too. See
+  Upgrading in the README.
+- iOS: `startOrUpdate` with the key of an activity that ended but is still
+  on the Lock Screen now starts a new activity (and removes the ended one),
+  as on Android. Before, it did nothing for up to four hours after `end`.
+  Only an activity the user dismissed still keeps the key from starting.
+  Like `start`, it can then throw when iOS refuses a new activity (for
+  example while the app is in the background). A scheduled activity that
+  starts also removes an ended one with its key.
+
 ## 0.3.0
 
 - **Breaking (Android):** live updates are removed 8 hours after they

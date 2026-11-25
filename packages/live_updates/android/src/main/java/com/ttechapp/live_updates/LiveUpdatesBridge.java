@@ -22,6 +22,7 @@ import android.util.Log;
 import androidx.annotation.Keep;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.annotation.RequiresApi;
 import io.flutter.FlutterInjector;
 import java.io.IOException;
 import java.io.InputStream;
@@ -560,6 +561,7 @@ public final class LiveUpdatesBridge {
 
   /** Records that the user swiped the update away (see DismissReceiver). */
   static void markDismissed(Context c, String id) {
+    forgetPostsInProcess(id);
     LiveUpdatesScheduler.cancelEnd(c, id);
     forgetStartTime(c, id);
     synchronized (staleIds) {
@@ -645,7 +647,10 @@ public final class LiveUpdatesBridge {
     return java.util.Arrays.asList(activeIds()).contains(id);
   }
 
-  /** Removes the live update {@code id}, optionally showing final content for a while. */
+  /**
+   * Ends the live update {@code id}. Unless {@code dismissAfterSeconds} is 0, the final content
+   * (else the content shown last) stays as a regular notification for at most four hours.
+   */
   public static void end(@NonNull String id, @Nullable String json, double dismissAfterSeconds)
       throws JSONException {
     // Never bring back an update the user dismissed (it already reported
@@ -658,11 +663,36 @@ public final class LiveUpdatesBridge {
       String id, @Nullable String json, double dismissAfterSeconds, boolean remote, boolean emit)
       throws JSONException {
     Context c = requireContext();
+    Object[] last;
+    synchronized (lastPosted) {
+      last = lastPosted.remove(id);
+    }
+    // Whether it is running: posted a moment ago (the system lists a new
+    // notification only after a moment) or listed as running.
+    // An update ended a moment ago may still be listed as running.
+    boolean recent;
+    boolean endedJustNow;
+    long nowUptime = SystemClock.uptimeMillis();
+    synchronized (recentlyPosted) {
+      Long ended = recentlyEnded.get(id);
+      Long posted = recentlyPosted.get(id);
+      endedJustNow = ended != null && nowUptime - ended <= RECENT_MS;
+      recent = posted != null && nowUptime - posted <= RECENT_MS && !endedJustNow;
+    }
+    Notification shown = recent || endedJustNow ? null : activeNotification(c, id);
+    boolean running = recent || shown != null;
     synchronized (recentlyPosted) {
       recentlyPosted.remove(id);
       recentlyEnded.put(id, SystemClock.uptimeMillis());
     }
-    if (emit) emit("ended", id);
+    // Reported once, like the iOS activity state: not again for an update
+    // that already ended (also when nothing is shown, for example with
+    // notifications blocked, as long as it was reported started).
+    boolean wasKnown;
+    synchronized (known) {
+      wasKnown = known.contains(id);
+    }
+    if (emit && (running || wasKnown)) emit("ended", id);
     synchronized (keyedIds) {
       keyedIds.remove(id);
     }
@@ -672,16 +702,171 @@ public final class LiveUpdatesBridge {
     synchronized (staleIds) {
       staleIds.remove(id);
     }
-    if (json != null && dismissAfterSeconds != 0) {
-      JSONObject content = new JSONObject(json);
-      Notification.Builder builder =
-          builder(c, content, remote, true);
-      if (dismissAfterSeconds > 0 && Build.VERSION.SDK_INT >= 26)
-        builder.setTimeoutAfter((long) (dismissAfterSeconds * 1000));
+    // As on iOS, the ended update stays as a regular notification (the final
+    // content, else what was shown) and is removed after at most four hours.
+    // Below Android 8 nothing can remove it later, so only final content
+    // stays there (until the user dismisses it). Never for an update the
+    // user dismissed (emit is false then).
+    Notification.Builder builder = null;
+    boolean keep = dismissAfterSeconds != 0;
+    // An ended notification this process kept may be replaced by final
+    // content; one cancelled a moment ago may still be listed.
+    boolean keptBefore;
+    synchronized (keptEnded) {
+      keptBefore = keptEnded.contains(id);
+    }
+    boolean endedShown = endedJustNow ? keptBefore : isListed(c, id);
+    if (json != null && keep && (running || endedShown)) {
+      // Final content replaces the update or its ended notification, but
+      // does not bring back one that is gone.
+      builder = builder(c, endedContent(new JSONObject(json)), remote, true);
+    } else if (keep && emit && running && Build.VERSION.SDK_INT >= 26) {
+      if (last != null) {
+        // The content posted last, also when the system does not list it yet.
+        builder = builder(c, endedContent((JSONObject) last[0]), (Boolean) last[1], true);
+      } else if (shown != null) {
+        // After a process restart: rebuilt from the shown notification.
+        builder = endedLook(c, shown);
+      }
+    }
+    if (builder != null) {
+      if (Build.VERSION.SDK_INT >= 26) {
+        builder.setTimeoutAfter(keepEndedMillis(dismissAfterSeconds));
+      }
+      synchronized (keptEnded) {
+        keptEnded.add(id);
+      }
       manager(c).notify(TAG_PREFIX + id, NOTIFICATION_ID, builder.build());
+    } else if (json == null && keep && !running) {
+      // Ended before (for example a repeated remote end): an ended
+      // notification stays as it is.
     } else {
       manager(c).cancel(TAG_PREFIX + id, NOTIFICATION_ID);
     }
+  }
+
+  /** Whether the system shows a notification for {@code id}, running or ended. */
+  private static boolean isListed(Context c, String id) {
+    for (StatusBarNotification n : manager(c).getActiveNotifications()) {
+      if (n.getId() == NOTIFICATION_ID && (TAG_PREFIX + id).equals(n.getTag())) return true;
+    }
+    return false;
+  }
+
+  /** Ids whose ended notification this process posted (endAll removes them). */
+  private static final Set<String> keptEnded = new java.util.HashSet<>();
+
+  /** Content and remote flag of the latest post of each running update, in this process. */
+  private static final Map<String, Object[]> lastPosted = new HashMap<>();
+
+  private static void forgetLastPosted(String id) {
+    synchronized (lastPosted) {
+      lastPosted.remove(id);
+    }
+  }
+
+  /** Forgets what this process posted for {@code id} (also used by tests, as after a restart). */
+  static void forgetPostsInProcess(String id) {
+    forgetLastPosted(id);
+    synchronized (recentlyPosted) {
+      recentlyPosted.remove(id);
+    }
+  }
+
+  /** Keys of the content that an ended update does not keep. */
+  private static final String[] RUNNING_ONLY_KEYS = {
+    "timerStart", "timerEnd", "showChronometer", "actions", "endAt", "endedContent",
+    "removeAtEnd", "maxDurationMillis", "timeoutAfterMillis", "androidAlert",
+  };
+
+  /**
+   * {@code content} as an ended update shows it: without running timers (a countdown would run
+   * past zero), buttons and running-only options.
+   */
+  static JSONObject endedContent(JSONObject content) throws JSONException {
+    JSONObject out = new JSONObject(content.toString());
+    for (String key : RUNNING_ONLY_KEYS) out.remove(key);
+    org.json.JSONArray metrics = out.optJSONArray("metrics");
+    if (metrics != null) {
+      org.json.JSONArray still = new org.json.JSONArray();
+      for (int i = 0; i < metrics.length(); i++) {
+        JSONObject m = metrics.optJSONObject(i);
+        String type = m == null ? "" : m.optString("type");
+        if (!type.equals("timer") && !type.equals("stopwatch")) still.put(metrics.get(i));
+      }
+      if (still.length() != metrics.length()) {
+        out.remove("criticalMetric");
+        if (still.length() == 0) out.remove("metrics");
+        else out.put("metrics", still);
+      }
+    }
+    return out;
+  }
+
+  /** How long an ended update stays at most, as on iOS (four hours). */
+  static final long MAX_ENDED_MS = 4 * 60 * 60 * 1000L;
+
+  /**
+   * How long an ended update stays for {@code dismissAfterSeconds}: a
+   * negative value (no duration given) keeps it the longest.
+   */
+  static long keepEndedMillis(double dismissAfterSeconds) {
+    if (dismissAfterSeconds < 0 || Double.isNaN(dismissAfterSeconds)) return MAX_ENDED_MS;
+    return Math.max(1, Math.min((long) (dismissAfterSeconds * 1000), MAX_ENDED_MS));
+  }
+
+  /** The running live update {@code id} as the system shows it, or {@code null}. */
+  @Nullable
+  private static Notification activeNotification(Context c, String id) {
+    for (StatusBarNotification n : manager(c).getActiveNotifications()) {
+      if (n.getId() == NOTIFICATION_ID && (TAG_PREFIX + id).equals(n.getTag())) {
+        Notification notification = n.getNotification();
+        boolean running =
+            (notification.flags & Notification.FLAG_ONGOING_EVENT) != 0
+                || notification.extras.getBoolean(EXTRA_STALE, false);
+        return running ? notification : null;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * {@code shown} as an ended update: the same content, but no longer ongoing
+   * or promoted, without buttons or running chronometer, removed by a tap and
+   * not reported as dismissed when swiped away.
+   */
+  @RequiresApi(26)
+  private static Notification.Builder endedLook(Context c, Notification shown) {
+    // The recovered builder writes into the notification it was made from,
+    // and build() keeps its actions when the builder has none: drop them on
+    // a copy.
+    Notification copy = shown.clone();
+    copy.actions = null;
+    if (Build.VERSION.SDK_INT >= 36) copy.flags &= ~Notification.FLAG_PROMOTED_ONGOING;
+    copy.extras.remove(EXTRA_STALE);
+    copy.extras.remove(EXTRA_KEYED);
+    Notification.Builder b =
+        Notification.Builder.recoverBuilder(c, copy)
+            .setOngoing(false)
+            .setAutoCancel(true)
+            .setOnlyAlertOnce(true)
+            .setDeleteIntent(null)
+            .setUsesChronometer(false)
+            .setChronometerCountDown(false)
+            .setActions();
+    // A chronometer's base would show as a time in the future or the past.
+    if (shown.extras.getBoolean(Notification.EXTRA_SHOW_CHRONOMETER, false)) {
+      b.setWhen(System.currentTimeMillis());
+    }
+    // Time metrics (Android 17) would keep running: no metric style.
+    String template = copy.extras.getString(Notification.EXTRA_TEMPLATE);
+    if (template != null && template.endsWith("MetricStyle")) b.setStyle(null);
+    requestPromotedOngoing(b, false);
+    android.os.Bundle extras = b.getExtras();
+    extras.remove(EXTRA_STALE);
+    extras.remove(EXTRA_KEYED);
+    if (copy.publicVersion != null) b.setPublicVersion(endedLook(c, copy.publicVersion).build());
+    return b;
   }
 
   /** Directory where Dart stores images referenced by {@code "image"}. */
@@ -753,15 +938,16 @@ public final class LiveUpdatesBridge {
       case "end":
         {
           // Final content only for an update that is shown: never bring back
-          // one the user dismissed. Without a dismiss time it stays, as with
-          // LiveUpdate.end(finalContent:).
+          // one the user dismissed. Without a dismiss time it stays for four
+          // hours, as with LiveUpdate.end().
           Context c = requireContext();
           boolean visible = isShown(id) && !isDismissed(c, id);
           end(
               id,
               visible ? content : null,
+              // Missing or not a number: the default (NaN keeps it the longest).
               data.has("live_updates_dismiss_after")
-                  ? data.optDouble("live_updates_dismiss_after", 0)
+                  ? data.optDouble("live_updates_dismiss_after", Double.NaN)
                   : -1,
               true,
               visible);
@@ -786,6 +972,7 @@ public final class LiveUpdatesBridge {
 
   /** Called by the dismiss receiver when a timeout removed the update. */
   static void timedOut(Context c, String id) {
+    forgetPostsInProcess(id);
     LiveUpdatesScheduler.cancelEnd(c, id);
     forgetStartTime(c, id);
     synchronized (staleIds) {
@@ -855,9 +1042,22 @@ public final class LiveUpdatesBridge {
     LiveUpdatesScheduler.cancel(requireContext(), key);
   }
 
-  /** Removes every live update of this app (not the scheduled ones). */
+  /** Removes every live update of this app, also ended ones (not the scheduled ones). */
   public static void endAll() throws JSONException {
     for (String id : activeIds()) end(id, null, 0);
+    Context c = requireContext();
+    List<String> kept;
+    synchronized (keptEnded) {
+      kept = new ArrayList<>(keptEnded);
+      keptEnded.clear();
+    }
+    for (String id : kept) manager(c).cancel(TAG_PREFIX + id, NOTIFICATION_ID);
+    for (StatusBarNotification n : manager(c).getActiveNotifications()) {
+      String tag = n.getTag();
+      if (n.getId() == NOTIFICATION_ID && tag != null && tag.startsWith(TAG_PREFIX)) {
+        manager(c).cancel(tag, NOTIFICATION_ID);
+      }
+    }
   }
 
   static void emit(String event, String id) {
@@ -1043,6 +1243,18 @@ public final class LiveUpdatesBridge {
     if (stale) extras.putBoolean(EXTRA_STALE, true);
     if (!extras.isEmpty()) b.addExtras(extras);
     if (!stale) addActions(c, b, id, content);
+    synchronized (lastPosted) {
+      lastPosted.put(id, new Object[] {content, remote});
+    }
+    boolean replacesEnded;
+    synchronized (keptEnded) {
+      replacesEnded = keptEnded.remove(id);
+    }
+    // A new update with the id of an ended one that is still shown: remove
+    // that one first, so the start alerts like any other.
+    if (!wasShown && !stale && (replacesEnded || isListed(c, id))) {
+      manager(c).cancel(TAG_PREFIX + id, NOTIFICATION_ID);
+    }
     manager(c).notify(TAG_PREFIX + id, NOTIFICATION_ID, b.build());
     if (staleNow) markStale(id);
     if (activeAgain) emit("active", id);

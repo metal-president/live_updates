@@ -164,7 +164,8 @@ final class LiveUpdateContent {
 
   /// Returns a copy with the given fields replaced. A `null` argument keeps
   /// the current value, so a field such as [publicContent] cannot be removed
-  /// with it: create a new [LiveUpdateContent] instead.
+  /// with it: create a new [LiveUpdateContent] instead. [alert] is the
+  /// exception: it belongs to one post, so the copy has it only when given.
   LiveUpdateContent copyWith({
     String? title,
     String? body,
@@ -200,7 +201,8 @@ final class LiveUpdateContent {
     publicContent: publicContent ?? this.publicContent,
     endAt: endAt ?? this.endAt,
     endedContent: endedContent ?? this.endedContent,
-    alert: alert ?? this.alert,
+    // One post's alert: not carried over to the next update.
+    alert: alert,
     ios: ios ?? this.ios,
     android: android ?? this.android,
   );
@@ -928,7 +930,8 @@ final class IosIslandContent {
 @immutable
 final class LiveUpdateAlert {
   /// Creates an alert. Without [title] or [body], the content's title and
-  /// body are used.
+  /// body are used, or those of its [LiveUpdateContent.publicContent] when it
+  /// has one, as the alert can show on a locked device.
   const LiveUpdateAlert({this.title, this.body});
 
   /// Title of the alert on iOS, where the system shows it on devices without

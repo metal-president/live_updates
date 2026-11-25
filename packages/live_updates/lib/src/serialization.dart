@@ -65,8 +65,16 @@ extension LiveUpdateContentJson on LiveUpdateContent {
     // The iOS alert option wins over the shared one.
     if (ios?.alert case final a?)
       'alert': {'title': a.title, 'body': a.body, 'sound': ?a.sound}
+    // Without its own text, the shared alert shows the public text when the
+    // content has one: it can appear on a locked device.
     else if (alert case final a?)
-      'alert': {'title': a.title ?? title, 'body': a.body ?? body ?? ''},
+      'alert': {
+        'title': a.title ?? publicContent?.title ?? title,
+        'body':
+            a.body ??
+            (publicContent != null ? publicContent!.body : body) ??
+            '',
+      },
     // Not 'alert': that key holds the iOS alert.
     if ((android?.alert ?? false) || alert != null) 'androidAlert': true,
     if (ios case final ios?) ...{

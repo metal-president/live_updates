@@ -170,7 +170,8 @@ abstract final class LiveUpdates {
   /// Activities are turned off for the app, the system limit of running
   /// activities is reached or the app is in the background; on Android when
   /// notifications are turned off for the app or for its channel. Check
-  /// [isSupported] before you offer to track something on the Lock Screen.
+  /// [isSupported] before you offer to track something on the Lock Screen
+  /// (it does not cover a turned-off Android channel).
   ///
   /// [pushUpdates] requests a per-activity APNs token on iOS (see
   /// [LiveUpdate.pushTokens]); it needs the Push Notifications capability.

@@ -35,6 +35,8 @@ void main() {
     const c = LiveUpdateContent(title: 'T');
     expect(c.copyWith(alert: a).alert, a);
     expect(c.copyWith(alert: a), isNot(c));
+    // An alert belongs to one post: copies do not keep it.
+    expect(c.copyWith(alert: a).copyWith(body: 'b').alert, isNull);
   });
 
   test('public content has value equality and is part of the content', () {

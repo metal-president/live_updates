@@ -268,8 +268,10 @@ differently.
   grants the notification permission, including updates started by a
   remote message. ([source][android-permission]) While notifications are
   turned off for the app or for its channel, `start` and `startOrUpdate`
-  throw a `LiveUpdateException`, as on iOS with Live Activities turned off
-  (from 0.4.0; `isSupported()` tells you beforehand).
+  throw a `LiveUpdateException` for a new update, as on iOS with Live
+  Activities turned off (from 0.4.0). `isSupported()` tells you beforehand
+  whether notifications are on for the app; a turned-off channel shows only
+  in the exception.
 - **After `end`:** from 0.4.0 the final content (or the content shown last)
   stays as a regular notification for up to 4 hours, like on iOS, and the
   user can swipe it away. Running timers (and timer or stopwatch metrics)
@@ -730,7 +732,8 @@ await update.update(
 
 - **iOS:** an update (or a scheduled start) shows the alert, with the
   content's title and body unless the alert sets its own; the system shows
-  them on devices without the Dynamic Island and on Apple Watch. Starting
+  them on devices without the Dynamic Island and on Apple Watch (with a
+  `publicContent`, its title and body are the default). Starting
   a Live Activity from the app is always silent. `IosLiveUpdateOptions.alert`
   (with a custom sound) takes precedence.
 - **Android:** the post plays the sound and vibration of the notification
@@ -738,8 +741,10 @@ await update.update(
   an update alerts anyway (see [Platform limits](#android)), and Android allows
   one requested alert per update every 10 seconds.
 - **Remote:** an `"alert": {"title": ..., "body": ...}` object in the
-  Android content alerts too, so one content works for both; on iOS the
-  alert goes in `aps.alert`, next to `content-state`.
+  Android content alerts too (unless it says `"androidAlert": false`), so
+  one content works for both; on iOS the alert goes in `aps.alert`, next to
+  `content-state`.
+- `copyWith` does not carry `alert` over: it belongs to one post.
 
 ### Android progress stages, timeout and alerts
 

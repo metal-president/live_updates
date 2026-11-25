@@ -580,6 +580,9 @@ public class LiveUpdatesBridgeTest {
     assertFalse(LiveUpdatesBridge.wantsAlert(withAlert, false));
     assertTrue(LiveUpdatesBridge.wantsAlert(new JSONObject("{\"androidAlert\":true}"), false));
     assertFalse(LiveUpdatesBridge.wantsAlert(new JSONObject("{\"alert\":true}"), true));
+    // An explicit androidAlert wins.
+    withAlert.put("androidAlert", false);
+    assertFalse(LiveUpdatesBridge.wantsAlert(withAlert, true));
     // What stays after the end does not alert.
     assertFalse(LiveUpdatesBridge.endedContent(withAlert).has("alert"));
   }
@@ -604,6 +607,36 @@ public class LiveUpdatesBridgeTest {
     assertTrue(events.isEmpty());
     assertFalse(Arrays.asList(LiveUpdatesBridge.activeIds()).contains("off-key"));
     shadowOf(manager).setNotificationsEnabled(true);
+  }
+
+  @Test
+  public void startOrUpdateOfAShownKeyDoesNotFailOnABlockedChannel() throws Exception {
+    LiveUpdatesBridge.startOrUpdate("shown-key", "{\"title\":\"A\",\"channelId\":\"later-off\"}");
+    manager.getNotificationChannel("later-off").setImportance(NotificationManager.IMPORTANCE_NONE);
+    // As update(): the shown update is updated, not an error.
+    LiveUpdatesBridge.startOrUpdate("shown-key", "{\"title\":\"B\",\"channelId\":\"later-off\"}");
+  }
+
+  @Test
+  @Config(sdk = 36)
+  public void startFailsWhenTheChannelGroupIsOff() throws Exception {
+    android.app.NotificationChannelGroup group =
+        new android.app.NotificationChannelGroup("g", "Group");
+    // setBlocked is hidden from the SDK stubs.
+    android.app.NotificationChannelGroup.class
+        .getMethod("setBlocked", boolean.class)
+        .invoke(group, true);
+    manager.createNotificationChannelGroup(group);
+    android.app.NotificationChannel channel =
+        new android.app.NotificationChannel("grouped", "Grouped", NotificationManager.IMPORTANCE_DEFAULT);
+    channel.setGroup("g");
+    manager.createNotificationChannel(channel);
+    try {
+      LiveUpdatesBridge.start("{\"title\":\"A\",\"channelId\":\"grouped\"}");
+      org.junit.Assert.fail("start must fail");
+    } catch (IllegalStateException expected) {
+      // The user turned that channel's group off.
+    }
   }
 
   @Test

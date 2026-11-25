@@ -236,7 +236,15 @@ public final class LiveUpdatesBridge {
       // Reported by post().
     }
     NotificationChannel channel = manager(c).getNotificationChannel(channelId);
-    return channel != null && channel.getImportance() == NotificationManager.IMPORTANCE_NONE;
+    if (channel == null) return false;
+    if (channel.getImportance() == NotificationManager.IMPORTANCE_NONE) return true;
+    // The user can also turn off the channel's group (Android 9+).
+    if (Build.VERSION.SDK_INT >= 28 && channel.getGroup() != null) {
+      android.app.NotificationChannelGroup group =
+          manager(c).getNotificationChannelGroup(channel.getGroup());
+      return group != null && group.isBlocked();
+    }
+    return false;
   }
 
   /** Completes waiting permission requests with the current state. */
@@ -280,9 +288,12 @@ public final class LiveUpdatesBridge {
   @NonNull
   public static String startOrUpdate(@NonNull String key, @NonNull String json)
       throws JSONException {
-    requireShowable(requireContext(), json);
+    Context c = requireContext();
     // A key the user dismissed stays hidden until the app ends it.
-    if (!isDismissed(requireContext(), key)) post(key, new JSONObject(json), false, true);
+    if (isDismissed(c, key)) return key;
+    // Only a new update fails; one already shown is updated, as update() does.
+    if (!isShown(key)) requireShowable(c, json);
+    post(key, new JSONObject(json), false, true);
     return key;
   }
 
@@ -1725,12 +1736,12 @@ public final class LiveUpdatesBridge {
   private static final long MIN_ALERT_INTERVAL_MS = 10_000;
 
   /**
-   * Whether this post should alert: {@code androidAlert}, or in a remote payload also the iOS
-   * {@code alert} object, so one content alerts on both platforms.
+   * Whether this post should alert: {@code androidAlert} when given, else in a remote payload the
+   * iOS {@code alert} object, so one content alerts on both platforms.
    */
   static boolean wantsAlert(JSONObject content, boolean remote) {
-    return content.optBoolean("androidAlert", false)
-        || (remote && content.optJSONObject("alert") != null);
+    if (content.has("androidAlert")) return content.optBoolean("androidAlert", false);
+    return remote && content.optJSONObject("alert") != null;
   }
 
   private static final Map<String, Long> lastAlert = new HashMap<>();

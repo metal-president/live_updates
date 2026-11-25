@@ -227,6 +227,14 @@ void main() {
     ).toJson();
     expect(both['alert'], {'title': 'i', 'body': 'b', 'sound': 's.caf'});
     expect(both['androidAlert'], isTrue);
+    // Without its own text, the public text (it can show when locked).
+    final private = const LiveUpdateContent(
+      title: 'Prescription for J. Doe',
+      body: 'Ready',
+      publicContent: LiveUpdatePublicContent(title: 'Order ready'),
+      alert: LiveUpdateAlert(),
+    ).toJson();
+    expect(private['alert'], {'title': 'Order ready', 'body': ''});
     final none = const LiveUpdateContent(title: 'Order').toJson();
     expect(none.containsKey('alert'), isFalse);
     expect(none.containsKey('androidAlert'), isFalse);

@@ -348,8 +348,10 @@ public final class LiveUpdatesBridge: NSObject {
 
   /// Ends the older activities of every key that more than one running
   /// activity has (ended ones with that key are removed too). The newest is
-  /// one the plugin has not seen before; when it cannot tell, the last one
-  /// the system lists stays.
+  /// the one running activity of the key that the plugin has not seen
+  /// before. When it cannot tell (none or several unseen, such as at the
+  /// first launch with this version), nothing is ended: the system lists
+  /// activities in no documented order.
   @available(iOS 17.2, *)
   @MainActor
   static func endDuplicateKeys() async {
@@ -359,9 +361,11 @@ public final class LiveUpdatesBridge: NSObject {
     let keyed = listed.filter { $0.attributes.key != nil && $0.activityState != .dismissed }
     for (_, group) in Dictionary(grouping: keyed, by: { $0.attributes.key ?? "" }) {
       let running = group.filter { $0.activityState == .active || $0.activityState == .stale }
-      guard group.count > 1, let last = running.last else { continue }
-      let keep = running.last(where: { !seen.contains($0.id) }) ?? last
-      for other in group where other.id != keep.id { await endNow(other) }
+      let unseen = running.filter { !seen.contains($0.id) }
+      guard group.count > 1, unseen.count == 1, let keep = unseen.first else { continue }
+      let others = group.filter { $0.id != keep.id }
+      guard others.allSatisfy({ seen.contains($0.id) }) else { continue }
+      for other in others { await endNow(other) }
     }
   }
 

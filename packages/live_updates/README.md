@@ -371,6 +371,13 @@ final pending = await LiveUpdates.scheduled();
   or `cancelAllScheduled`. `endAll()` ends running updates and cancels
   schedules too, such as when the user logs out or switches accounts;
   `endAll(includeScheduled: false)` leaves schedules alone.
+- Schedules live on the device, and only the app can cancel them. If the
+  user is logged out on the server or does not open the app, a schedule
+  still shows its update at its time; on iOS a push cannot cancel it either,
+  because a scheduled activity gets its push token only once it starts. Call
+  `endAll()` at logout and at app start when the session is no longer valid,
+  and keep sensitive details out of scheduled content (or give it a
+  `publicContent`, see [Hiding content on the Lock Screen](#hiding-content-on-the-lock-screen)).
 - **iOS 26 and later:** the system starts the Live Activity at that time
   ([source][ios-request-start]) and presents an alert:
   `IosLiveUpdateOptions.alert`, or else the title and body. Call `schedule`

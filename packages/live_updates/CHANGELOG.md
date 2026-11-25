@@ -3,10 +3,11 @@
 - `LiveUpdate.isPromoted()`: whether Android promoted the shown update to a
   Live Update (`Notification.FLAG_PROMOTED_ONGOING`), the system's actual
   decision. `false` below Android 16 and on other platforms.
-- Android: a debug warning when content that asks for promotion
+- Android: a warning when content that asks for promotion
   (`AndroidLiveUpdateMode.liveUpdate`) has an empty title, which Android
-  requires to promote a notification. Remote payloads log the same warning
-  natively. Nothing else changes: the notification is still posted.
+  requires to promote a notification. The Dart API prints it in debug builds
+  only; remote payloads log it with `Log.w` in every build. Nothing else
+  changes: the notification is still posted.
 
 ## 0.2.1
 

@@ -103,7 +103,7 @@ class AndroidLiveUpdatesPlatform extends LiveUpdatesPlatform
 
   @override
   Future<bool> isPromoted(String id) async =>
-      LiveUpdatesBridge.isPromoted(_j(id));
+      _call(() => LiveUpdatesBridge.isPromoted(_j(id)));
 
   @override
   Future<String> start(

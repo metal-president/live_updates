@@ -41,6 +41,11 @@ final class LiveUpdate {
   /// requirements (such as [AndroidLiveUpdateMode.liveUpdate] and a title),
   /// the user's settings and device maker criteria. `false` when the update
   /// is not shown, below Android 16 and on other platforms.
+  ///
+  /// It reflects the notification as the system currently lists it. The
+  /// system decides on promotion after the notification is posted and updates
+  /// its list asynchronously, so this may be `false` for a moment right after
+  /// [LiveUpdates.start] or [update].
   Future<bool> isPromoted() => _platform.isPromoted(id);
 
   /// Lifecycle changes of this live update, such as the user dismissing it

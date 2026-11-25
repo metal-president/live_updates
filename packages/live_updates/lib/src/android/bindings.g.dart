@@ -832,7 +832,10 @@ extension type LiveUpdatesBridge._(jni$_.JObject _$this)
   /// Update ({@code Notification.FLAG_PROMOTED_ONGOING}). This is the system's
   /// actual decision, which also depends on the promotion requirements, the
   /// user's settings and device maker criteria, unlike {@code
-  /// canPostPromotedNotifications()}. {@code false} below Android 16, when not
+  /// canPostPromotedNotifications()}. It reflects the notification as the
+  /// system currently lists it: the system decides on promotion after posting
+  /// and updates its list asynchronously, so this may be {@code false} for a
+  /// moment after a start or update. {@code false} below Android 16, when not
   /// attached, or when {@code id} is not shown.
   static core$_.bool isPromoted(jni$_.JString id) {
     final _$$classRef = _class.reference;

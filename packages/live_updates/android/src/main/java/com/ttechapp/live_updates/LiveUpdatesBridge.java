@@ -682,7 +682,9 @@ public final class LiveUpdatesBridge {
       recentlyPosted.remove(id);
       recentlyEnded.put(id, SystemClock.uptimeMillis());
     }
-    if (emit) emit("ended", id);
+    // Reported once, like the iOS activity state: not again for an update
+    // that already ended.
+    if (emit && running) emit("ended", id);
     synchronized (keyedIds) {
       keyedIds.remove(id);
     }
@@ -699,7 +701,9 @@ public final class LiveUpdatesBridge {
     // user dismissed (emit is false then).
     Notification.Builder builder = null;
     boolean keep = dismissAfterSeconds != 0;
-    if (json != null && keep) {
+    if (json != null && keep && (running || isListed(c, id))) {
+      // Final content replaces the update or its ended notification, but
+      // does not bring back one that is gone.
       builder = builder(c, endedContent(new JSONObject(json)), remote, true);
     } else if (keep && emit && running && Build.VERSION.SDK_INT >= 26) {
       if (last != null) {
@@ -724,6 +728,14 @@ public final class LiveUpdatesBridge {
     } else {
       manager(c).cancel(TAG_PREFIX + id, NOTIFICATION_ID);
     }
+  }
+
+  /** Whether the system shows a notification for {@code id}, running or ended. */
+  private static boolean isListed(Context c, String id) {
+    for (StatusBarNotification n : manager(c).getActiveNotifications()) {
+      if (n.getId() == NOTIFICATION_ID && (TAG_PREFIX + id).equals(n.getTag())) return true;
+    }
+    return false;
   }
 
   /** Ids whose ended notification this process posted (endAll removes them). */
@@ -826,8 +838,11 @@ public final class LiveUpdatesBridge {
             .setDeleteIntent(null)
             .setUsesChronometer(false)
             .setChronometerCountDown(false)
-            .setWhen(System.currentTimeMillis())
             .setActions();
+    // A chronometer's base would show as a time in the future or the past.
+    if (shown.extras.getBoolean(Notification.EXTRA_SHOW_CHRONOMETER, false)) {
+      b.setWhen(System.currentTimeMillis());
+    }
     // Time metrics (Android 17) would keep running: no metric style.
     String template = copy.extras.getString(Notification.EXTRA_TEMPLATE);
     if (template != null && template.endsWith("MetricStyle")) b.setStyle(null);
@@ -915,8 +930,9 @@ public final class LiveUpdatesBridge {
           end(
               id,
               visible ? content : null,
+              // Missing or not a number: the default (NaN keeps it the longest).
               data.has("live_updates_dismiss_after")
-                  ? data.optDouble("live_updates_dismiss_after", 0)
+                  ? data.optDouble("live_updates_dismiss_after", Double.NaN)
                   : -1,
               true,
               visible);
@@ -1214,6 +1230,15 @@ public final class LiveUpdatesBridge {
     if (!stale) addActions(c, b, id, content);
     synchronized (lastPosted) {
       lastPosted.put(id, new Object[] {content, remote});
+    }
+    boolean replacesEnded;
+    synchronized (keptEnded) {
+      replacesEnded = keptEnded.remove(id);
+    }
+    // A new update with the id of an ended one that is still shown: remove
+    // that one first, so the start alerts like any other.
+    if (!wasShown && !stale && (replacesEnded || isListed(c, id))) {
+      manager(c).cancel(TAG_PREFIX + id, NOTIFICATION_ID);
     }
     manager(c).notify(TAG_PREFIX + id, NOTIFICATION_ID, b.build());
     if (staleNow) markStale(id);

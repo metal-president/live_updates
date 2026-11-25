@@ -346,6 +346,39 @@ public class LiveUpdatesBridgeTest {
   }
 
   @Test
+  public void endedIsReportedOnceAndFinalContentDoesNotBringBackAGoneUpdate() throws Exception {
+    List<String> events = new ArrayList<>();
+    LiveUpdatesBridge.observeEvents(events::add, 1);
+    String id = LiveUpdatesBridge.start("{\"title\":\"Order\"}");
+    LiveUpdatesBridge.end(id, null, 0);
+    LiveUpdatesBridge.end(id, "{\"title\":\"Delivered\"}", -1);
+    assertEquals(null, shown(id));
+    assertEquals(Arrays.asList("started:" + id, "ended:" + id), events);
+  }
+
+  @Test
+  public void finalContentReplacesAnEndedNotification() throws Exception {
+    String id = LiveUpdatesBridge.start("{\"title\":\"Order\"}");
+    LiveUpdatesBridge.end(id, null, -1);
+    LiveUpdatesBridge.forgetPostsInProcess(id);
+    // A later end with final content, after the moment of the first end.
+    LiveUpdatesBridge.end(id, "{\"title\":\"Delivered\"}", 60);
+    assertEquals("Delivered", shown(id).extras.getString(Notification.EXTRA_TITLE));
+  }
+
+  @Test
+  public void anUnreadableRemoteDismissTimeUsesTheDefault() throws Exception {
+    remote("start", "r11", "{\"title\":\"R\"}");
+    JSONObject data =
+        new JSONObject()
+            .put("live_updates_event", "end")
+            .put("live_updates_id", "r11")
+            .put("live_updates_dismiss_after", "");
+    LiveUpdatesBridge.handleRemotePayload(data.toString());
+    assertEquals(4 * HOUR, shown("r11").getTimeoutAfter());
+  }
+
+  @Test
   public void endAllAlsoRemovesEndedUpdates() throws Exception {
     String a = LiveUpdatesBridge.start("{\"title\":\"A\"}");
     String b = LiveUpdatesBridge.start("{\"title\":\"B\"}");

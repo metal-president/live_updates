@@ -265,7 +265,8 @@ differently.
   user can swipe it away. Running timers (and timer or stopwatch metrics)
   are left out of it, so a countdown does not run past zero. This applies to
   `end` and remote `end` payloads; an update removed by `maxDuration`,
-  `timeoutAfter` or `removeAtEnd` is removed at once. `dismissAfter` longer than that is capped at 4
+  `timeoutAfter` or `removeAtEnd` is removed at once. Unlike iOS, Android
+  does not report `dismissed` when the ended notification goes away. `dismissAfter` longer than that is capped at 4
   hours; `Duration.zero` removes it at once. Below Android 8.0 the system
   cannot remove a notification later, so only `finalContent` stays there,
   until the user dismisses it ([source][android-timeout-after]).

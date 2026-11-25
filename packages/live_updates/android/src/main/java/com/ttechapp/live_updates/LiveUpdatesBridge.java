@@ -22,6 +22,7 @@ import android.util.Log;
 import androidx.annotation.Keep;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.annotation.RequiresApi;
 import io.flutter.FlutterInjector;
 import java.io.IOException;
 import java.io.InputStream;
@@ -658,6 +659,10 @@ public final class LiveUpdatesBridge {
       String id, @Nullable String json, double dismissAfterSeconds, boolean remote, boolean emit)
       throws JSONException {
     Context c = requireContext();
+    // What is shown now, kept when there is no final content (never for an
+    // update the user dismissed: emit is false then).
+    Notification shown =
+        json == null && emit && dismissAfterSeconds != 0 ? activeNotification(c, id) : null;
     synchronized (recentlyPosted) {
       recentlyPosted.remove(id);
       recentlyEnded.put(id, SystemClock.uptimeMillis());
@@ -672,16 +677,80 @@ public final class LiveUpdatesBridge {
     synchronized (staleIds) {
       staleIds.remove(id);
     }
+    // As on iOS, the ended update stays as a regular notification (the final
+    // content, else what was shown) and is removed after at most four hours.
+    // Below Android 8 nothing can remove it later, so only final content
+    // stays there (until the user dismisses it).
+    Notification.Builder builder = null;
     if (json != null && dismissAfterSeconds != 0) {
-      JSONObject content = new JSONObject(json);
-      Notification.Builder builder =
-          builder(c, content, remote, true);
-      if (dismissAfterSeconds > 0 && Build.VERSION.SDK_INT >= 26)
-        builder.setTimeoutAfter((long) (dismissAfterSeconds * 1000));
+      builder = builder(c, new JSONObject(json), remote, true);
+    } else if (shown != null && Build.VERSION.SDK_INT >= 26) {
+      builder = endedLook(c, shown);
+    }
+    if (builder != null) {
+      if (Build.VERSION.SDK_INT >= 26) {
+        builder.setTimeoutAfter(keepEndedMillis(dismissAfterSeconds));
+      }
       manager(c).notify(TAG_PREFIX + id, NOTIFICATION_ID, builder.build());
     } else {
       manager(c).cancel(TAG_PREFIX + id, NOTIFICATION_ID);
     }
+  }
+
+  /** How long an ended update stays at most, as on iOS (four hours). */
+  static final long MAX_ENDED_MS = 4 * 60 * 60 * 1000L;
+
+  /**
+   * How long an ended update stays for {@code dismissAfterSeconds}: a
+   * negative value (no duration given) keeps it the longest.
+   */
+  static long keepEndedMillis(double dismissAfterSeconds) {
+    if (dismissAfterSeconds < 0) return MAX_ENDED_MS;
+    return Math.max(1, Math.min((long) (dismissAfterSeconds * 1000), MAX_ENDED_MS));
+  }
+
+  /** The running live update {@code id} as the system shows it, or {@code null}. */
+  @Nullable
+  private static Notification activeNotification(Context c, String id) {
+    for (StatusBarNotification n : manager(c).getActiveNotifications()) {
+      if (n.getId() == NOTIFICATION_ID && (TAG_PREFIX + id).equals(n.getTag())) {
+        Notification notification = n.getNotification();
+        boolean running =
+            (notification.flags & Notification.FLAG_ONGOING_EVENT) != 0
+                || notification.extras.getBoolean(EXTRA_STALE, false);
+        return running ? notification : null;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * {@code shown} as an ended update: the same content, but no longer ongoing
+   * or promoted, without buttons, removed by a tap and not reported as
+   * dismissed when swiped away.
+   */
+  @RequiresApi(26)
+  private static Notification.Builder endedLook(Context c, Notification shown) {
+    // The recovered builder writes into the notification it was made from,
+    // and build() keeps its actions when the builder has none: drop them on
+    // a copy.
+    Notification copy = shown.clone();
+    copy.actions = null;
+    copy.extras.remove(EXTRA_STALE);
+    copy.extras.remove(EXTRA_KEYED);
+    Notification.Builder b =
+        Notification.Builder.recoverBuilder(c, copy)
+            .setOngoing(false)
+            .setAutoCancel(true)
+            .setOnlyAlertOnce(true)
+            .setDeleteIntent(null)
+            .setActions();
+    requestPromotedOngoing(b, false);
+    android.os.Bundle extras = b.getExtras();
+    extras.remove(EXTRA_STALE);
+    extras.remove(EXTRA_KEYED);
+    if (copy.publicVersion != null) b.setPublicVersion(endedLook(c, copy.publicVersion).build());
+    return b;
   }
 
   /** Directory where Dart stores images referenced by {@code "image"}. */

@@ -183,10 +183,88 @@ public class LiveUpdatesBridgeTest {
     assertEquals("On the way", shown("r1").extras.getCharSequence(Notification.EXTRA_TEXT).toString());
 
     assertTrue(remote("end", "r1", null));
-    assertEquals(null, shown("r1"));
+    // The content shown last stays as an ended notification.
+    assertEndedLook(shown("r1"), "Order");
+    assertFalse(Arrays.asList(LiveUpdatesBridge.activeIds()).contains("r1"));
     // An update for an ended update does not bring it back.
     assertTrue(remote("update", "r1", "{\"title\":\"Again\"}"));
-    assertEquals(null, shown("r1"));
+    assertEndedLook(shown("r1"), "Order");
+  }
+
+  private static final long HOUR = 60 * 60 * 1000L;
+
+  private static void assertEndedLook(Notification n, String title) {
+    assertNotNull(n);
+    assertEquals(title, n.extras.getString(Notification.EXTRA_TITLE));
+    assertFalse((n.flags & Notification.FLAG_ONGOING_EVENT) != 0);
+    assertTrue((n.flags & Notification.FLAG_AUTO_CANCEL) != 0);
+    assertFalse(n.extras.getBoolean("android.requestPromotedOngoing"));
+    assertEquals(null, n.deleteIntent);
+  }
+
+  @Test
+  public void endKeepsTheLastContentForFourHoursByDefault() throws Exception {
+    String id =
+        LiveUpdatesBridge.startOrUpdate(
+            "order-k",
+            "{\"title\":\"Order\",\"body\":\"On the way\",\"progress\":0.5,\"route\":\"/o\","
+                + "\"actions\":[{\"id\":\"call\",\"title\":\"Call\"}],"
+                + "\"publicContent\":{\"title\":\"Delivery\"}}");
+    List<String> events = new ArrayList<>();
+    LiveUpdatesBridge.observeEvents(events::add, 1);
+    LiveUpdatesBridge.end(id, null, -1);
+    Notification n = shown(id);
+    assertEndedLook(n, "Order");
+    assertEquals("On the way", n.extras.getCharSequence(Notification.EXTRA_TEXT).toString());
+    assertEquals(null, n.actions);
+    assertNotNull(n.contentIntent);
+    assertEquals(4 * HOUR, n.getTimeoutAfter());
+    assertEndedLook(n.publicVersion, "Delivery");
+    assertEquals(null, LiveUpdatesBridge.keyForId(id));
+    assertEquals(Arrays.asList("ended:" + id), events);
+    assertFalse(Arrays.asList(LiveUpdatesBridge.activeIds()).contains(id));
+    // The key starts a new update.
+    LiveUpdatesBridge.startOrUpdate("order-k", "{\"title\":\"Again\"}");
+    assertTrue((shown(id).flags & Notification.FLAG_ONGOING_EVENT) != 0);
+  }
+
+  @Test
+  public void dismissAfterIsCappedAtFourHours() throws Exception {
+    String a = LiveUpdatesBridge.start("{\"title\":\"A\"}");
+    LiveUpdatesBridge.end(a, null, 60);
+    assertEquals(60_000, shown(a).getTimeoutAfter());
+    String b = LiveUpdatesBridge.start("{\"title\":\"B\"}");
+    LiveUpdatesBridge.end(b, "{\"title\":\"Done\"}", 24 * 3600);
+    assertEquals(4 * HOUR, shown(b).getTimeoutAfter());
+    String c = LiveUpdatesBridge.start("{\"title\":\"C\"}");
+    LiveUpdatesBridge.end(c, "{\"title\":\"Done\"}", -1);
+    assertEquals(4 * HOUR, shown(c).getTimeoutAfter());
+  }
+
+  @Test
+  public void dismissAfterZeroRemovesItAtOnce() throws Exception {
+    String a = LiveUpdatesBridge.start("{\"title\":\"A\"}");
+    LiveUpdatesBridge.end(a, null, 0);
+    assertEquals(null, shown(a));
+    String b = LiveUpdatesBridge.start("{\"title\":\"B\"}");
+    LiveUpdatesBridge.end(b, "{\"title\":\"Done\"}", 0);
+    assertEquals(null, shown(b));
+    remote("start", "r9", "{\"title\":\"R\"}");
+    JSONObject data =
+        new JSONObject()
+            .put("live_updates_event", "end")
+            .put("live_updates_id", "r9")
+            .put("live_updates_dismiss_after", 0);
+    LiveUpdatesBridge.handleRemotePayload(data.toString());
+    assertEquals(null, shown("r9"));
+  }
+
+  @Test
+  public void endingAnEndedUpdateAgainRemovesIt() throws Exception {
+    String a = LiveUpdatesBridge.start("{\"title\":\"A\"}");
+    LiveUpdatesBridge.end(a, null, 60);
+    LiveUpdatesBridge.end(a, null, -1);
+    assertEquals(null, shown(a));
   }
 
   @Test
@@ -390,10 +468,11 @@ public class LiveUpdatesBridgeTest {
   }
 
   @Test
-  public void remoteEndKeepsFinalContentWithoutDismissTime() throws Exception {
+  public void remoteEndKeepsFinalContentForFourHoursWithoutDismissTime() throws Exception {
     remote("start", "r6", "{\"title\":\"A\"}");
     remote("end", "r6", "{\"title\":\"Delivered\"}");
     assertEquals("Delivered", shown("r6").extras.getString(Notification.EXTRA_TITLE));
+    assertEquals(4 * HOUR, shown("r6").getTimeoutAfter());
   }
 
   @Test

@@ -194,8 +194,8 @@ class AndroidLiveUpdatesPlatform extends LiveUpdatesPlatform
       () => LiveUpdatesBridge.end(
         _j(id),
         json == null ? null : _j(json),
-        // Android has no system default policy: keep final content until
-        // dismissed when no duration is given (-1), remove immediately for 0.
+        // No duration given (-1) keeps the ended update for four hours, as
+        // the iOS default policy does; 0 removes it immediately.
         dismissSeconds(dismissAfter),
       ),
     );

@@ -178,6 +178,11 @@ Interface Guidelines for Live Activities and Android's
   notification.
 - Do not bring back an update the user dismissed. On Android `update` fails
   for a dismissed update, and remote `update` payloads for it are ignored.
+  `startOrUpdate` does not show a dismissed key again until you `end` it on
+  Android; iOS cannot always tell a dismissal from other ends (for example
+  while the app is not running), so there the key can start again once the
+  system no longer lists the dismissed activity. Use a new key for a new
+  activity.
 - Keep `shortCriticalText` under 7 characters (see
   [Platform limits](#platform-limits)).
 
@@ -255,6 +260,18 @@ differently.
 - **Permissions:** on Android 13 and later nothing is shown until the user
   grants the notification permission, including updates started by a
   remote message. ([source][android-permission])
+- **After `end`:** from 0.4.0 the final content (or the content shown last)
+  stays as a regular notification for up to 4 hours, like on iOS, and the
+  user can swipe it away. `dismissAfter` longer than that is capped at 4
+  hours; `Duration.zero` removes it at once. Below Android 8.0 the system
+  cannot remove a notification later, so only `finalContent` stays there,
+  until the user dismisses it ([source][android-timeout-after]).
+- **Sound:** the first post of a live update plays the sound of its
+  channel, while iOS starts a Live Activity silently. The plugin creates its
+  channels with the default importance; to start silently, create your own
+  channel with `IMPORTANCE_LOW` before the first post and pass its
+  `channelId` (`alert: true` then plays no sound either). Users can change
+  a channel's sound in Settings. ([source][android-channels])
 - **Duration:** from 0.3.0 a live update is removed 8 hours after it
   started by default, like on iOS (`AndroidLiveUpdateOptions.maxDuration`;
   `null` for no limit).
@@ -272,6 +289,7 @@ differently.
 [ios-stale-date]: https://developer.apple.com/documentation/activitykit/activitycontent/staledate
 [android-alarms]: https://developer.android.com/develop/background-work/services/alarms
 [android-14-exact-alarms]: https://developer.android.com/about/versions/14/changes/schedule-exact-alarms
+[android-channels]: https://developer.android.com/develop/ui/views/notifications/channels
 [android-timeout-after]: https://developer.android.com/reference/android/app/Notification.Builder#setTimeoutAfter(long)
 [ios-push]: https://developer.apple.com/documentation/activitykit/starting-and-updating-live-activities-with-activitykit-push-notifications
 [ios-hig]: https://developer.apple.com/design/human-interface-guidelines/live-activities
@@ -308,10 +326,9 @@ Future<void> trackOrder() async {
   // Lifecycle: stale (iOS), ended, dismissed (e.g. swiped away on Android).
   update.states.listen((state) => print(state));
 
-  // iOS keeps the final content on the Lock Screen for 5 minutes. Android
-  // removes the notification now; pass finalContent to keep that content as a
-  // regular notification for 5 minutes (Android 8.0+; on Android 7 until the
-  // user dismisses it).
+  // The last content stays for 5 minutes: on the iOS Lock Screen, and on
+  // Android as a regular notification the user can swipe away. Without
+  // dismissAfter it stays up to 4 hours; Duration.zero removes it now.
   await update.end(dismissAfter: const Duration(minutes: 5));
 }
 ```
@@ -1081,7 +1098,7 @@ Deliver a data message and pass it to `LiveUpdates.handleRemotePayload`:
 | `live_updates_event` | `start`, `update` or `end` |
 | `live_updates_id` | Your id for the update (used by later messages) |
 | `live_updates_content` | Content as a JSON string, same keys as above |
-| `live_updates_dismiss_after` | Optional, seconds to keep final content on `end` (without it, it stays until dismissed) |
+| `live_updates_dismiss_after` | Optional, seconds to keep final content on `end` (at most and by default 4 hours, like `dismissAfter` of `LiveUpdate.end`) |
 
 With Firebase, [`live_updates_fcm`](https://pub.dev/packages/live_updates_fcm)
 does this for you.
@@ -1112,6 +1129,16 @@ apply them again:
   the start of both the Lock Screen and the Dynamic Island closures, with
   `state` passed to the building blocks instead of `context.state`, so the
   activity shows `endedContent` from `endAt` on (0.3.0).
+
+### From 0.3.x to 0.4.0
+
+- **Android keeps an ended update for up to 4 hours by default**, as iOS
+  does: `end()` without `finalContent` no longer removes the notification at
+  once but leaves the content shown last as a regular notification, and
+  `dismissAfter: null` (also a remote `end` without
+  `live_updates_dismiss_after`) means 4 hours instead of "until dismissed".
+  To remove it at once as before, pass `dismissAfter: Duration.zero` (remote:
+  `"live_updates_dismiss_after": 0`).
 
 ### From 0.2.x to 0.3.0
 

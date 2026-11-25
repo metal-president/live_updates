@@ -1369,8 +1369,8 @@ enum LiveUpdateState {
   stale,
 
   /// Ended by the app or a remote update (on Android also removed by
-  /// [AndroidLiveUpdateOptions.timeoutAfter]); may still be visible on iOS
-  /// until its dismissal time.
+  /// [AndroidLiveUpdateOptions.timeoutAfter]); may still be visible until
+  /// its dismissal time (see [LiveUpdate.end]).
   ended,
 
   /// Removed from the screen, by the system or the user.

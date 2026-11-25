@@ -1,3 +1,15 @@
+## 0.4.0
+
+- **Breaking (Android):** an ended live update stays visible for up to four
+  hours by default, like iOS keeps an ended Live Activity on the Lock
+  Screen. `LiveUpdate.end()` without `finalContent` keeps the content shown
+  last as a regular notification (no longer ongoing or promoted, without
+  buttons) instead of removing it at once, and `dismissAfter: null` (or a
+  remote `end` without `live_updates_dismiss_after`) means four hours
+  instead of until the user dismisses it. `dismissAfter` is capped at four
+  hours. Pass `Duration.zero` to remove it at once. See Upgrading in the
+  README.
+
 ## 0.3.0
 
 - **Breaking (Android):** live updates are removed 8 hours after they

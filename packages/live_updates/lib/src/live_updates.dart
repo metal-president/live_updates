@@ -24,12 +24,14 @@ final class LiveUpdate {
   Future<void> update(LiveUpdateContent content) =>
       _platform.update(id, content);
 
-  /// Ends the update. On iOS [dismissAfter] keeps it on the Lock Screen for
-  /// that long (the system allows at most four hours); `Duration.zero`
-  /// removes it immediately and `null` uses the system default. On Android the
-  /// notification is removed at once unless [finalContent] is given: then
-  /// that content stays as a regular notification for [dismissAfter]
-  /// (Android 8.0+; until dismissed when [dismissAfter] is `null`).
+  /// Ends the update. [finalContent] (or, without it, the content shown last)
+  /// stays visible for [dismissAfter], at most four hours, which is also the
+  /// default when [dismissAfter] is `null`; `Duration.zero` removes it
+  /// immediately. On iOS it stays on the Lock Screen (the system may remove
+  /// it earlier). On Android it becomes a regular notification that is no
+  /// longer ongoing or promoted and has no buttons; the user can swipe it
+  /// away. Below Android 8.0 the system cannot remove it later: there only
+  /// [finalContent] stays, until the user dismisses it.
   Future<void> end({LiveUpdateContent? finalContent, Duration? dismissAfter}) =>
       _platform.end(id, finalContent: finalContent, dismissAfter: dismissAfter);
 
@@ -456,7 +458,8 @@ abstract final class LiveUpdates {
   /// `live_updates_id` (chosen by the server for remote starts) and
   /// `live_updates_content` (the content as a JSON string, same keys as the
   /// iOS `content-state`), plus `live_updates_dismiss_after` (seconds) for
-  /// `end`.
+  /// `end`: how long the ended update stays, at most and by default four
+  /// hours, as `dismissAfter` of [LiveUpdate.end].
   static Future<bool> handleRemotePayload(Map<String, Object?> data) =>
       _platform.handleRemotePayload(data);
 }

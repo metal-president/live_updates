@@ -604,6 +604,13 @@ public class LiveUpdatesBridgeTest {
     } catch (IllegalStateException expected) {
       // Same.
     }
+    try {
+      // A time that has passed shows it now, as startOrUpdate.
+      LiveUpdatesBridge.schedule("off-key", "{\"title\":\"A\"}", 0, true, 0);
+      org.junit.Assert.fail("schedule for now must fail");
+    } catch (IllegalStateException expected) {
+      // Same.
+    }
     assertTrue(events.isEmpty());
     assertFalse(Arrays.asList(LiveUpdatesBridge.activeIds()).contains("off-key"));
     shadowOf(manager).setNotificationsEnabled(true);

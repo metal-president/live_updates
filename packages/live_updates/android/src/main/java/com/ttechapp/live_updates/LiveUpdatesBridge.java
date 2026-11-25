@@ -1044,6 +1044,8 @@ public final class LiveUpdatesBridge {
   public static void schedule(
       @NonNull String key, @NonNull String json, long atMillis, boolean exact, long windowMillis)
       throws JSONException {
+    // A time that has passed shows it now: fail as startOrUpdate does.
+    if (atMillis <= System.currentTimeMillis()) requireShowable(requireContext(), json);
     LiveUpdatesScheduler.schedule(requireContext(), key, json, atMillis, exact, windowMillis);
   }
 

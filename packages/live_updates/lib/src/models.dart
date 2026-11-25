@@ -156,7 +156,8 @@ final class LiveUpdateContent {
   /// alerts anyway. Android allows one alert per update every 10 seconds.
   ///
   /// [LiveUpdate.end] never alerts, also with this set on its final
-  /// content: [LiveUpdate.update] with the alert first.
+  /// content: [LiveUpdate.update] with the alert first. With this set,
+  /// Android alerts whatever [AndroidLiveUpdateOptions.alert] says.
   final LiveUpdateAlert? alert;
 
   /// iOS-only options.
@@ -168,7 +169,8 @@ final class LiveUpdateContent {
   /// Returns a copy with the given fields replaced. A `null` argument keeps
   /// the current value, so a field such as [publicContent] cannot be removed
   /// with it: create a new [LiveUpdateContent] instead. [alert] is the
-  /// exception: it belongs to one post, so the copy has it only when given.
+  /// exception: it belongs to one post, so the copy has it only when given
+  /// (the alerts in [ios] and [android] are kept with those options).
   LiveUpdateContent copyWith({
     String? title,
     String? body,

@@ -64,6 +64,31 @@ void fileRules() {
     },
   );
 
+  test('marks a kept Info.plist made before the marker', () async {
+    expect(await run(), 0);
+    expect(
+      file('Info.plist').readAsStringSync(),
+      contains('LiveUpdatesWidget'),
+    );
+    // An Info.plist from before 0.4.0, kept as yours.
+    file('Info.plist').writeAsStringSync(
+      '<?xml version="1.0" encoding="UTF-8"?>\n<plist version="1.0">\n<dict>\n'
+      '\t<key>CFBundleVersion</key>\n\t<string>1</string>\n</dict>\n</plist>\n',
+    );
+    expect(await run(), 0);
+    final text = file('Info.plist').readAsStringSync();
+    expect(text, contains('<key>LiveUpdatesWidget</key>\n\t<true/>\n</dict>'));
+    expect(text, contains('<key>CFBundleVersion</key>'));
+    // Once only.
+    expect(await run(), 0);
+    expect(
+      '<key>LiveUpdatesWidget</key>'.allMatches(
+        file('Info.plist').readAsStringSync(),
+      ),
+      hasLength(1),
+    );
+  });
+
   test('creates the asset catalog once and keeps it', () async {
     expect(await run(), 0);
     final catalog = file('Assets.xcassets/Contents.json');

@@ -223,7 +223,8 @@ extension LiveUpdatesBridge {
     set { UserDefaults.standard.set(newValue, forKey: schedulesKey) }
   }
 
-  /// Protects the images that `json` names (`image`, `endedContent.image`)
+  /// Protects the images that `json` names (`image`, `endedContent.image`,
+  /// `extraImages`)
   /// from the clean-up of unused images (Dart's ImageStore, which deletes
   /// files a day after their modification date) until `date`.
   static func keepImages(of json: String, until date: Date) {
@@ -231,7 +232,8 @@ extension LiveUpdatesBridge {
       let object = try? JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any]
     else { return }
     let ended = object["endedContent"] as? [String: Any]
-    for name in [object["image"] as? String, ended?["image"] as? String].compactMap({ $0 }) {
+    let extra = (object["extraImages"] as? [String: Any])?.values.compactMap { $0 as? String } ?? []
+    for name in [object["image"] as? String, ended?["image"] as? String].compactMap({ $0 }) + extra {
       guard !name.hasPrefix("."), let url = LiveUpdatesImages.url(name),
         let modified = try? FileManager.default.attributesOfItem(atPath: url.path)[
           .modificationDate] as? Date,
@@ -258,7 +260,7 @@ extension LiveUpdatesBridge {
 
   /// Request JSON for an activity's current content (the content-state keys
   /// plus its stale date and relevance).
-  @available(iOS 17.2, *)
+  @available(iOS 16.2, *)
   private static func encode(_ content: ActivityContent<LiveUpdatesAttributes.ContentState>)
     throws -> String
   {

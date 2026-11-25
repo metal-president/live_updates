@@ -7,7 +7,7 @@ iOS **Live Activities** and Android **Live Update** notifications with one Dart 
 - **Scheduling and ending at a time:** show a live update later, even if
   the app is not running then (iOS 26+ and Android), and switch it to ended
   content such as "Delivered" at a set time.
-- **iOS 17.2+:** Lock Screen and Dynamic Island, with five built-in layouts
+- **iOS 16.2+:** Lock Screen and Dynamic Island, with five built-in layouts
   (standard, timer, metrics, stepper, journey) and a SwiftUI widget you
   generate with one command and can customize.
 - **Android:** `ProgressStyle` notifications on Android 16+, promoted to a
@@ -51,10 +51,13 @@ Screenshots of the example app in this repository.
 ## Platform support
 
 **Requirements:** Flutter 3.50+, iOS 15.0+, Android 7.0 (API 24)+. Live
-Activities need iOS 17.2: on iOS 15.0 to 17.1 every call does nothing and
-`isSupported()` returns `false`.
+Activities need iOS 16.2: on iOS 15.0 to 16.1 every call does nothing and
+`isSupported()` returns `false`, as it does on iOS 16 when the app's widget
+extension targets a newer iOS. Some features need a newer iOS: buttons need
+iOS 17.0 (before that none are shown; a tap on the activity still opens the
+app with its route), and push-to-start needs iOS 17.2.
 
-| | iOS 17.2+ | Android 16+ | Android 7–15 | iOS 15.0–17.1, other |
+| | iOS 16.2+ | Android 16+ | Android 7–15 | iOS 15.0–16.1, other |
 | --- | --- | --- | --- | --- |
 | Start / update / end | Live Activity | Live Update (when promoted) | Ongoing notification | no-op |
 | Progress | ✓ | `ProgressStyle` (segments, points) | progress bar | |
@@ -62,13 +65,13 @@ Activities need iOS 17.2: on iOS 15.0 to 17.1 every call does nothing and
 | Metrics | `metrics` layout | Android 17 `MetricStyle`, else text | text | |
 | Steps, journey | `stepper`, `journey` layouts | progress segments and points, text | progress bar, text | |
 | Semantic colors | – | Android 17+ | – | |
-| Buttons (`actions`) | ✓ | ✓ | ✓ | |
+| Buttons (`actions`) | iOS 17+ | ✓ | ✓ | |
 | Image | ✓ | large icon (not with Android 17 metrics) | large icon | |
 | Tap route (`onTap`) | ✓ | ✓ | ✓ | |
 | Scheduled start (`schedule`) | iOS 26+ | alarm | alarm | |
 | Ended content at a time (`endAt`) | stale date | alarm | alarm | |
 | Lifecycle events (`states`, `onStarted`) | ✓ | ✓ | ✓ | |
-| Live Activity push tokens | ✓ | – (FCM via `live_updates_fcm`) | – (FCM via `live_updates_fcm`) | |
+| Live Activity push tokens | ✓ (push-to-start iOS 17.2+) | – (FCM via `live_updates_fcm`) | – (FCM via `live_updates_fcm`) | |
 | Remote updates | push to the system (APNs, or FCM), no app code | data message → `handleRemotePayload` | data message → `handleRemotePayload` | |
 | One push to many devices | broadcast channels (iOS 18+) | FCM topics | FCM topics | |
 
@@ -91,13 +94,13 @@ flutter pub add live_updates
    ```
 
    This writes `ios/LiveUpdatesWidget/`, adds a *LiveUpdatesWidget* extension
-   target (iOS 17.2) to `Runner.xcodeproj`, sets `NSSupportsLiveActivities`,
+   target (iOS 16.2) to `Runner.xcodeproj`, sets `NSSupportsLiveActivities`,
    and sets up the URL scheme for taps (`liveupdates-<bundle id>`) and the App
    Group for [images](#images). It needs Ruby with the `xcodeproj` gem
    (included with CocoaPods) and offers to run
    `gem install --user-install xcodeproj` if it is missing.
 
-   - **Deployment target:** only the widget extension needs iOS 17.2; the
+   - **Deployment target:** only the widget extension needs iOS 16.2; the
      app can target iOS 15.0 or later.
    - **Flavors:** every build configuration (for example `Debug-dev`,
      `Release-prod`) gets a widget bundle id and an App Group derived from
@@ -118,7 +121,7 @@ With `--no-xcode` only the widget sources are written. Then, in Xcode:
 
 1. File > New > Target > Widget Extension named `LiveUpdatesWidget`
    (no Live Activity or configuration intent templates), deployment target
-   17.2, and replace its generated Swift files with the files from
+   16.2, and replace its generated Swift files with the files from
    `ios/LiveUpdatesWidget/`.
 2. Add `LiveUpdatesActionIntent.swift` to both the Runner and the widget
    target (Target Membership).
@@ -127,6 +130,8 @@ With `--no-xcode` only the widget sources are written. Then, in Xcode:
 4. For images: add the App Groups capability with the same group to both
    targets and set `LiveUpdatesAppGroup` to that group in both Info.plist
    files.
+5. In the widget's `Info.plist`, add `LiveUpdatesWidget` as a Boolean set to
+   YES, so the plugin checks that this extension supports the running iOS.
 
 ### Android
 
@@ -304,6 +309,7 @@ differently.
   ([source][android-alarms], [source][android-14-exact-alarms])
 
 [ios-activitykit]: https://developer.apple.com/documentation/activitykit/displaying-live-data-with-live-activities
+[ios-button-intent]: https://developer.apple.com/documentation/swiftui/button/init(intent:label:)
 [ios-request-start]: https://developer.apple.com/documentation/activitykit/activity/request(attributes:content:pushtype:style:alertconfiguration:start:)
 [ios-stale-date]: https://developer.apple.com/documentation/activitykit/activitycontent/staledate
 [android-alarms]: https://developer.android.com/develop/background-work/services/alarms
@@ -584,6 +590,9 @@ Where a press is delivered:
   `requiresUnlock: true` on buttons with consequences, such as cancelling an
   order: iOS asks for Face ID or the passcode first, and Android 12+ asks the
   user to unlock.
+- On iOS 16.2 to 16.x no buttons are shown: they use App Intents in Live
+  Activities, which need iOS 17 ([source][ios-button-intent]). A tap on the
+  activity still opens the app with its `route`.
 - Android shows up to three actions. On iOS keep labels short: the whole
   content must stay under ActivityKit's 4 KB limit.
 
@@ -729,11 +738,13 @@ sets the accent (progress, buttons, timer, Dynamic Island keyline), the Lock
 Screen background and its text color, like `AndroidLiveUpdateOptions.color`
 on Android.
 
-- In our tests on iOS 27 (device and simulator), the default Lock Screen
-  card was black in Light and Dark Mode alike. Apple's guidelines describe a
-  light background in Light Mode, which other versions or setups may show.
-  The Dynamic Island is always black. Choose an accent that reads well on
-  dark and on light backgrounds.
+- **Choose an accent that reads well on dark and on light backgrounds:**
+  the same activity can appear on both. The Dynamic Island is always black,
+  while the Lock Screen card follows the system: in our tests on iOS 27
+  (device and simulator) it was black in Light and Dark Mode alike, but
+  Apple's guidelines describe a light background in Light Mode, which other
+  versions or setups (such as iOS 16) may show. The template's text uses the
+  system colors, so only colors you set need checking.
 - With a custom background, set the text color too, for example
   `backgroundColor: Color(0xFFFFFFFF), foregroundColor: Color(0xFF000000)`.
 - While the Always-On display dims the Lock Screen, the system colors are
@@ -1096,7 +1107,26 @@ Each place shows the first icon that is set:
 
 In the layout, `context.state` has every field of `LiveUpdateContent`, and
 `context.state.extra["driver"]` reads `IosLiveUpdateOptions.extra`, for
-values the template does not show.
+values the template does not show. For more pictures than `image`, pass
+`IosLiveUpdateOptions.extraImages`: the plugin stores them like `image`
+(scaled, in the App Group, cleaned up when unused), and the layout loads one
+with `LiveUpdatesImages.url(context.state.extraImages["map"])`:
+
+```dart
+ios: IosLiveUpdateOptions(
+  layout: IosLiveUpdateLayout.custom('courier'),
+  extra: {'gate': 'B12'},
+  extraImages: {
+    'map': LiveUpdateImage.asset('assets/map.png', maxDimension: 160),
+    'driver': LiveUpdateImage.asset('assets/driver.png'),
+  },
+),
+```
+
+Keep them few and small: the widget extension has little memory, and
+ActivityKit may refuse images larger than they are shown. A push replaces the
+whole content state and cannot add pictures, so extra images suit activities
+that the app updates itself.
 
 ### Custom layouts
 
@@ -1139,7 +1169,7 @@ update on both platforms.
 ### iOS (APNs)
 
 ```dart
-// Start activities from your server (iOS 17.2+).
+// Start activities from your server (push-to-start, iOS 17.2+).
 LiveUpdates.pushToStartTokens.listen((token) => api.registerPushToStart(token.hex));
 
 // Update a running activity from your server.
@@ -1262,6 +1292,16 @@ apply them again:
   notification's countdown cannot stop at zero), and leaves out the timer of
   a countdown that is already over. Pass
   `AndroidLiveUpdateOptions(removeAtCountdownEnd: false)` to keep it.
+- **iOS 16.2 and later:** Live Activities now work from iOS 16.2. Run
+  `create_widget` again, then lower the deployment target of the
+  `LiveUpdatesWidget` target to 16.2 in Xcode and check that your layout file
+  builds for it (`create_widget` does not change an existing target, and
+  says when it is higher; with `--no-xcode` check it yourself).
+  `create_widget` also adds `LiveUpdatesWidget` = YES to the widget's
+  `Info.plist`, so the plugin checks that extension.
+  Until the extension supports the device's iOS, `isSupported()` stays
+  `false` there, so the app does not start activities that no widget can
+  show.
 - **What stays after `end` has no buttons or running timers** on either
   platform (the final content, or the content shown last).
 - **iOS `startOrUpdate` replaces an ended activity** with the key that is

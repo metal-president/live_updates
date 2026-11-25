@@ -6,7 +6,7 @@ import 'android_platform.dart';
 import 'ios_platform.dart';
 import 'live_updates_platform.dart';
 
-/// Backend for the current native platform. Below iOS 17.2 (apps may target
+/// Backend for the current native platform. Below iOS 16.2 (apps may target
 /// iOS 15.0) the plugin does nothing, as on other platforms, except that
 /// scheduling reports that it needs a newer iOS.
 LiveUpdatesPlatform createDefaultPlatform() {

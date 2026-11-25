@@ -57,6 +57,17 @@
   `stateOf` also reports updates that have ended. Android keeps reporting
   `dismissed` until the app ends the update; iOS while it lists the
   activity.
+- Live Activities on iOS 16.2 and later (was 17.2): everything works
+  except buttons (iOS 17.0; none are shown before) and push-to-start (iOS
+  17.2). For an existing widget extension, run `create_widget` again (it
+  adds `LiveUpdatesWidget` = YES to the widget's Info.plist and says when the
+  deployment target is higher; with `--no-xcode` check it yourself), then
+  lower its deployment target to 16.2 in Xcode. Until the extension supports
+  the device's iOS, `isSupported()` stays `false` there.
+- `IosLiveUpdateOptions.extraImages`: more pictures for custom iOS layouts,
+  stored like `image` and read in the widget with
+  `LiveUpdatesImages.url(context.state.extraImages["key"])`. Run
+  `create_widget` again.
 
 ## 0.3.0
 

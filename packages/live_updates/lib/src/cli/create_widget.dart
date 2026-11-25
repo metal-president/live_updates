@@ -136,6 +136,9 @@ Future<int> createWidget(List<String> args, {Directory? templates}) async {
     f.writeAsStringSync(content);
     stdout.writeln('write  ${f.path}');
   }
+  // A kept Info.plist (made before 0.4.0) gets the marker the plugin uses to
+  // find its widget extension (see LiveUpdatesBridge.widgetExtensionRuns).
+  _markWidgetPlist(File('${out.path}/Info.plist'));
 
   if (editXcode) {
     if (!_enableLiveActivities('${ios.path}/Runner/Info.plist')) return 1;
@@ -163,7 +166,7 @@ Future<int> createWidget(List<String> args, {Directory? templates}) async {
           '\nCould not edit the Xcode project automatically (needs the '
           '"xcodeproj" Ruby gem, bundled with CocoaPods).\n'
           'Add the extension manually: Xcode > File > New > Target > Widget '
-          'Extension named "$name" (deployment target 17.2), then replace its '
+          'Extension named "$name" (deployment target 16.2), then replace its '
           'files with the ones in ${out.path}.',
         );
       return 1;
@@ -257,6 +260,27 @@ bool _plistBuddy(String command, String plist) =>
       plist,
     ]).exitCode ==
     0;
+
+/// Adds `LiveUpdatesWidget` = true to the widget's XML [plist] when it is
+/// missing (plain text, so it also runs where PlistBuddy does not).
+void _markWidgetPlist(File plist) {
+  if (!plist.existsSync()) return;
+  final text = plist.readAsStringSync();
+  if (text.contains('<key>LiveUpdatesWidget</key>')) return;
+  final end = text.lastIndexOf('</dict>');
+  if (!text.trimLeft().startsWith('<?xml') || end < 0) {
+    stderr.writeln(
+      'Could not add LiveUpdatesWidget to ${plist.path}; add it as a Boolean '
+      'set to YES.',
+    );
+    return;
+  }
+  plist.writeAsStringSync(
+    '${text.substring(0, end)}\t<key>LiveUpdatesWidget</key>\n\t<true/>\n'
+    '${text.substring(end)}',
+  );
+  stdout.writeln('update ${plist.path} (LiveUpdatesWidget = true)');
+}
 
 /// Sets NSSupportsLiveActivities and the tap URL scheme. Returns `false`
 /// (after printing why) if Info.plist could not be updated.

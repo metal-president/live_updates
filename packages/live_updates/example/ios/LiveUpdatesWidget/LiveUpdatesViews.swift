@@ -547,21 +547,30 @@ struct LiveUpdatesActionButtons: View {
   let actions: [LiveUpdatesAction]
   let activityID: String
 
+  /// Buttons need iOS 17 (App Intents in Live Activities): before that none
+  /// are shown, and a tap on the activity opens the app with its route.
+  private var shown: [LiveUpdatesAction] {
+    if #available(iOS 17.0, *) { return actions }
+    return []
+  }
+
   var body: some View {
-    if !actions.isEmpty {
+    if !shown.isEmpty {
       HStack(spacing: 8) {
-        ForEach(actions) { action in
+        ForEach(shown) { action in
           if action.opensApp, let url = action.liveUpdatesURL(activityID: activityID) {
             Link(destination: url) { LiveUpdatesActionLabel(action: action) }
-          } else if action.requiresUnlock {
-            Button(
-              intent: LiveUpdatesSecureActionIntent(activityId: activityID, actionId: action.id)
-            ) {
-              LiveUpdatesActionLabel(action: action)
-            }
-          } else {
-            Button(intent: LiveUpdatesActionIntent(activityId: activityID, actionId: action.id)) {
-              LiveUpdatesActionLabel(action: action)
+          } else if #available(iOS 17.0, *) {
+            if action.requiresUnlock {
+              Button(
+                intent: LiveUpdatesSecureActionIntent(activityId: activityID, actionId: action.id)
+              ) {
+                LiveUpdatesActionLabel(action: action)
+              }
+            } else {
+              Button(intent: LiveUpdatesActionIntent(activityId: activityID, actionId: action.id)) {
+                LiveUpdatesActionLabel(action: action)
+              }
             }
           }
         }

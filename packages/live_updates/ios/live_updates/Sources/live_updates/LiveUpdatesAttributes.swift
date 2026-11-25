@@ -25,6 +25,10 @@ public struct LiveUpdatesAttributes: ActivityAttributes {
     /// Buttons, rendered by the widget template.
     public var actions: [LiveUpdatesAction]
     public var extra: [String: String]
+    /// `IosLiveUpdateOptions.extraImages`: file names in
+    /// `LiveUpdatesImages.directory`, for custom layouts
+    /// (`LiveUpdatesImages.url(state.extraImages["map"])`).
+    public var extraImages: [String: String]
     /// Timer start (stopwatch) in seconds since 1970, counted by the system.
     public var timerStart: Double?
     /// Timer end (countdown) in seconds since 1970, counted by the system.
@@ -64,6 +68,7 @@ public struct LiveUpdatesAttributes: ActivityAttributes {
       icon: LiveUpdatesIcon? = nil, iosIcon: LiveUpdatesIcon? = nil,
       islandIcon: LiveUpdatesIcon? = nil, route: String? = nil, image: String? = nil,
       actions: [LiveUpdatesAction] = [], extra: [String: String] = [:],
+      extraImages: [String: String] = [:],
       timerStart: Double? = nil, timerEnd: Double? = nil,
       compactTrailing: String? = nil, compactLeading: String? = nil, minimal: String? = nil,
       tintArgb: Int? = nil, backgroundArgb: Int? = nil, foregroundArgb: Int? = nil,
@@ -81,6 +86,7 @@ public struct LiveUpdatesAttributes: ActivityAttributes {
       self.image = image
       self.actions = actions
       self.extra = extra
+      self.extraImages = extraImages
       self.timerStart = timerStart
       self.timerEnd = timerEnd
       self.compactTrailing = compactTrailing
@@ -111,6 +117,11 @@ public struct LiveUpdatesAttributes: ActivityAttributes {
       image = try c.decodeIfPresent(String.self, forKey: .image)
       actions = try c.decodeIfPresent([LiveUpdatesAction].self, forKey: .actions) ?? []
       extra = try c.decodeIfPresent([String: String].self, forKey: .extra) ?? [:]
+      // An image name that does not decode is left out, not the others.
+      let images =
+        (try? c.decodeIfPresent([String: LiveUpdatesLossy<String>].self, forKey: .extraImages))
+        ?? nil
+      extraImages = images?.compactMapValues(\.value) ?? [:]
       timerStart = try c.decodeIfPresent(Double.self, forKey: .timerStart)
       timerEnd = try c.decodeIfPresent(Double.self, forKey: .timerEnd)
       compactTrailing = try c.decodeIfPresent(String.self, forKey: .compactTrailing)

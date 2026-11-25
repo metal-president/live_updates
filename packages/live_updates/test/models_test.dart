@@ -27,6 +27,19 @@ void main() {
     expect(b, isNot(a));
   });
 
+  test('extra images take part in equality', () {
+    const a = IosLiveUpdateOptions(
+      extraImages: {'map': LiveUpdateImage.asset('assets/map.png')},
+    );
+    expect(
+      a,
+      const IosLiveUpdateOptions(
+        extraImages: {'map': LiveUpdateImage.asset('assets/map.png')},
+      ),
+    );
+    expect(a, isNot(const IosLiveUpdateOptions()));
+  });
+
   test('the shared alert has value equality and is part of the content', () {
     const a = LiveUpdateAlert(title: 'Arrived');
     expect(a, const LiveUpdateAlert(title: 'Arrived'));

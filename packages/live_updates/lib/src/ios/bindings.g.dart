@@ -112,7 +112,7 @@ external ffi.Pointer<objc.ObjCBlockImpl> _1j14om6_wrapListenerBlock_xtuoz7(
 /// on the platform (main) thread, and Tasks hop to the main actor before
 /// touching it. Handlers are Dart listener blocks, callable from any thread.
 /// The plugin builds for apps that target iOS 15.0, but Live Activities
-/// need iOS 17.2. Below that, <code>isAvailable</code> is <code>false</code> and Dart uses its
+/// need iOS 16.2. Below that, <code>isAvailable</code> is <code>false</code> and Dart uses its
 /// no-op backend without calling the rest; if called anyway, methods return
 /// empty results, and <code>start</code>, <code>startOrUpdate</code> and <code>update</code> report an error.
 extension type LiveUpdatesBridge._(objc.ObjCObject object$)
@@ -300,7 +300,8 @@ extension type LiveUpdatesBridge._(objc.ObjCObject object$)
         : objc.NSString.fromPointer($ret, retain: true, release: true);
   }
 
-  /// Whether this iOS version supports live_updates (iOS 17.2 or later).
+  /// Whether this iOS version supports live_updates (iOS 16.2 or later) and
+  /// the app’s widget extension can run on it, so started activities show.
   static bool isAvailable() {
     return _objc_msgSend_91o635(_class_LiveUpdatesBridge, _sel_isAvailable);
   }
@@ -369,7 +370,8 @@ extension type LiveUpdatesBridge._(objc.ObjCObject object$)
     );
   }
 
-  /// Calls <code>handler</code> with every push-to-start token (hex).
+  /// Calls <code>handler</code> with every push-to-start token (hex). Push-to-start
+  /// needs iOS 17.2: before that no token comes.
   static void observePushToStartTokens(
     objc.ObjCBlock<ffi.Void Function(objc.NSString)> handler,
   ) {

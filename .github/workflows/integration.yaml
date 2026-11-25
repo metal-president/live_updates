@@ -35,7 +35,7 @@ jobs:
       - name: Boot an iPhone simulator
         id: sim
         run: |
-          # Newest available iPhone runtime (Live Activities need iOS 17.2+).
+          # Newest available iPhone runtime (Live Activities need iOS 16.2+).
           udid=$(xcrun simctl list devices available --json | python3 -c '
           import json, sys
           devices = json.load(sys.stdin)["devices"]

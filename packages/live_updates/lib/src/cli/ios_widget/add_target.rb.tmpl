@@ -111,10 +111,34 @@ def ensure_assets(project, target, name, ext_dir)
   target.resources_build_phase.add_file_reference(ref)
 end
 
+# Live Activities can show from iOS 16.2. An existing extension (created
+# for 17.2 before live_updates 0.4.0) is not changed, as layout code kept in
+# it may need a newer iOS: this only tells the user how to support 16.2.
+def report_deployment_target(project, target, name)
+  values = target.build_configurations.map do |config|
+    config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] ||
+      project.build_configurations.find { |c| c.name == config.name }
+        &.build_settings&.[]('IPHONEOS_DEPLOYMENT_TARGET')
+  end.compact.uniq
+  higher = values.select { |v| Gem::Version.correct?(v) && Gem::Version.new(v) > Gem::Version.new('16.2') }
+  unknown = values.reject { |v| Gem::Version.correct?(v) }
+  if higher.any?
+    puts "#{name} targets iOS #{higher.join(', ')}; Live Activities can show from iOS 16.2. " \
+         "To support iOS 16, lower the deployment target of #{name} to 16.2 in Xcode " \
+         'and check that your layout builds for it (until then live_updates reports ' \
+         'isSupported() false on older iOS versions).'
+  elsif unknown.any? || values.empty?
+    shown = unknown.any? ? " (#{unknown.join(', ')})" : ''
+    puts "Could not read the deployment target of #{name}#{shown}. " \
+         'Live Activities can show from iOS 16.2 when it is 16.2 or lower.'
+  end
+end
+
 if (existing = project.targets.find { |t| t.name == name })
   ensure_widget_files(project, existing, name, ext_dir)
   ensure_assets(project, existing, name, ext_dir)
   ensure_shared_intent(project, [runner, existing], name)
+  report_deployment_target(project, existing, name)
   project.save
   if use_group
     configure_app_group(project, runner, ios_dir, 'Runner/Runner.entitlements', groups)
@@ -122,12 +146,12 @@ if (existing = project.targets.find { |t| t.name == name })
     project.save
     puts "Target #{name} already exists; configured App Groups #{groups.values.uniq.join(', ')}."
   else
-    puts "Target #{name} already exists; skipping Xcode changes."
+    puts "Target #{name} already exists; refreshed its files."
   end
   exit 0
 end
 
-target = project.new_target(:app_extension, name, :ios, '17.2', nil, :swift)
+target = project.new_target(:app_extension, name, :ios, '16.2', nil, :swift)
 group = project.main_group.find_subpath(name, true)
 group.set_source_tree('<group>')
 group.set_path(name)
@@ -152,7 +176,7 @@ target.build_configurations.each do |config|
   s['INFOPLIST_KEY_CFBundleDisplayName'] = name
   s['MARKETING_VERSION'] = '$(FLUTTER_BUILD_NAME)'
   s['CURRENT_PROJECT_VERSION'] = '$(FLUTTER_BUILD_NUMBER)'
-  s['IPHONEOS_DEPLOYMENT_TARGET'] = '17.2'
+  s['IPHONEOS_DEPLOYMENT_TARGET'] = '16.2'
   s['SWIFT_VERSION'] = '5.0'
   s['TARGETED_DEVICE_FAMILY'] = '1,2'
   s['SKIP_INSTALL'] = 'YES'

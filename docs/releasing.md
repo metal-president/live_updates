@@ -25,8 +25,11 @@ Every release of `live_updates` and `live_updates_fcm` follows these steps.
    CI compiles the Dart examples of both READMEs
    (`tool/check_readme_snippets.dart`); this review covers what it cannot.
 4. **Minimum iOS check.** CI only runs the newest iOS simulator. Run the
-   example app on a simulator below iOS 17.2 (for example iOS 16.4): it must
-   launch, show `supported: false`, and Start / Update / End must not crash.
+   example app on an iOS 16 simulator (for example iOS 16.4): Start /
+   Update / End must work, no buttons are shown and push-to-start reports
+   no token. Below iOS
+   16.2 (when a simulator is available) the app must launch, show
+   `supported: false`, and Start / Update / End must not crash.
 5. **Pull request.** Bump versions and changelogs, open a PR and wait for all
    CI jobs (`analyze-test`, `android-unit-test`, `ios-unit-test`,
    `build-android`, `build-ios (swiftpm)`, `build-ios (cocoapods)` and the

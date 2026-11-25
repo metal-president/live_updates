@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:flutter/foundation.dart' show debugPrint;
+import 'package:flutter/foundation.dart' show FlutterError, debugPrint;
 import 'package:flutter/services.dart' show AssetManifest, rootBundle;
 
 import '../icon_checks.dart';
@@ -50,6 +50,42 @@ mixin ContentEncoder {
     if (content.image case final image?) {
       final store = _store ??= ImageStore(_directory);
       json['image'] = await store.store(image, keepUntil: showAt);
+    }
+    // iOS custom layouts: more pictures, by name (the widget reads them from
+    // the same directory).
+    // A picture that cannot be stored is left out (with a warning), not the
+    // whole content.
+    if (storesIconAssets && (content.ios?.extraImages.isNotEmpty ?? false)) {
+      final images = content.ios!.extraImages;
+      // A wrong size is a mistake in the code, as for the main image.
+      for (final MapEntry(:key, :value) in images.entries) {
+        if (value.maxDimension <= 0) {
+          throw LiveUpdateException(
+            'extraImages["$key"]: maxDimension must be positive, got '
+            '${value.maxDimension}',
+          );
+        }
+      }
+      if (imageDirectory == null) {
+        debugPrint(
+          'live_updates: extra images ${images.keys.join(', ')} left out: '
+          '$missingImageDirectoryHint',
+        );
+      } else {
+        final store = _store ??= ImageStore(_directory);
+        final names = <String, String>{};
+        for (final MapEntry(:key, :value) in images.entries) {
+          try {
+            names[key] = await store.store(value, keepUntil: showAt);
+          } on Object catch (e) {
+            // Such as a missing file or asset (a FlutterError) or a failed
+            // download; other errors are mistakes in the code.
+            if (e is Error && e is! FlutterError) rethrow;
+            debugPrint('live_updates: extra image "$key" left out: $e');
+          }
+        }
+        if (names.isNotEmpty) json['extraImages'] = names;
+      }
     }
     if (content.endedContent?.image case final image?) {
       final store = _store ??= ImageStore(_directory);

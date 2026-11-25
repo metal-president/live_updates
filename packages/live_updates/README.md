@@ -137,6 +137,7 @@ app icon as a solid shape.
 (Android 16 QPR1 and later). It is granted at install time without a prompt,
 and users can turn it off per app in Settings.
 ([source][android-promoted-permission], [source][android-live-update])
+
 If your app only uses `AndroidLiveUpdateMode.ongoing` or
 `AndroidLiveUpdateMode.classic`, which never ask for promotion, you can remove
 the permission in `android/app/src/main/AndroidManifest.xml`:
@@ -232,8 +233,10 @@ differently.
   the permission, it reflects the system's decision for that notification.
 - **User settings:** users can demote or dismiss a Live Update and turn off
   Live Updates for your app in Settings. Updates then appear as regular
-  ongoing notifications; `LiveUpdates.canPostPromotedNotifications()` tells
-  you which. To send users to the setting, open the
+  ongoing notifications. `LiveUpdates.canPostPromotedNotifications()` tells
+  you whether Live Updates are turned off for your app, and
+  `LiveUpdate.isPromoted()` whether one shown update is promoted. To send
+  users to the setting, open the
   `Settings.ACTION_APP_NOTIFICATION_PROMOTION_SETTINGS` intent (the Live
   Update guide names it `ACTION_MANAGE_APP_PROMOTED_NOTIFICATIONS`, which is
   not in the SDK) with `Settings.EXTRA_APP_PACKAGE`; some devices have no

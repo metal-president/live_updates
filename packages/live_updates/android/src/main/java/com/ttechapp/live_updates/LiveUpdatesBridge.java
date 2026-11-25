@@ -561,7 +561,7 @@ public final class LiveUpdatesBridge {
 
   /** Records that the user swiped the update away (see DismissReceiver). */
   static void markDismissed(Context c, String id) {
-    forgetLastPosted(id);
+    forgetPostsInProcess(id);
     LiveUpdatesScheduler.cancelEnd(c, id);
     forgetStartTime(c, id);
     synchronized (staleIds) {
@@ -672,9 +672,12 @@ public final class LiveUpdatesBridge {
     // An update ended a moment ago may still be listed as running.
     boolean recent;
     boolean endedJustNow;
+    long nowUptime = SystemClock.uptimeMillis();
     synchronized (recentlyPosted) {
-      endedJustNow = recentlyEnded.containsKey(id);
-      recent = recentlyPosted.containsKey(id) && !endedJustNow;
+      Long ended = recentlyEnded.get(id);
+      Long posted = recentlyPosted.get(id);
+      endedJustNow = ended != null && nowUptime - ended <= RECENT_MS;
+      recent = posted != null && nowUptime - posted <= RECENT_MS && !endedJustNow;
     }
     Notification shown = recent || endedJustNow ? null : activeNotification(c, id);
     boolean running = recent || shown != null;
@@ -683,8 +686,13 @@ public final class LiveUpdatesBridge {
       recentlyEnded.put(id, SystemClock.uptimeMillis());
     }
     // Reported once, like the iOS activity state: not again for an update
-    // that already ended.
-    if (emit && running) emit("ended", id);
+    // that already ended (also when nothing is shown, for example with
+    // notifications blocked, as long as it was reported started).
+    boolean wasKnown;
+    synchronized (known) {
+      wasKnown = known.contains(id);
+    }
+    if (emit && (running || wasKnown)) emit("ended", id);
     synchronized (keyedIds) {
       keyedIds.remove(id);
     }
@@ -701,7 +709,14 @@ public final class LiveUpdatesBridge {
     // user dismissed (emit is false then).
     Notification.Builder builder = null;
     boolean keep = dismissAfterSeconds != 0;
-    if (json != null && keep && (running || isListed(c, id))) {
+    // An ended notification this process kept may be replaced by final
+    // content; one cancelled a moment ago may still be listed.
+    boolean keptBefore;
+    synchronized (keptEnded) {
+      keptBefore = keptEnded.contains(id);
+    }
+    boolean endedShown = endedJustNow ? keptBefore : isListed(c, id);
+    if (json != null && keep && (running || endedShown)) {
       // Final content replaces the update or its ended notification, but
       // does not bring back one that is gone.
       builder = builder(c, endedContent(new JSONObject(json)), remote, true);
@@ -750,7 +765,7 @@ public final class LiveUpdatesBridge {
     }
   }
 
-  /** Tests: forgets what this process posted for {@code id}, as after a restart. */
+  /** Forgets what this process posted for {@code id} (also used by tests, as after a restart). */
   static void forgetPostsInProcess(String id) {
     forgetLastPosted(id);
     synchronized (recentlyPosted) {
@@ -957,7 +972,7 @@ public final class LiveUpdatesBridge {
 
   /** Called by the dismiss receiver when a timeout removed the update. */
   static void timedOut(Context c, String id) {
-    forgetLastPosted(id);
+    forgetPostsInProcess(id);
     LiveUpdatesScheduler.cancelEnd(c, id);
     forgetStartTime(c, id);
     synchronized (staleIds) {

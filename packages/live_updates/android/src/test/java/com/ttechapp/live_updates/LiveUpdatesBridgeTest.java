@@ -379,6 +379,35 @@ public class LiveUpdatesBridgeTest {
   }
 
   @Test
+  public void endAfterATimeoutReportsNothingAndShowsNothing() throws Exception {
+    List<String> events = new ArrayList<>();
+    LiveUpdatesBridge.observeEvents(events::add, 1);
+    String id = LiveUpdatesBridge.start("{\"title\":\"Order\",\"timeoutAfterMillis\":60000}");
+    // The system removed it and the dismiss receiver reported the timeout.
+    manager.cancel(LiveUpdatesBridge.TAG_PREFIX + id, LiveUpdatesBridge.NOTIFICATION_ID);
+    LiveUpdatesBridge.timedOut(app, id);
+    LiveUpdatesBridge.end(id, "{\"title\":\"Delivered\"}", -1);
+    assertEquals(null, shown(id));
+    assertEquals(Arrays.asList("started:" + id, "ended:" + id), events);
+  }
+
+  @Test
+  public void endIsReportedForAKnownUpdateThatIsNotShown() throws Exception {
+    List<String> events = new ArrayList<>();
+    LiveUpdatesBridge.observeEvents(events::add, 1);
+    String id = LiveUpdatesBridge.start("{\"title\":\"Order\"}");
+    // Not listed (for example with notifications blocked), and not posted a
+    // moment ago.
+    manager.cancel(LiveUpdatesBridge.TAG_PREFIX + id, LiveUpdatesBridge.NOTIFICATION_ID);
+    LiveUpdatesBridge.forgetPostsInProcess(id);
+    LiveUpdatesBridge.end(id, null, -1);
+    assertEquals(Arrays.asList("started:" + id, "ended:" + id), events);
+    // The key starts (and is reported) again.
+    LiveUpdatesBridge.startOrUpdate(id, "{\"title\":\"Again\"}");
+    assertEquals("started:" + id, events.get(events.size() - 1));
+  }
+
+  @Test
   public void endAllAlsoRemovesEndedUpdates() throws Exception {
     String a = LiveUpdatesBridge.start("{\"title\":\"A\"}");
     String b = LiveUpdatesBridge.start("{\"title\":\"B\"}");

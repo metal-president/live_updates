@@ -158,21 +158,28 @@ public final class LiveUpdatesBridge: NSObject {
     return activity.id
   }
 
-  /// Ids of activities this app ended (guarded by `endedLock`), so a later
-  /// `dismissed` state is not mistaken for the user's dismissal.
-  private static var endedIds: Set<String> = []
+  /// UserDefaults key with the ids of activities this app ended, so a later
+  /// `dismissed` state is not mistaken for the user's dismissal (kept across
+  /// launches, pruned to the activities the system still lists).
+  static let endedIdsKey = "live_updates.endedIds"
   private static let endedLock = NSLock()
 
   static func noteEndedByApp(_ id: String) {
     endedLock.lock()
     defer { endedLock.unlock() }
-    endedIds.insert(id)
+    var ids = Set(UserDefaults.standard.stringArray(forKey: endedIdsKey) ?? [])
+    if #available(iOS 17.2, *) {
+      let listed = Set(Activity<LiveUpdatesAttributes>.activities.map(\.id))
+      ids = ids.filter { listed.contains($0) }
+    }
+    ids.insert(id)
+    UserDefaults.standard.set(Array(ids), forKey: endedIdsKey)
   }
 
   static func endedByApp(_ id: String) -> Bool {
     endedLock.lock()
     defer { endedLock.unlock() }
-    return endedIds.contains(id)
+    return UserDefaults.standard.stringArray(forKey: endedIdsKey)?.contains(id) ?? false
   }
 
   /// Ends `activity` and removes it from the screen at once.

@@ -266,10 +266,11 @@ differently.
   are left out of it, so a countdown does not run past zero. This applies to
   `end` and remote `end` payloads; an update removed by `maxDuration`,
   `timeoutAfter` or `removeAtEnd` is removed at once. Unlike iOS, Android
-  does not report `dismissed` when the ended notification goes away. `dismissAfter` longer than that is capped at 4
-  hours; `Duration.zero` removes it at once. Below Android 8.0 the system
-  cannot remove a notification later, so only `finalContent` stays there,
-  until the user dismisses it ([source][android-timeout-after]).
+  does not report `dismissed` when the ended notification goes away.
+  `dismissAfter` longer than 4 hours is capped at 4 hours; `Duration.zero`
+  removes it at once. Below Android 8.0 the system cannot remove a
+  notification later, so only `finalContent` stays there, until the user
+  dismisses it ([source][android-timeout-after]).
 - **Sound:** the first post of a live update plays the sound of its
   channel, while iOS starts a Live Activity silently. The plugin creates its
   channels with the default importance; to start silently, create your own

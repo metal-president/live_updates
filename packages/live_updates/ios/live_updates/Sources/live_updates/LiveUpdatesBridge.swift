@@ -424,6 +424,11 @@ public final class LiveUpdatesBridge: NSObject {
               emitStarted(activity.id)
             }
             emit("\(name(of: state)):\(activity.id)")
+            // Ended by a push, the system or the user: its push token is of
+            // no more use, so stop watching for new ones (end() does too).
+            if state == .ended || state == .dismissed {
+              await MainActor.run { tokenTasks.removeValue(forKey: activity.id)?.cancel() }
+            }
             // An ended activity stays listed until it is dismissed.
             if state == .dismissed { break }
           }

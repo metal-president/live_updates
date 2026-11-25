@@ -1,3 +1,12 @@
+## 0.3.0
+
+- Requires live_updates 0.3.0 (scheduled live updates, `endAt` and
+  `endedContent`). Android live updates are now removed after 8 hours by
+  default; remote payloads take `maxDurationMillis` (`0` for no limit, see
+  docs/server-fcm.md and Upgrading in the live_updates README).
+- Docs: turning on installation IDs applies to the whole app: Firebase stops
+  issuing registration tokens, so check other SDKs that use them first.
+
 ## 0.2.1
 
 - Requires live_updates 0.2.1, so remote payloads can carry `publicContent`

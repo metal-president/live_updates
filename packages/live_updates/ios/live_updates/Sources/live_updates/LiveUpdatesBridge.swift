@@ -764,6 +764,7 @@ struct Payload: Decodable {
   var image: String?
   var actions: [LiveUpdatesAction]?
   var extra: [String: String]?
+  var extraImages: [String: String]?
   var timerStart: Double?
   var timerEnd: Double?
   var compactTrailing: String?
@@ -794,6 +795,7 @@ struct Payload: Decodable {
       state: .init(
         title: title, body: body, progress: progress, icon: icon, iosIcon: iosIcon,
         islandIcon: islandIcon, route: route, image: image, actions: actions ?? [], extra: extra ?? [:],
+        extraImages: extraImages ?? [:],
         timerStart: timerStart, timerEnd: timerEnd,
         compactTrailing: compactTrailing, compactLeading: compactLeading, minimal: minimal,
         tintArgb: tintArgb, backgroundArgb: backgroundArgb, foregroundArgb: foregroundArgb,

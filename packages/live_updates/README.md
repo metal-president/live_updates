@@ -736,11 +736,13 @@ sets the accent (progress, buttons, timer, Dynamic Island keyline), the Lock
 Screen background and its text color, like `AndroidLiveUpdateOptions.color`
 on Android.
 
-- In our tests on iOS 27 (device and simulator), the default Lock Screen
-  card was black in Light and Dark Mode alike. Apple's guidelines describe a
-  light background in Light Mode, which other versions or setups may show.
-  The Dynamic Island is always black. Choose an accent that reads well on
-  dark and on light backgrounds.
+- **Choose an accent that reads well on dark and on light backgrounds:**
+  the same activity can appear on both. The Dynamic Island is always black,
+  while the Lock Screen card follows the system: in our tests on iOS 27
+  (device and simulator) it was black in Light and Dark Mode alike, but
+  Apple's guidelines describe a light background in Light Mode, which other
+  versions or setups (such as iOS 16) may show. The template's text uses the
+  system colors, so only colors you set need checking.
 - With a custom background, set the text color too, for example
   `backgroundColor: Color(0xFFFFFFFF), foregroundColor: Color(0xFF000000)`.
 - While the Always-On display dims the Lock Screen, the system colors are
@@ -1103,7 +1105,26 @@ Each place shows the first icon that is set:
 
 In the layout, `context.state` has every field of `LiveUpdateContent`, and
 `context.state.extra["driver"]` reads `IosLiveUpdateOptions.extra`, for
-values the template does not show.
+values the template does not show. For more pictures than `image`, pass
+`IosLiveUpdateOptions.extraImages`: the plugin stores them like `image`
+(scaled, in the App Group, cleaned up when unused), and the layout loads one
+with `LiveUpdatesImages.url(context.state.extraImages["map"])`:
+
+```dart
+ios: IosLiveUpdateOptions(
+  layout: IosLiveUpdateLayout.custom('courier'),
+  extra: {'driver': 'Alex'},
+  extraImages: {
+    'map': LiveUpdateImage.asset('assets/map.png', maxDimension: 160),
+    'driver': LiveUpdateImage.asset('assets/driver.png'),
+  },
+),
+```
+
+Keep them few and small: the widget extension has little memory, and
+ActivityKit may refuse images larger than they are shown. A push replaces the
+whole content state and cannot add pictures, so extra images suit activities
+that the app updates itself.
 
 ### Custom layouts
 

@@ -144,8 +144,9 @@ class _ExamplePageState extends State<ExamplePage> {
       layout: _layout,
       // The compact Dynamic Island shows the countdown instead of the progress.
       compactTrailing: IosIslandContent.timer,
-      // Accent for progress, buttons and the timer.
-      color: const Color(0xFF8C9EFF),
+      // Accent for progress, buttons and the timer: readable on the dark
+      // Dynamic Island and on light and dark Lock Screen cards.
+      color: const Color(0xFF3D5AFE),
       // A simple shape in the Dynamic Island instead of the photo.
       islandIcon: const LiveUpdateIcon.symbol('shippingbox.fill'),
     ),

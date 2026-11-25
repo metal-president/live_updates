@@ -719,6 +719,7 @@ final class IosLiveUpdateOptions {
     this.relevanceScore,
     this.alert,
     this.extra = const {},
+    this.extraImages = const {},
     this.compactLeading,
     this.compactTrailing,
     this.minimal,
@@ -742,6 +743,15 @@ final class IosLiveUpdateOptions {
   /// Additional values available to a customized widget as
   /// `context.state.extra`.
   final Map<String, String> extra;
+
+  /// Additional pictures for a customized widget, stored like
+  /// [LiveUpdateContent.image] (scaled to [LiveUpdateImage.maxDimension],
+  /// saved in the App Group, reused when identical and cleaned up when
+  /// unused for a day). The widget reads one as
+  /// `LiveUpdatesImages.url(context.state.extraImages["map"])`. Keep them
+  /// few and small: the widget extension has little memory. A push cannot
+  /// add pictures: only ones the app stored can be named by a push.
+  final Map<String, LiveUpdateImage> extraImages;
 
   /// What the generated widget shows on the leading side of the compact
   /// Dynamic Island. `null` (or content that is missing) shows
@@ -815,6 +825,7 @@ final class IosLiveUpdateOptions {
       other.relevanceScore == relevanceScore &&
       other.alert == alert &&
       mapEquals(other.extra, extra) &&
+      mapEquals(other.extraImages, extraImages) &&
       other.compactLeading == compactLeading &&
       other.compactTrailing == compactTrailing &&
       other.minimal == minimal &&
@@ -831,6 +842,7 @@ final class IosLiveUpdateOptions {
     relevanceScore,
     alert,
     Object.hashAllUnordered(extra.entries.map((e) => (e.key, e.value))),
+    Object.hashAllUnordered(extraImages.entries.map((e) => (e.key, e.value))),
     compactLeading,
     compactTrailing,
     minimal,

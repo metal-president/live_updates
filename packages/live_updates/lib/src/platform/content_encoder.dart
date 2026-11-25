@@ -51,6 +51,15 @@ mixin ContentEncoder {
       final store = _store ??= ImageStore(_directory);
       json['image'] = await store.store(image, keepUntil: showAt);
     }
+    // iOS custom layouts: more pictures, by name (the widget reads them from
+    // the same directory).
+    if (storesIconAssets && (content.ios?.extraImages.isNotEmpty ?? false)) {
+      final store = _store ??= ImageStore(_directory);
+      json['extraImages'] = {
+        for (final MapEntry(:key, :value) in content.ios!.extraImages.entries)
+          key: await store.store(value, keepUntil: showAt),
+      };
+    }
     if (content.endedContent?.image case final image?) {
       final store = _store ??= ImageStore(_directory);
       // Shown from endAt on: kept until then.

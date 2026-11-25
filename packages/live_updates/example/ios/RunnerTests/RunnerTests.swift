@@ -103,6 +103,14 @@ struct ContentStateDecodingTests {
     #expect(LiveUpdatesBridge.endedContent(final: nil, shown: past, now: now) == nil)
   }
 
+  @Test func extraImagesDecode() throws {
+    let state = try decode(#"{"title":"T","extraImages":{"map":"lu_1.png"}}"#)
+    #expect(state.extraImages == ["map": "lu_1.png"])
+    // Malformed: left out, not the whole state.
+    #expect(try decode(#"{"title":"T","extraImages":3}"#).extraImages.isEmpty)
+    #expect(try decode(#"{"title":"T"}"#).extraImages.isEmpty)
+  }
+
   @Test func endedContentDecodes() throws {
     let state = try decode(#"{"title":"T","endedContent":{"title":"Done","body":"Enjoy"}}"#)
     #expect(state.endedContent == LiveUpdatesEndedContent(title: "Done", body: "Enjoy"))

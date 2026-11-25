@@ -62,6 +62,10 @@
   17.2). Run `create_widget` again: it lowers the deployment target of an
   existing widget extension to 16.2. Until the extension supports the
   device's iOS, `isSupported()` stays `false` there.
+- `IosLiveUpdateOptions.extraImages`: more pictures for custom iOS layouts,
+  stored like `image` and read in the widget with
+  `LiveUpdatesImages.url(context.state.extraImages["key"])`. Run
+  `create_widget` again.
 
 ## 0.3.0
 

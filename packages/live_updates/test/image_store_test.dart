@@ -87,6 +87,39 @@ void main() {
     });
   });
 
+  testWidgets('extra images are stored on iOS only', (tester) async {
+    await tester.runAsync(() async {
+      const content = LiveUpdateContent(
+        title: 'Order',
+        ios: IosLiveUpdateOptions(
+          extra: {'map': 'text'},
+          extraImages: {
+            'map': LiveUpdateImage.file('example/assets/parcel.png'),
+            'courier': LiveUpdateImage.file(
+              'example/assets/parcel.png',
+              maxDimension: 64,
+            ),
+          },
+        ),
+      );
+      final json = jsonDecode(
+        await _Encoder(dir, ios: true).encodeContent(content),
+      ) as Map<String, Object?>;
+      final images = json['extraImages']! as Map;
+      expect(images.keys, unorderedEquals(['map', 'courier']));
+      for (final name in images.values) {
+        expect(name, startsWith(ImageStore.prefix));
+        expect(File('${dir.path}/$name').existsSync(), isTrue);
+      }
+      // Its own key: extra keeps its text values.
+      expect(json['extra'], {'map': 'text'});
+      final android = jsonDecode(
+        await _Encoder(dir).encodeContent(content),
+      ) as Map<String, Object?>;
+      expect(android.containsKey('extraImages'), isFalse);
+    });
+  });
+
   testWidgets('removes stale files', (tester) async {
     await tester.runAsync(() async {
       final stale = File('${dir.path}/${ImageStore.prefix}old.png')
@@ -110,9 +143,13 @@ void main() {
 }
 
 class _Encoder with ContentEncoder {
-  _Encoder(this.dir);
+  _Encoder(this.dir, {this.ios = false});
 
   final Directory dir;
+  final bool ios;
+
+  @override
+  bool get storesIconAssets => ios;
 
   @override
   String? get imageDirectory => dir.path;

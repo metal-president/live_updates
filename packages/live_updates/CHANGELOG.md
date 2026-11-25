@@ -44,6 +44,8 @@
 - Docs: the README lists scheduling and `endAt` in the feature list and the
   platform table, and says the exact alarm default applies to apps that
   target Android 13 or higher.
+- Docs: on iOS, a schedule made before the user turns off Live Activities
+  for the app still starts at its time.
 
 ## 0.2.2
 

@@ -394,7 +394,10 @@ final pending = await LiveUpdates.scheduled();
   activity's push token is issued only once it starts. If an update with the
   key is running at that time, the system shows both until the app runs; the
   plugin then ends the older one. In tests the activity started 3 to 4
-  seconds after the requested time.
+  seconds after the requested time. Turning off Live Activities for the app
+  in Settings blocks new requests but does not cancel a schedule made
+  before: in tests (iOS 27.2) it still started at its time. Call
+  `cancelAllScheduled()` when the user opts out in your app.
 - **Android:** an alarm posts the notification. It is on time only with
   exact alarms: add `SCHEDULE_EXACT_ALARM` to your app's manifest (this
   package does not declare it). From Android 14 it is denied by default for

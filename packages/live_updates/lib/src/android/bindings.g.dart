@@ -1823,6 +1823,38 @@ extension type LiveUpdatesBridge._(jni$_.JObject _$this)
     ).object<jni$_.JString>();
   }
 
+  static final _id_cancelAllScheduled = _class.staticMethodId(
+    r'cancelAllScheduled',
+    r'()V',
+  );
+
+  static final _cancelAllScheduled =
+      jni$_.ProtectedJniExtensions.lookup<
+            jni$_.NativeFunction<
+              jni$_.JThrowablePtr Function(
+                jni$_.Pointer<jni$_.Void>,
+                jni$_.JMethodIDPtr,
+              )
+            >
+          >('globalEnv_CallStaticVoidMethod')
+          .asFunction<
+            jni$_.JThrowablePtr Function(
+              jni$_.Pointer<jni$_.Void>,
+              jni$_.JMethodIDPtr,
+            )
+          >();
+
+  /// from: `static public void cancelAllScheduled()`
+  ///
+  /// Cancels every schedule (not the endAt alarms of shown updates).
+  static void cancelAllScheduled() {
+    final _$$classRef = _class.reference;
+    _cancelAllScheduled(
+      _$$classRef.pointer,
+      _id_cancelAllScheduled.pointer,
+    ).check();
+  }
+
   static final _id_cancelScheduled = _class.staticMethodId(
     r'cancelScheduled',
     r'(Ljava/lang/String;)V',

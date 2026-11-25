@@ -762,9 +762,10 @@ extension LiveUpdatesAttributes.ContentState {
     isStale && endedContent != nil ? liveUpdatesEndedState : self
   }
 
-  /// `endedContent`'s title and body with this content's icons, colors, tap
-  /// route and layout-free Dynamic Island choices ("title" and "body" show
-  /// the ended text). No progress, timer, buttons, image or layout data.
+  /// `endedContent`'s title, body, image and icon (else this content's icon)
+  /// with this content's platform icons, colors, tap route and layout-free
+  /// Dynamic Island choices ("title" and "body" show the ended text). No
+  /// progress, timer, buttons or layout data.
   var liveUpdatesEndedState: Self {
     let e = endedContent
     func island(_ choice: String?) -> String? {
@@ -772,8 +773,8 @@ extension LiveUpdatesAttributes.ContentState {
       return choice
     }
     return Self(
-      title: e?.title ?? title, body: e?.body, icon: icon, iosIcon: iosIcon,
-      islandIcon: islandIcon, route: route,
+      title: e?.title ?? title, body: e?.body, icon: e?.icon ?? icon, iosIcon: iosIcon,
+      islandIcon: islandIcon, route: route, image: e?.image,
       compactTrailing: island(compactTrailing), compactLeading: island(compactLeading),
       minimal: island(minimal),
       tintArgb: tintArgb, backgroundArgb: backgroundArgb, foregroundArgb: foregroundArgb)

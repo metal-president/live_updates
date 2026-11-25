@@ -176,6 +176,11 @@ public final class LiveUpdatesBridge: NSObject {
   /// `{"key": String, "at": epoch seconds}`.
   @objc public static func scheduledJson() -> String { scheduledFromDart() }
 
+  /// Cancels every schedule (scheduled activities that have not started).
+  @objc public static func cancelAllScheduled(_ completion: @escaping () -> Void) {
+    cancelAllScheduledFromDart(completion)
+  }
+
   /// Cancels the schedule with `key`, if any.
   @objc public static func cancelScheduled(_ key: String, completion: @escaping () -> Void) {
     cancelScheduledFromDart(key, completion: completion)

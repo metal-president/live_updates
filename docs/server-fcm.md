@@ -40,7 +40,8 @@ package README): `title`, `body`, `progress`, `route`, `timerEnd` /
 `extra`, `publicContent` (what a locked device shows while it hides
 sensitive content: `{"title": ..., "body": ..., "keepProgress": true,
 "keepTimer": true}`), `endAt` (seconds since 1970) with `endedContent`
-(`{"title": ..., "body": ...}`, shown from `endAt` on), Android options such as `channelId`,
+(`{"title": ..., "body": ..., "icon": {...}}`, shown from `endAt` on; its
+`image` is a file name like `image`), Android options such as `channelId`,
 `shortCriticalText`, `progressSegments` or `"androidLockScreenVisibility":
 "secret"`, and the iOS options `layout` / `compactLeading` /
 `compactTrailing` / `minimal` / `tintArgb` / `backgroundArgb` /
@@ -48,9 +49,9 @@ sensitive content: `{"title": ..., "body": ..., "keepProgress": true,
 requires `title`, and `extra` must map strings to strings, or the activity
 rejects the content.
 
-Ending at a time: on Android, `endAt` with `endedContent` swaps the
-notification for the ended content at that time, and `"removeAtEnd": true`
-removes it then instead. `maxDurationMillis` limits how long an Android live
+Ending at a time: on Android, the update becomes stale at `endAt` and
+shows `endedContent` if it is set; `"removeAtEnd": true` removes it then
+instead. `maxDurationMillis` limits how long an Android live
 update is shown, counted from its start: without the key the default of
 8 hours applies, and `0` means no limit. On iOS the widget shows
 `endedContent` once the activity is stale: send `stale-date` (the `endAt`

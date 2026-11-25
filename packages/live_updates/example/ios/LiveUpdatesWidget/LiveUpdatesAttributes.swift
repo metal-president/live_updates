@@ -288,17 +288,27 @@ public struct LiveUpdatesPublicContent: Codable, Hashable {
 public struct LiveUpdatesEndedContent: Codable, Hashable {
   public var title: String
   public var body: String?
+  /// Used instead of the content's `icon` once stale.
+  public var icon: LiveUpdatesIcon?
+  /// File name of an image in `LiveUpdatesImages.directory` (App Group).
+  public var image: String?
 
-  public init(title: String, body: String? = nil) {
+  public init(
+    title: String, body: String? = nil, icon: LiveUpdatesIcon? = nil, image: String? = nil
+  ) {
     self.title = title
     self.body = body
+    self.icon = icon
+    self.image = image
   }
 
   public init(from decoder: Decoder) throws {
     let c = try decoder.container(keyedBy: CodingKeys.self)
     title = try c.decode(String.self, forKey: .title)
-    // A body that does not decode is left out, not the ended content.
+    // Parts that do not decode are left out, not the ended content.
     body = (try? c.decodeIfPresent(String.self, forKey: .body)) ?? nil
+    icon = (try? c.decodeIfPresent(LiveUpdatesIcon.self, forKey: .icon)) ?? nil
+    image = (try? c.decodeIfPresent(String.self, forKey: .image)) ?? nil
   }
 }
 

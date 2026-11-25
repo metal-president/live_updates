@@ -303,6 +303,10 @@ class AndroidLiveUpdatesPlatform extends LiveUpdatesPlatform
   );
 
   @override
+  Future<void> cancelAllScheduled() async =>
+      _call(LiveUpdatesBridge.cancelAllScheduled);
+
+  @override
   Future<void> cancelScheduled(String key) async =>
       _call(() => LiveUpdatesBridge.cancelScheduled(_j(key)));
 }

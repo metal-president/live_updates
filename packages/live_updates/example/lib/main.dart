@@ -96,6 +96,7 @@ class _ExamplePageState extends State<ExamplePage> {
     endedContent: const LiveUpdateEndedContent(
       title: 'Order #1234',
       body: 'Delivered',
+      icon: LiveUpdateIcon.symbol('checkmark.circle.fill'),
     ),
     // Counted by the system: no update needed every second.
     timer: LiveUpdateTimer.countdown(_eta),

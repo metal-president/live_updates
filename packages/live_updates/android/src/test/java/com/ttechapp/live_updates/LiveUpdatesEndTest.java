@@ -177,11 +177,18 @@ public class LiveUpdatesEndTest {
   }
 
   @Test
-  public void endAtWithoutEndedContentChangesNothing() throws Exception {
+  public void endAtWithoutEndedContentOnlyMakesItStale() throws Exception {
     long endAt = System.currentTimeMillis() + 20 * MINUTE;
-    LiveUpdatesBridge.startOrUpdate("order", "{\"title\":\"Order\",\"endAt\":" + seconds(endAt) + "}");
+    LiveUpdatesBridge.startOrUpdate(
+        "order", "{\"title\":\"Order\",\"progress\":0.5,\"endAt\":" + seconds(endAt) + "}");
     assertAbout(8 * HOUR, shown("order").getTimeoutAfter());
-    assertTrue(shadowOf(alarms).getScheduledAlarms().isEmpty());
+    events.clear();
+    fireEndAlarm();
+    Notification n = shown("order");
+    assertEquals("Order", n.extras.getString(Notification.EXTRA_TITLE));
+    assertTrue((n.flags & Notification.FLAG_ONGOING_EVENT) != 0);
+    assertEquals(Arrays.asList("stale:order"), events);
+    assertTrue(Arrays.asList(LiveUpdatesBridge.activeIds()).contains("order"));
   }
 
   @Test
@@ -214,23 +221,70 @@ public class LiveUpdatesEndTest {
     assertNotNull(n.contentIntent);
     assertNull(n.actions);
     assertEquals(0, n.extras.getInt(Notification.EXTRA_PROGRESS_MAX));
+    // A tap does not remove it: the update keeps running.
+    assertEquals(0, n.flags & Notification.FLAG_AUTO_CANCEL);
     // maxDuration still removes it when its time comes.
     assertAbout(HOUR, n.getTimeoutAfter());
-    assertEquals(Arrays.asList("ended:order"), events);
-    assertFalse(Arrays.asList(LiveUpdatesBridge.activeIds()).contains("order"));
+    // Stale, as on iOS: still running and found by its key.
+    assertEquals(Arrays.asList("stale:order"), events);
+    assertTrue(Arrays.asList(LiveUpdatesBridge.activeIds()).contains("order"));
+    assertEquals("order", LiveUpdatesBridge.idForKey("order"));
+    assertEquals("order", LiveUpdatesBridge.keyForId("order"));
+  }
+
+  @Test
+  public void anUpdateAfterTheEndMakesItActiveAgain() throws Exception {
+    long endAt = System.currentTimeMillis() + 20 * MINUTE;
+    LiveUpdatesBridge.startOrUpdate(
+        "order",
+        "{\"title\":\"Order\",\"endAt\":" + seconds(endAt)
+            + ",\"endedContent\":{\"title\":\"Delivered\"}}");
+    fireEndAlarm();
+    events.clear();
+    LiveUpdatesBridge.startOrUpdate("order", "{\"title\":\"Order again\"}");
+    Notification n = shown("order");
+    assertEquals("Order again", n.extras.getString(Notification.EXTRA_TITLE));
+    assertTrue((n.flags & Notification.FLAG_ONGOING_EVENT) != 0);
+    assertFalse(n.extras.getBoolean(LiveUpdatesBridge.EXTRA_STALE, false));
+    assertEquals(Arrays.asList("active:order"), events);
+  }
+
+  @Test
+  public void aStaleUpdateIsEndedByEndAndCanBeDismissed() throws Exception {
+    long endAt = System.currentTimeMillis() + 20 * MINUTE;
+    String json =
+        "{\"title\":\"Order\",\"endAt\":" + seconds(endAt)
+            + ",\"endedContent\":{\"title\":\"Delivered\"}}";
+    LiveUpdatesBridge.startOrUpdate("a", json);
+    fireEndAlarm();
+    events.clear();
+    LiveUpdatesBridge.end("a", null, 0);
+    assertNull(shown("a"));
+    assertEquals(Arrays.asList("ended:a"), events);
+    // A swipe reports dismissed, as for any live update.
+    LiveUpdatesBridge.startOrUpdate("b", json);
+    fireEndAlarm();
+    Notification n = shown("b");
+    assertNotNull(n.deleteIntent);
+    events.clear();
+    new LiveUpdatesDismissReceiver()
+        .onReceive(app, shadowOf(n.deleteIntent).getSavedIntent());
+    assertEquals(Arrays.asList("dismissed:b"), events);
   }
 
   @Test
   public void anEndedContentWhoseTimeHasPassedIsShownAtOnce() throws Exception {
     long endAt = System.currentTimeMillis() - MINUTE;
     LiveUpdatesBridge.startOrUpdate(
-        "order",
+        "late",
         "{\"title\":\"Order\",\"endAt\":" + seconds(endAt)
             + ",\"endedContent\":{\"title\":\"Delivered\"}}");
-    Notification n = shown("order");
+    Notification n = shown("late");
     assertEquals("Delivered", n.extras.getString(Notification.EXTRA_TITLE));
     assertEquals(0, n.flags & Notification.FLAG_ONGOING_EVENT);
     assertTrue(shadowOf(alarms).getScheduledAlarms().isEmpty());
+    assertEquals(Arrays.asList("started:late", "stale:late"), events);
+    assertTrue(Arrays.asList(LiveUpdatesBridge.activeIds()).contains("late"));
   }
 
   @Test
@@ -340,5 +394,30 @@ public class LiveUpdatesEndTest {
             + ",\"endedContent\":{\"title\":\"Delivered\"}}");
     fireEndAlarm();
     assertEquals("Delivered", shown("order").extras.getString(Notification.EXTRA_TITLE));
+  }
+
+  @Test
+  public void theEndedIconAndImageReplaceTheContentOnes() throws Exception {
+    JSONObject content =
+        new JSONObject(
+            "{\"title\":\"Order\",\"icon\":{\"native\":\"ic_a\"},"
+                + "\"androidSmallIcon\":{\"native\":\"ic_small\"},\"image\":\"lu_a.png\","
+                + "\"progress\":0.5,\"channelId\":\"c\",\"maxDurationMillis\":0}");
+    JSONObject withBoth =
+        LiveUpdatesBridge.staleContent(
+            content,
+            new JSONObject(
+                "{\"title\":\"Done\",\"icon\":{\"native\":\"ic_done\"},\"image\":\"lu_b.png\"}"));
+    assertEquals("ic_done", withBoth.getJSONObject("icon").getString("native"));
+    assertEquals("ic_small", withBoth.getJSONObject("androidSmallIcon").getString("native"));
+    assertEquals("lu_b.png", withBoth.getString("image"));
+    assertEquals("c", withBoth.getString("channelId"));
+    assertEquals(0, withBoth.getLong("maxDurationMillis"));
+    assertFalse(withBoth.has("progress"));
+    JSONObject plain =
+        LiveUpdatesBridge.staleContent(content, new JSONObject("{\"title\":\"Done\"}"));
+    assertEquals("ic_a", plain.getJSONObject("icon").getString("native"));
+    // No ended image: no image.
+    assertFalse(plain.has("image"));
   }
 }

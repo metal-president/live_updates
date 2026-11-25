@@ -181,6 +181,21 @@ public class LiveUpdatesSchedulerTest {
   }
 
   @Test
+  public void cancelAllRemovesSchedulesButNotEndAlarmsOfShownUpdates() throws Exception {
+    long now = System.currentTimeMillis();
+    LiveUpdatesBridge.schedule("a", "{\"title\":\"A\"}", now + MINUTE, true, 0);
+    LiveUpdatesBridge.schedule("b", "{\"title\":\"B\"}", now + 2 * MINUTE, true, 0);
+    LiveUpdatesBridge.startOrUpdate(
+        "shown", "{\"title\":\"S\",\"endAt\":" + (now + 3 * MINUTE) / 1000.0 + "}");
+    assertEquals(3, shadowOf(alarms).getScheduledAlarms().size());
+    LiveUpdatesBridge.cancelAllScheduled();
+    assertEquals("[]", LiveUpdatesBridge.scheduledJson());
+    ShadowAlarmManager.ScheduledAlarm left = onlyAlarm();
+    assertEquals(
+        LiveUpdatesScheduler.ACTION_END, shadowOf(left.operation).getSavedIntent().getAction());
+  }
+
+  @Test
   public void cancelRemovesTheAlarmAndTheSchedule() throws Exception {
     LiveUpdatesBridge.schedule(
         "order", "{\"title\":\"A\"}", System.currentTimeMillis() + MINUTE, true, 0);
@@ -215,6 +230,31 @@ public class LiveUpdatesSchedulerTest {
         .onReceive(app, shadowOf(onlyAlarm().operation).getSavedIntent());
     assertNull(shown("order"));
     assertEquals(at, onlyAlarm().getTriggerAtMs());
+  }
+
+  @Test
+  public void reschedulingLaterKeepsTheImagesOfTheScheduledContent() throws Exception {
+    java.io.File dir = new java.io.File(app.getCacheDir(), "live_updates");
+    dir.mkdirs();
+    java.io.File image = new java.io.File(dir, "lu_a.png");
+    java.io.File ended = new java.io.File(dir, "lu_b.png");
+    for (java.io.File f : new java.io.File[] {image, ended}) {
+      java.nio.file.Files.write(f.toPath(), new byte[] {1});
+      f.setLastModified(System.currentTimeMillis() - 2 * 86_400_000L);
+    }
+    long now = System.currentTimeMillis();
+    LiveUpdatesBridge.schedule(
+        "order",
+        "{\"title\":\"A\",\"image\":\"lu_a.png\",\"endedContent\":{\"title\":\"B\","
+            + "\"image\":\"lu_b.png\"}}",
+        now + MINUTE,
+        true,
+        0);
+    long later = now + 5 * 86_400_000L;
+    LiveUpdatesBridge.reschedule("order", null, later);
+    // The clean-up of unused images goes by the modification time.
+    assertEquals(later, image.lastModified(), 1000);
+    assertEquals(later, ended.lastModified(), 1000);
   }
 
   @Test(expected = IllegalStateException.class)

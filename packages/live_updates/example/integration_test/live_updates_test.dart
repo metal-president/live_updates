@@ -102,8 +102,8 @@ void main() {
       (await LiveUpdates.active()).map((u) => u.key),
       isNot(contains(key)),
     );
-    // endAll leaves schedules alone.
-    await LiveUpdates.endAll();
+    // endAll can leave schedules alone.
+    await LiveUpdates.endAll(includeScheduled: false);
     expect(await LiveUpdates.findScheduled(key), isNotNull);
 
     final later = at.add(const Duration(hours: 1));
@@ -117,6 +117,14 @@ void main() {
 
     await moved.cancel();
     expect(await LiveUpdates.findScheduled(key), isNull);
+    // cancelAllScheduled clears every schedule.
+    await LiveUpdates.schedule(
+      key,
+      const LiveUpdateContent(title: 'Later'),
+      at: later,
+    );
+    await LiveUpdates.cancelAllScheduled();
+    expect(await LiveUpdates.scheduled(), isEmpty);
     await expectLater(moved.reschedule(), throwsA(isA<LiveUpdateException>()));
   });
 

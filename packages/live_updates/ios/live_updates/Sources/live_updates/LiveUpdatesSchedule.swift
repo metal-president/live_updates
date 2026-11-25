@@ -61,6 +61,8 @@ extension LiveUpdatesBridge {
           request = try encode(activity.content)
         }
         try await scheduleNow(key, json: request, at: Date(timeIntervalSince1970: at))
+        // Unchanged content: its images must now last until the new time.
+        if json == nil { keepImages(of: request, until: Date(timeIntervalSince1970: at)) }
         completion(nil)
       } catch {
         completion(error.localizedDescription)
@@ -89,6 +91,19 @@ extension LiveUpdatesBridge {
     guard #available(iOS 26.0, *) else { return completion() }
     Task { @MainActor in
       await cancelPending(key)
+      completion()
+    }
+  }
+
+  /// Cancels every scheduled activity that has not started.
+  static func cancelAllScheduledFromDart(_ completion: @escaping () -> Void) {
+    guard #available(iOS 26.0, *) else { return completion() }
+    Task { @MainActor in
+      for activity in Activity<LiveUpdatesAttributes>.activities where isPending(activity) {
+        scheduleTasks.removeValue(forKey: activity.id)?.cancel()
+        await activity.end(nil, dismissalPolicy: .immediate)
+        storedSchedules.removeValue(forKey: activity.id)
+      }
       completion()
     }
   }
@@ -204,6 +219,25 @@ extension LiveUpdatesBridge {
       UserDefaults.standard.dictionary(forKey: schedulesKey) as? [String: [String: Any]] ?? [:]
     }
     set { UserDefaults.standard.set(newValue, forKey: schedulesKey) }
+  }
+
+  /// Protects the images that `json` names (`image`, `endedContent.image`)
+  /// from the clean-up of unused images (Dart's ImageStore, which deletes
+  /// files a day after their modification date) until `date`.
+  static func keepImages(of json: String, until date: Date) {
+    guard
+      let object = try? JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any]
+    else { return }
+    let ended = object["endedContent"] as? [String: Any]
+    for name in [object["image"] as? String, ended?["image"] as? String].compactMap({ $0 }) {
+      guard let url = LiveUpdatesImages.url(name),
+        let modified = try? FileManager.default.attributesOfItem(atPath: url.path)[
+          .modificationDate] as? Date,
+        modified < date
+      else { continue }
+      try? FileManager.default.setAttributes(
+        [.modificationDate: date], ofItemAtPath: url.path)
+    }
   }
 
   /// `json` with the push setting of the `stored` request.

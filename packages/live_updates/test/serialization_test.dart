@@ -361,6 +361,19 @@ void main() {
       ),
     ).toJson();
     expect(explicit['staleDate'], 60.0);
+    expect(
+      const LiveUpdateContent(
+        title: 'x',
+        endedContent: LiveUpdateEndedContent(
+          title: 'Done',
+          icon: LiveUpdateIcon.symbol('checkmark'),
+        ),
+      ).toJson()['endedContent'],
+      {
+        'title': 'Done',
+        'icon': {'symbol': 'checkmark'},
+      },
+    );
     expect(explicit['endedContent'], {'title': 'Done', 'body': 'Enjoy'});
     expect(jsonDecode(jsonEncode(explicit)), explicit);
   });

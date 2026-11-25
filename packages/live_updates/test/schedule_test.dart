@@ -52,6 +52,12 @@ class SchedulePlatform extends NoopLiveUpdatesPlatform {
   ];
 
   @override
+  Future<void> cancelAllScheduled() async {
+    calls.add('cancelAll');
+    schedules.clear();
+  }
+
+  @override
   Future<void> cancelScheduled(String key) async {
     calls.add('cancel:$key');
     schedules.remove(key);
@@ -167,6 +173,35 @@ void main() {
       'cancel:a',
       'cancel:b',
     ]);
+  });
+
+  test('cancelAllScheduled removes every schedule', () async {
+    await LiveUpdates.schedule(
+      'a',
+      const LiveUpdateContent(title: 'A'),
+      at: t1,
+    );
+    await LiveUpdates.schedule(
+      'b',
+      const LiveUpdateContent(title: 'B'),
+      at: t2,
+    );
+    await LiveUpdates.cancelAllScheduled();
+    expect(await LiveUpdates.scheduled(), isEmpty);
+    expect(p.calls.last, 'cancelAll');
+  });
+
+  test('endAll cancels schedules unless told not to', () async {
+    await LiveUpdates.schedule(
+      'a',
+      const LiveUpdateContent(title: 'A'),
+      at: t1,
+    );
+    await LiveUpdates.endAll(includeScheduled: false);
+    expect(await LiveUpdates.scheduled(), hasLength(1));
+    await LiveUpdates.endAll();
+    expect(await LiveUpdates.scheduled(), isEmpty);
+    expect(p.calls.where((c) => c == 'cancelAll'), hasLength(1));
   });
 
   test('exact alarm helpers go to the platform', () async {

@@ -133,6 +133,9 @@ abstract class LiveUpdatesPlatform {
 
   /// Cancels the schedule with [key], if any.
   Future<void> cancelScheduled(String key) async {}
+
+  /// Cancels every schedule.
+  Future<void> cancelAllScheduled() async {}
 }
 
 /// Backend for unsupported platforms: every call succeeds and does nothing.

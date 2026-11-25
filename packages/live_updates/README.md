@@ -366,8 +366,11 @@ final pending = await LiveUpdates.scheduled();
 - Scheduling again with the same key replaces the schedule. A time that is
   not in the future shows the update now.
 - A scheduled update is not part of `active()` or `find` until it is shown;
-  then it appears on `onStarted` while the app runs. `endAll` does not
-  cancel schedules; use `cancelScheduled` or `ScheduledLiveUpdate.cancel`.
+  then it appears on `onStarted` while the app runs. `startOrUpdate` does
+  not cancel a schedule; use `cancelScheduled`, `ScheduledLiveUpdate.cancel`
+  or `cancelAllScheduled`. `endAll()` ends running updates and cancels
+  schedules too, such as when the user logs out or switches accounts;
+  `endAll(includeScheduled: false)` leaves schedules alone.
 - **iOS 26 and later:** the system starts the Live Activity at that time
   ([source][ios-request-start]) and presents an alert:
   `IosLiveUpdateOptions.alert`, or else the title and body. Call `schedule`
@@ -419,8 +422,14 @@ await LiveUpdates.startOrUpdate(
 );
 ```
 
-- Without `endedContent`, nothing visible changes at `endAt`. The update
-  keeps running until the app ends it or it reaches its time limit.
+- At `endAt` the update reports `LiveUpdateState.stale` on both platforms
+  and keeps running: it stays in `active()` and `find`, until the app ends
+  it or it reaches its time limit. Updating it with new content makes it
+  active again.
+- Without `endedContent`, nothing visible changes at `endAt`.
+- `LiveUpdateEndedContent` can also set an `icon` (used instead of the
+  content's icon; platform icon options still win) and an `image` (without
+  one, the ended display shows no image).
 - **iOS:** `endAt` becomes the activity's stale date (an explicit
   `IosLiveUpdateOptions.staleDate` wins), and the generated widget shows
   `endedContent` once the activity is stale ([source][ios-stale-date]). In
@@ -430,10 +439,10 @@ await LiveUpdates.startOrUpdate(
   switch lives in your layout file: one generated before 0.3.0 needs it
   added (see [Upgrading](#upgrading)).
 - **Android:** an alarm replaces the notification with `endedContent` as a
-  regular notification (title, body, icon, color and tap route; no progress,
-  timer or buttons), and the update reports `LiveUpdateState.ended`. Like
-  scheduling, the switch is on time only with exact alarms, otherwise
-  within 10 minutes. `AndroidLiveUpdateOptions(removeAtEnd: true)` removes
+  regular notification (title, body, icon, image, color and tap route; no
+  progress, timer or buttons) that is no longer ongoing or promoted, so the
+  user can swipe it away (reported as `dismissed`). Like scheduling, the
+  switch is on time only with exact alarms, otherwise within 10 minutes. `AndroidLiveUpdateOptions(removeAtEnd: true)` removes
   the notification at `endAt` instead, exactly
   ([source][android-timeout-after]).
 - **Android time limit:** `AndroidLiveUpdateOptions.maxDuration` removes the

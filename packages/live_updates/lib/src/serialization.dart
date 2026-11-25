@@ -40,7 +40,12 @@ extension LiveUpdateContentJson on LiveUpdateContent {
     // Seconds since 1970, as the timer.
     if (endAt case final e?) 'endAt': e.millisecondsSinceEpoch / 1000,
     if (endedContent case final e?)
-      'endedContent': {'title': e.title, 'body': ?e.body},
+      'endedContent': {
+        'title': e.title,
+        'body': ?e.body,
+        'icon': ?e.icon?.toJson(),
+        // 'image' is set to the stored file name by the platform encoder.
+      },
     // iOS: the stale date, which endAt sets unless the iOS option does.
     if (ios?.staleDate ?? endAt case final d?)
       'staleDate': d.millisecondsSinceEpoch / 1000,

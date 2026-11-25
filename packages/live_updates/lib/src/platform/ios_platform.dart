@@ -318,6 +318,15 @@ class IosLiveUpdatesPlatform extends LiveUpdatesPlatform with ContentEncoder {
       parseSchedules(LiveUpdatesBridge.scheduledJson().toDartString());
 
   @override
+  Future<void> cancelAllScheduled() async {
+    final done = Completer<void>();
+    LiveUpdatesBridge.cancelAllScheduled(
+      ObjCBlock_ffiVoid.listener(done.complete),
+    );
+    await done.future;
+  }
+
+  @override
   Future<void> cancelScheduled(String key) async {
     final done = Completer<void>();
     LiveUpdatesBridge.cancelScheduled(

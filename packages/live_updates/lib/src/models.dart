@@ -116,10 +116,12 @@ final class LiveUpdateContent {
   final LiveUpdatePublicContent? publicContent;
 
   /// When the activity this content describes is over, such as the
-  /// delivery time. At that time [endedContent] replaces this content, even
+  /// delivery time. At that time the live update reports
+  /// [LiveUpdateState.stale] and [endedContent] replaces this content, even
   /// if the app is not running; without [endedContent] nothing visible
-  /// changes. The live update keeps running until the app ends it or the
-  /// system removes it.
+  /// changes. The live update keeps running (it stays in
+  /// [LiveUpdates.active]) until the app ends it or the time limit removes
+  /// it; an update with new content makes it active again.
   ///
   /// iOS: it is the activity's stale date (unless
   /// [IosLiveUpdateOptions.staleDate] is set, which wins), and the generated
@@ -127,12 +129,13 @@ final class LiveUpdateContent {
   /// removes a Live Activity after at most eight hours (plus up to four
   /// hours on the Lock Screen).
   ///
-  /// Android: an alarm swaps the notification for [endedContent] as a
-  /// regular notification and the update reports [LiveUpdateState.ended]; it
-  /// is on time with exact alarms ([LiveUpdates.canScheduleExactly]),
-  /// otherwise within ten minutes. [AndroidLiveUpdateOptions.removeAtEnd]
-  /// removes the notification at this time instead, and
-  /// [AndroidLiveUpdateOptions.maxDuration] limits how long it is shown.
+  /// Android: an alarm makes the update stale and shows [endedContent] as a
+  /// regular notification (no longer ongoing or promoted, so the user can
+  /// swipe it away); it is on time with exact alarms
+  /// ([LiveUpdates.canScheduleExactly]), otherwise within ten minutes.
+  /// [AndroidLiveUpdateOptions.removeAtEnd] removes the notification at
+  /// this time instead, and [AndroidLiveUpdateOptions.maxDuration] limits
+  /// how long it is shown.
   final DateTime? endAt;
 
   /// What is shown from [endAt] on, such as "Delivered". `null` keeps this
@@ -236,12 +239,17 @@ final class LiveUpdateContent {
 /// What a live update shows from [LiveUpdateContent.endAt] on, such as
 /// "Delivered" ([LiveUpdateContent.endedContent]).
 ///
-/// Only [title], [body], the icon, the colors and the tap route are shown;
-/// progress, the timer, buttons, images and layout data are left out.
+/// Only [title], [body], the icon, [image], the colors and the tap route are
+/// shown; progress, the timer, buttons and layout data are left out.
 @immutable
 final class LiveUpdateEndedContent {
   /// Creates ended content.
-  const LiveUpdateEndedContent({required this.title, this.body});
+  const LiveUpdateEndedContent({
+    required this.title,
+    this.body,
+    this.icon,
+    this.image,
+  });
 
   /// Primary text.
   final String title;
@@ -249,14 +257,27 @@ final class LiveUpdateEndedContent {
   /// Secondary text.
   final String? body;
 
+  /// Icon used instead of [LiveUpdateContent.icon] from
+  /// [LiveUpdateContent.endAt] on. Platform options still take precedence
+  /// ([IosLiveUpdateOptions.icon], [AndroidLiveUpdateOptions.smallIcon]).
+  /// `null` keeps the icon of the content.
+  final LiveUpdateIcon? icon;
+
+  /// Picture shown from [LiveUpdateContent.endAt] on, as
+  /// [LiveUpdateContent.image] is before. `null` shows no picture. It is
+  /// prepared when the content is posted and kept until it is shown.
+  final LiveUpdateImage? image;
+
   @override
   bool operator ==(Object other) =>
       other is LiveUpdateEndedContent &&
       other.title == title &&
-      other.body == body;
+      other.body == body &&
+      other.icon == icon &&
+      other.image == image;
 
   @override
-  int get hashCode => Object.hash(title, body);
+  int get hashCode => Object.hash(title, body, icon, image);
 
   @override
   String toString() => 'LiveUpdateEndedContent(title: $title, body: $body)';

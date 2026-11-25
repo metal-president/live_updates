@@ -304,9 +304,14 @@ abstract final class LiveUpdates {
     }
   }
 
-  /// Ends every live update started by this app. Scheduled live updates
-  /// that have not been shown yet stay scheduled (see [cancelScheduled]).
-  static Future<void> endAll() => _platform.endAll();
+  /// Ends every live update started by this app and, unless
+  /// [includeScheduled] is `false`, cancels every scheduled one that has not
+  /// been shown yet ([cancelAllScheduled]), for example when the user logs
+  /// out or switches accounts.
+  static Future<void> endAll({bool includeScheduled = true}) async {
+    if (includeScheduled) await _platform.cancelAllScheduled();
+    await _platform.endAll();
+  }
 
   /// Whether live updates can be scheduled with [schedule] on this device
   /// right now: on iOS 26 and later when Live Activities are enabled for the
@@ -323,7 +328,9 @@ abstract final class LiveUpdates {
   /// The app does not need to run at that time. A scheduled update is not
   /// part of [active] or [find] until it is shown; it then appears on
   /// [onStarted] while the app runs. Use [scheduled] and [findScheduled] to
-  /// list or look up schedules. [endAll] does not cancel them.
+  /// list or look up schedules. [startOrUpdate] with the same key does not
+  /// cancel a schedule; [cancelScheduled], [cancelAllScheduled] and [endAll]
+  /// do.
   ///
   /// iOS (26 and later): the system starts the Live Activity and presents
   /// an alert, [IosLiveUpdateOptions.alert] or else the title and body.
@@ -388,6 +395,11 @@ abstract final class LiveUpdates {
   /// [ScheduledLiveUpdate.cancel].
   static Future<void> cancelScheduled(String key) =>
       _platform.cancelScheduled(key);
+
+  /// Cancels every live update scheduled with [schedule] that has not been
+  /// shown yet. Running live updates are not affected; [endAll] ends those
+  /// and cancels schedules too.
+  static Future<void> cancelAllScheduled() => _platform.cancelAllScheduled();
 
   /// Whether scheduled live updates are shown on time on Android, which
   /// needs exact alarms: the app must declare the `SCHEDULE_EXACT_ALARM`

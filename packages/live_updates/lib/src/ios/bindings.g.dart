@@ -184,6 +184,18 @@ extension type LiveUpdatesBridge._(objc.ObjCObject object$)
     return _objc_msgSend_91o635(_class_LiveUpdatesBridge, _sel_canSchedule);
   }
 
+  /// Cancels every schedule (scheduled activities that have not started).
+  static void cancelAllScheduled(
+    objc.ObjCBlock<ffi.Void Function()> completion,
+  ) {
+    final _$$ref = completion.ref;
+    _objc_msgSend_f167m6(
+      _class_LiveUpdatesBridge,
+      _sel_cancelAllScheduled_,
+      _$$ref.pointer,
+    );
+  }
+
   /// Cancels the schedule with <code>key</code>, if any.
   static void cancelScheduled(
     objc.NSString key, {
@@ -1817,6 +1829,7 @@ late final _sel_backgroundActionsDone = objc.registerName(
   "backgroundActionsDone",
 );
 late final _sel_canSchedule = objc.registerName("canSchedule");
+late final _sel_cancelAllScheduled_ = objc.registerName("cancelAllScheduled:");
 late final _sel_cancelScheduled_completion_ = objc.registerName(
   "cancelScheduled:completion:",
 );

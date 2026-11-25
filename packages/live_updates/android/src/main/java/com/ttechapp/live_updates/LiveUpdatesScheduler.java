@@ -33,14 +33,14 @@ import org.json.JSONObject;
  */
 final class LiveUpdatesScheduler {
   static final String ACTION_FIRE = "com.ttechapp.live_updates.SCHEDULED";
-  /** Alarm of {@code LiveUpdateContent.endAt}: shows the ended content. */
+  /** Alarm of {@code LiveUpdateContent.endAt}: the update becomes stale. */
   static final String ACTION_END = "com.ttechapp.live_updates.END";
   static final String EXTRA_KEY = "com.ttechapp.live_updates.KEY";
 
   private static final String LOG_TAG = "live_updates";
   private static final String PREFS = "com.ttechapp.live_updates";
   private static final String PREF_SCHEDULES = "schedules";
-  /** Live update id -> {@code {"at", "json" (ended content), "removeAt", "remote"}}. */
+  /** Live update id -> {@code {"at", "json" (stale content, "" for none), "remote"}}. */
   private static final String PREF_ENDS = "ends";
   private static final Object lock = new Object();
 
@@ -127,11 +127,32 @@ final class LiveUpdatesScheduler {
       if (json != null) {
         new JSONObject(json);
         entry.put("json", json);
+      } else {
+        // Unchanged content: its images must now last until the new time.
+        keepImages(c, new JSONObject(entry.optString("json", "{}")), atMillis);
       }
       entry.put("at", atMillis);
       write(c, all);
     }
     arm(c, key, entry);
+  }
+
+  /**
+   * Protects the images that {@code content} names ({@code image}, {@code endedContent.image})
+   * from the clean-up of unused images (Dart's ImageStore deletes files a day after their
+   * modification time) until {@code untilMillis}.
+   */
+  static void keepImages(Context c, JSONObject content, long untilMillis) {
+    JSONObject ended = content.optJSONObject("endedContent");
+    for (String name :
+        new String[] {
+          LiveUpdatesBridge.optString(content, "image"),
+          ended == null ? null : LiveUpdatesBridge.optString(ended, "image")
+        }) {
+      if (name == null || name.contains("/") || name.startsWith(".")) continue;
+      java.io.File file = new java.io.File(LiveUpdatesBridge.imageDirectory(c), name);
+      if (file.exists() && file.lastModified() < untilMillis) file.setLastModified(untilMillis);
+    }
   }
 
   /** Cancels the schedule with {@code key}, if any. */
@@ -149,6 +170,15 @@ final class LiveUpdatesScheduler {
       alarms(c).cancel(pi);
       pi.cancel();
     }
+  }
+
+  /** Cancels every schedule. */
+  static void cancelAll(Context c) {
+    List<String> keys = new ArrayList<>();
+    synchronized (lock) {
+      for (Iterator<String> it = read(c).keys(); it.hasNext(); ) keys.add(it.next());
+    }
+    for (String key : keys) cancel(c, key);
   }
 
   /** Schedules as a JSON array of {@code {"key", "at"}} (epoch seconds). */
@@ -192,21 +222,16 @@ final class LiveUpdatesScheduler {
     }
   }
 
-  // MARK: endAt with endedContent
+  // MARK: endAt
 
   /**
-   * Shows {@code endedJson} instead of the live update {@code id} at {@code atMillis}, replacing
-   * its earlier end alarm. {@code removeAt} (epoch ms, 0: none) still removes it later.
+   * Makes the live update {@code id} stale at {@code atMillis}, showing {@code staleJson} (empty:
+   * no change), replacing its earlier endAt alarm.
    */
-  static void scheduleEnd(
-      Context c, String id, long atMillis, String endedJson, long removeAt, boolean remote) {
+  static void scheduleEnd(Context c, String id, long atMillis, String staleJson, boolean remote) {
     JSONObject entry = new JSONObject();
     try {
-      entry
-          .put("at", atMillis)
-          .put("json", endedJson)
-          .put("removeAt", removeAt)
-          .put("remote", remote);
+      entry.put("at", atMillis).put("json", staleJson).put("remote", remote);
     } catch (JSONException e) {
       return; // Not for these values.
     }
@@ -262,13 +287,9 @@ final class LiveUpdatesScheduler {
     }
     try {
       LiveUpdatesBridge.endAlarmFired(
-          c,
-          id,
-          entry.optString("json"),
-          entry.optLong("removeAt"),
-          entry.optBoolean("remote"));
+          c, id, entry.optString("json"), entry.optBoolean("remote"));
     } catch (RuntimeException e) {
-      Log.e(LOG_TAG, "Could not show the ended content of a live update", e);
+      Log.e(LOG_TAG, "Could not make a live update stale", e);
     }
   }
 

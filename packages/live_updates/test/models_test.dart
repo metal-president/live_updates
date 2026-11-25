@@ -90,6 +90,28 @@ void main() {
       const LiveUpdateEndedContent(title: 'Delivered', body: 'Enjoy').hashCode,
     );
     expect(e, isNot(const LiveUpdateEndedContent(title: 'Delivered')));
+    const withIcon = LiveUpdateEndedContent(
+      title: 'Delivered',
+      icon: LiveUpdateIcon.symbol('checkmark'),
+      image: LiveUpdateImage.asset('assets/done.png'),
+    );
+    expect(
+      withIcon,
+      const LiveUpdateEndedContent(
+        title: 'Delivered',
+        icon: LiveUpdateIcon.symbol('checkmark'),
+        image: LiveUpdateImage.asset('assets/done.png'),
+      ),
+    );
+    expect(
+      withIcon,
+      isNot(
+        const LiveUpdateEndedContent(
+          title: 'Delivered',
+          icon: LiveUpdateIcon.symbol('checkmark'),
+        ),
+      ),
+    );
     final at = DateTime(2030);
     final a = LiveUpdateContent(title: 'Order', endAt: at, endedContent: e);
     expect(a, LiveUpdateContent(title: 'Order', endAt: at, endedContent: e));

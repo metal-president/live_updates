@@ -48,6 +48,15 @@ struct ContentStateDecodingTests {
     #expect(try decode(#"{"title":"T"}"#).endedContent == nil)
   }
 
+  @Test func endedIconAndImageDecode() throws {
+    let state = try decode(
+      #"{"title":"T","endedContent":{"title":"Done","icon":{"symbol":"checkmark"},"image":"lu_b.png"}}"#)
+    #expect(state.endedContent?.icon == LiveUpdatesIcon(symbol: "checkmark"))
+    #expect(state.endedContent?.image == "lu_b.png")
+    let bad = try decode(#"{"title":"T","endedContent":{"title":"Done","icon":3,"image":[]}}"#)
+    #expect(bad.endedContent == LiveUpdatesEndedContent(title: "Done"))
+  }
+
   @Test func aMalformedEndedContentIsLeftOut() throws {
     #expect(try decode(#"{"title":"T","endedContent":{"body":"x"}}"#).endedContent == nil)
     let state = try decode(#"{"title":"T","endedContent":{"title":"Done","body":3}}"#)
@@ -257,6 +266,23 @@ struct ScheduleTests {
     let merged = try LiveUpdatesBridge.keepingPushSetting(
       of: nil, in: #"{"title":"New","enablePushUpdates":true}"#)
     #expect(try object(merged)["enablePushUpdates"] == nil)
+  }
+
+  @Test func reschedulingKeepsTheImagesOfTheScheduledContent() throws {
+    let directory = try #require(LiveUpdatesImages.directory)
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    let name = "lu_test_keep.png"
+    let url = directory.appendingPathComponent(name)
+    try Data([1]).write(to: url)
+    defer { try? FileManager.default.removeItem(at: url) }
+    try FileManager.default.setAttributes(
+      [.modificationDate: Date(timeIntervalSinceNow: -2 * 86_400)], ofItemAtPath: url.path)
+    let until = Date(timeIntervalSinceNow: 5 * 86_400)
+    LiveUpdatesBridge.keepImages(
+      of: #"{"title":"A","endedContent":{"title":"B","image":"\#(name)"}}"#, until: until)
+    let modified = try #require(
+      FileManager.default.attributesOfItem(atPath: url.path)[.modificationDate] as? Date)
+    #expect(abs(modified.timeIntervalSince(until)) < 1)
   }
 
   @Test func nothingScheduledIsAnEmptyList() throws {

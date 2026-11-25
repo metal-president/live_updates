@@ -58,7 +58,7 @@ Activities need iOS 17.2: on iOS 15.0 to 17.1 every call does nothing and
 | --- | --- | --- | --- | --- |
 | Start / update / end | Live Activity | Live Update (when promoted) | Ongoing notification | no-op |
 | Progress | ✓ | `ProgressStyle` (segments, points) | progress bar | |
-| Timer (countdown, stopwatch) | ✓ | chronometer | chronometer | |
+| Timer (countdown, stopwatch) | ✓ (a countdown stops at zero) | chronometer (removed when a countdown ends) | chronometer (removed when a countdown ends, Android 8+) | |
 | Metrics | `metrics` layout | Android 17 `MetricStyle`, else text | text | |
 | Steps, journey | `stepper`, `journey` layouts | progress segments and points, text | progress bar, text | |
 | Semantic colors | – | Android 17+ | – | |
@@ -426,7 +426,8 @@ final pending = await LiveUpdates.scheduled();
   `publicContent`, see [Hiding content on the Lock Screen](#hiding-content-on-the-lock-screen)).
 - **iOS 26 and later:** the system starts the Live Activity at that time
   ([source][ios-request-start]) and presents an alert:
-  `IosLiveUpdateOptions.alert`, or else the title and body. Call `schedule`
+  `IosLiveUpdateOptions.alert`, else `LiveUpdateContent.alert`, else the
+  public text (`publicContent`) or the title and body. Call `schedule`
   and `reschedule` while the app is in the foreground; they throw a
   `LiveUpdateException` in the background and before iOS 26 (check
   `canSchedule`). ActivityKit drops content updates made before the start,
@@ -502,7 +503,10 @@ await LiveUpdates.startOrUpdate(
   `startOrUpdate` then does not show the key again until you `end` it). Like scheduling, the
   switch is on time only with exact alarms, otherwise within 10 minutes.
   `AndroidLiveUpdateOptions(removeAtEnd: true)` removes the notification at
-  `endAt` instead, exactly ([source][android-timeout-after]).
+  `endAt` instead, exactly ([source][android-timeout-after]). With a
+  countdown that ends by `endAt` (as in the example), the notification is
+  removed at the countdown's end instead when the app may not set exact
+  alarms, so it never counts below zero (see [Timers](#timers)).
 - **Android time limit:** `AndroidLiveUpdateOptions.maxDuration` removes the
   notification that long after the update started (later updates do not
   reset it), even if the app is not running. It defaults to 8 hours, like
@@ -653,7 +657,7 @@ LiveUpdateContent(
 | Layout | iOS Lock Screen | Data | Android |
 | --- | --- | --- | --- |
 | `standard` (default) | image, title, body, progress bar | `progress` | progress bar |
-| `timer` | a large countdown or stopwatch | `timer` | chronometer |
+| `timer` | a large countdown or stopwatch | `timer` | chronometer (removed when a countdown ends) |
 | `metrics` | up to three labeled values | `metrics` | Android 17 `MetricStyle` (not in `classic`); otherwise number and text metrics in the text |
 | `stepper` | stages as dots, the current one highlighted | `steps` | Android 16+ progress segments and points; "2/4 Preparing" in the text |
 | `journey` | from and to with the progress between them | `journey`, `progress` | "Shop → Home" in the text |
@@ -797,7 +801,8 @@ LiveUpdateContent(
   Android 17 `metrics` replace the progress bar.
 - `timeoutAfter` counts from the latest post.
 - Requested alerts are limited to one per update every 10 seconds. The iOS
-  equivalent of `alert` is `IosLiveUpdateOptions.alert`.
+  equivalent of `alert` is `IosLiveUpdateOptions.alert`;
+  `LiveUpdateContent.alert` covers both (see [Alerts](#alerts)).
 
 ### Android 17 metrics and semantic colors
 

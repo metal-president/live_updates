@@ -127,9 +127,29 @@ With `--no-xcode` only the widget sources are written. Then, in Xcode:
 
 No native setup is required: the plugin declares `POST_NOTIFICATIONS` and
 `POST_PROMOTED_NOTIFICATIONS`. Call `LiveUpdates.requestPermission()` before
-starting on Android 13+. Also add a single-color status bar icon and make it
-the default icon (see [Icons](#icons)); without one, Android shows the app
-icon as a solid shape.
+starting on Android 13+; it asks for `POST_NOTIFICATIONS` only
+([source][android-permission]). Also add a single-color status bar icon and
+make it the default icon (see [Icons](#icons)); without one, Android shows the
+app icon as a solid shape.
+
+`POST_PROMOTED_NOTIFICATIONS` is required, in addition to
+`POST_NOTIFICATIONS`, for a notification to be promoted to a Live Update
+(Android 16 QPR1 and later). It is granted at install time without a prompt,
+and users can turn it off per app in Settings.
+([source][android-promoted-permission], [source][android-live-update])
+If your app only uses `AndroidLiveUpdateMode.ongoing` or
+`AndroidLiveUpdateMode.classic`, which never ask for promotion, you can remove
+the permission in `android/app/src/main/AndroidManifest.xml`:
+
+```xml
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+  <uses-permission
+      android:name="android.permission.POST_PROMOTED_NOTIFICATIONS"
+      tools:node="remove" />
+  ...
+</manifest>
+```
 
 Android only promotes a notification to a Live Update when the build supports
 it, the user allows it (`LiveUpdates.canPostPromotedNotifications()`), and the
@@ -211,8 +231,10 @@ differently.
   Live Updates for your app in Settings. Updates then appear as regular
   ongoing notifications; `LiveUpdates.canPostPromotedNotifications()` tells
   you which. To send users to the setting, open the
-  `Settings.ACTION_MANAGE_APP_PROMOTED_NOTIFICATIONS` intent.
-  ([source][android-live-update])
+  `Settings.ACTION_APP_NOTIFICATION_PROMOTION_SETTINGS` intent with
+  `Settings.EXTRA_APP_PACKAGE`; some devices have no matching screen, so
+  handle that case. ([source][android-live-update],
+  [source][android-promotion-settings])
 - **Status bar chip:** the chip is at most 96 dp wide. `shortCriticalText`
   is shown in full only if it is shorter than 7 characters; longer text is
   cut, or only the icon is shown when less than half of it fits. Without
@@ -228,6 +250,8 @@ differently.
 [ios-hig-specs]: https://developer.apple.com/design/human-interface-guidelines/live-activities#Specifications
 [android-live-update]: https://developer.android.com/develop/ui/views/notifications/live-update
 [android-permission]: https://developer.android.com/develop/ui/views/notifications/notification-permission
+[android-promoted-permission]: https://developer.android.com/reference/android/Manifest.permission#POST_PROMOTED_NOTIFICATIONS
+[android-promotion-settings]: https://developer.android.com/reference/android/provider/Settings#ACTION_APP_NOTIFICATION_PROMOTION_SETTINGS
 
 ## Usage
 

@@ -345,9 +345,9 @@ abstract final class LiveUpdates {
   /// Android: an alarm posts the notification. It is on time only with
   /// exact alarms ([canScheduleExactly], [AndroidScheduleOptions]),
   /// otherwise within [AndroidScheduleOptions.window]. Schedules survive
-  /// reboots, app updates and time zone changes. If the user force-stops
-  /// the app, Android cancels its alarms; the plugin sets them again the next
-  /// time the app starts and shows overdue ones then.
+  /// reboots, app updates and time zone changes. A force-stopped app gets no
+  /// alarms; the plugin sets them again the next time the app starts and
+  /// shows overdue ones then.
   ///
   /// On other platforms this does nothing.
   static Future<ScheduledLiveUpdate> schedule(

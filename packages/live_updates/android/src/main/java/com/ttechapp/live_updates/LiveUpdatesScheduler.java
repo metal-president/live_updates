@@ -289,7 +289,8 @@ final class LiveUpdatesScheduler {
       LiveUpdatesBridge.endAlarmFired(
           c, id, entry.optString("json"), entry.optBoolean("remote"));
     } catch (RuntimeException e) {
-      Log.e(LOG_TAG, "Could not make a live update stale", e);
+      // Only the type: messages of JSON errors can quote the content.
+      Log.e(LOG_TAG, "Could not make a live update stale: " + e.getClass().getName());
     }
   }
 
@@ -336,7 +337,8 @@ final class LiveUpdatesScheduler {
     try {
       LiveUpdatesBridge.startOrUpdate(key, entry.getString("json"));
     } catch (JSONException | RuntimeException e) {
-      Log.e(LOG_TAG, "Could not show a scheduled live update", e);
+      // Only the type: messages of JSON errors can quote the content.
+      Log.e(LOG_TAG, "Could not show a scheduled live update: " + e.getClass().getName());
     }
   }
 

@@ -230,7 +230,7 @@ extension LiveUpdatesBridge {
     else { return }
     let ended = object["endedContent"] as? [String: Any]
     for name in [object["image"] as? String, ended?["image"] as? String].compactMap({ $0 }) {
-      guard let url = LiveUpdatesImages.url(name),
+      guard !name.hasPrefix("."), let url = LiveUpdatesImages.url(name),
         let modified = try? FileManager.default.attributesOfItem(atPath: url.path)[
           .modificationDate] as? Date,
         modified < date

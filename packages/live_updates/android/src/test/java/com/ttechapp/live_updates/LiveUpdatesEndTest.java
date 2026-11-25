@@ -420,4 +420,50 @@ public class LiveUpdatesEndTest {
     // No ended image: no image.
     assertFalse(plain.has("image"));
   }
+
+  @Test
+  public void aStaleUpdateThatTimedOutStartsFreshWithTheKey() throws Exception {
+    long endAt = System.currentTimeMillis() + 20 * MINUTE;
+    LiveUpdatesBridge.startOrUpdate(
+        "fresh",
+        "{\"title\":\"Order\",\"endAt\":" + seconds(endAt)
+            + ",\"endedContent\":{\"title\":\"Delivered\"}}");
+    fireEndAlarm();
+    // maxDuration removed it (the system's timeout).
+    manager.cancel(LiveUpdatesBridge.TAG_PREFIX + "fresh", LiveUpdatesBridge.NOTIFICATION_ID);
+    LiveUpdatesBridge.timedOut(app, "fresh");
+    android.os.SystemClock.sleep(3100); // Past the tracking of recent posts.
+    events.clear();
+    LiveUpdatesBridge.startOrUpdate("fresh", "{\"title\":\"Next order\"}");
+    // A new update: started, not "active again".
+    assertEquals(Arrays.asList("started:fresh"), events);
+  }
+
+  @Test
+  public void malformedEndKeysInRemotePayloadsFailSafe() throws Exception {
+    JSONObject data =
+        new JSONObject()
+            .put("live_updates_event", "start")
+            .put("live_updates_id", "bad")
+            .put(
+                "live_updates_content",
+                "{\"title\":\"Remote\",\"endAt\":\"soon\",\"endedContent\":\"done\","
+                    + "\"maxDurationMillis\":\"long\",\"removeAtEnd\":\"yes\"}");
+    assertTrue(LiveUpdatesBridge.handleRemotePayload(data.toString()));
+    Notification n = shown("bad");
+    assertNotNull(n);
+    assertEquals("Remote", n.extras.getString(Notification.EXTRA_TITLE));
+    // The default limit; no end alarm.
+    assertAbout(8 * HOUR, n.getTimeoutAfter());
+    assertTrue(shadowOf(alarms).getScheduledAlarms().isEmpty());
+    // Ended content without a title is ignored too.
+    data.put("live_updates_id", "bad2")
+        .put(
+            "live_updates_content",
+            "{\"title\":\"Remote\",\"endAt\":" + seconds(System.currentTimeMillis() + MINUTE)
+                + ",\"endedContent\":{\"body\":\"x\",\"icon\":3,\"image\":\"../x\"}}");
+    assertTrue(LiveUpdatesBridge.handleRemotePayload(data.toString()));
+    fireEndAlarm();
+    assertEquals("Remote", shown("bad2").extras.getString(Notification.EXTRA_TITLE));
+  }
 }

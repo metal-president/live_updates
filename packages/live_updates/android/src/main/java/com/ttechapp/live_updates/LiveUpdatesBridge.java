@@ -562,6 +562,9 @@ public final class LiveUpdatesBridge {
   static void markDismissed(Context c, String id) {
     LiveUpdatesScheduler.cancelEnd(c, id);
     forgetStartTime(c, id);
+    synchronized (staleIds) {
+      staleIds.remove(id);
+    }
     synchronized (actionLock) {
       List<String> ids = readStrings(c, PREF_DISMISSED);
       ids.remove(id);
@@ -785,6 +788,9 @@ public final class LiveUpdatesBridge {
   static void timedOut(Context c, String id) {
     LiveUpdatesScheduler.cancelEnd(c, id);
     forgetStartTime(c, id);
+    synchronized (staleIds) {
+      staleIds.remove(id);
+    }
     synchronized (keyedIds) {
       keyedIds.remove(id);
     }
@@ -1175,7 +1181,7 @@ public final class LiveUpdatesBridge {
       try {
         post(id, new JSONObject(json), remote, keyForId(id) != null, true);
       } catch (JSONException e) {
-        Log.w(LOG_TAG, "endedContent: " + e.getMessage());
+        Log.w(LOG_TAG, "endedContent: " + e.getClass().getName());
         return;
       }
     }

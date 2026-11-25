@@ -285,6 +285,22 @@ struct ScheduleTests {
     #expect(abs(modified.timeIntervalSince(until)) < 1)
   }
 
+  @Test func namesOutsideTheImageFilesAreNotTouched() throws {
+    let directory = try #require(LiveUpdatesImages.directory)
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    let url = directory.appendingPathComponent(".hidden_test")
+    try Data([1]).write(to: url)
+    defer { try? FileManager.default.removeItem(at: url) }
+    let old = Date(timeIntervalSinceNow: -2 * 86_400)
+    try FileManager.default.setAttributes([.modificationDate: old], ofItemAtPath: url.path)
+    LiveUpdatesBridge.keepImages(
+      of: #"{"title":"A","image":".hidden_test","endedContent":{"title":"B","image":"../x"}}"#,
+      until: Date(timeIntervalSinceNow: 86_400))
+    let modified = try #require(
+      FileManager.default.attributesOfItem(atPath: url.path)[.modificationDate] as? Date)
+    #expect(abs(modified.timeIntervalSince(old)) < 1)
+  }
+
   @Test func nothingScheduledIsAnEmptyList() throws {
     UserDefaults.standard.removeObject(forKey: LiveUpdatesBridge.schedulesKey)
     let list = try JSONSerialization.jsonObject(

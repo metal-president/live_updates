@@ -611,6 +611,19 @@ public class LiveUpdatesBridgeTest {
     } catch (IllegalStateException expected) {
       // Same.
     }
+    // Rescheduling to now as well; a later time is kept for later.
+    shadowOf(manager).setNotificationsEnabled(true);
+    long later = System.currentTimeMillis() + 3_600_000;
+    LiveUpdatesBridge.schedule("off-key", "{\"title\":\"A\"}", later, true, 0);
+    shadowOf(manager).setNotificationsEnabled(false);
+    LiveUpdatesBridge.reschedule("off-key", null, later + 60_000);
+    try {
+      LiveUpdatesBridge.reschedule("off-key", null, 0);
+      org.junit.Assert.fail("reschedule to now must fail");
+    } catch (IllegalStateException expected) {
+      // Same.
+    }
+    LiveUpdatesBridge.cancelScheduled("off-key");
     assertTrue(events.isEmpty());
     assertFalse(Arrays.asList(LiveUpdatesBridge.activeIds()).contains("off-key"));
     shadowOf(manager).setNotificationsEnabled(true);

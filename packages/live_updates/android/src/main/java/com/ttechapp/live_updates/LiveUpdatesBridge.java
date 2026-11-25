@@ -292,8 +292,9 @@ public final class LiveUpdatesBridge {
   }
 
   /**
-   * {@code strict}: fail when a new update could not be shown (calls from Dart); a schedule
-   * whose time comes while notifications are off posts nothing, as before.
+   * {@code strict}: fail when nothing could be shown (calls from Dart), also for a key that is
+   * already shown; a schedule whose time comes while notifications are off posts nothing, as
+   * before.
    */
   static String startOrUpdate(String key, String json, boolean strict) throws JSONException {
     Context c = requireContext();
@@ -1044,8 +1045,7 @@ public final class LiveUpdatesBridge {
   public static void schedule(
       @NonNull String key, @NonNull String json, long atMillis, boolean exact, long windowMillis)
       throws JSONException {
-    // A time that has passed shows it now: fail as startOrUpdate does.
-    if (atMillis <= System.currentTimeMillis()) requireShowable(requireContext(), json);
+    requireShowableNow(key, json, atMillis);
     LiveUpdatesScheduler.schedule(requireContext(), key, json, atMillis, exact, windowMillis);
   }
 
@@ -1055,7 +1055,19 @@ public final class LiveUpdatesBridge {
    */
   public static void reschedule(@NonNull String key, @Nullable String json, long atMillis)
       throws JSONException {
+    requireShowableNow(
+        key, json != null ? json : LiveUpdatesScheduler.storedJson(requireContext(), key), atMillis);
     LiveUpdatesScheduler.reschedule(requireContext(), key, json, atMillis);
+  }
+
+  /**
+   * A schedule for a time that has passed shows its update now: it fails as startOrUpdate does
+   * (not for a key the user dismissed, which startOrUpdate leaves alone).
+   */
+  private static void requireShowableNow(String key, @Nullable String json, long atMillis) {
+    Context c = requireContext();
+    if (json == null || atMillis > System.currentTimeMillis() || isDismissed(c, key)) return;
+    requireShowable(c, json);
   }
 
   /** Scheduled live updates as a JSON array of {@code {"key", "at"}} (epoch seconds). */

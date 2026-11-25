@@ -21,8 +21,8 @@ final class LiveUpdate {
   LiveUpdatesPlatform get _platform => LiveUpdatesPlatform.instance;
 
   /// Replaces the shown content. Throws a [LiveUpdateException] when the
-  /// update has ended, and on Android also while notifications are turned
-  /// off for the app or for its channel.
+  /// update has ended, and on Android also when the user dismissed it or
+  /// while notifications are turned off for the app or for its channel.
   Future<void> update(LiveUpdateContent content) =>
       _platform.update(id, content);
 
@@ -231,7 +231,9 @@ abstract final class LiveUpdates {
   /// the dismissed activity. Use a new key for a new activity.
   ///
   /// Throws a [LiveUpdateException] when a new live update cannot be shown,
-  /// as [start] does.
+  /// as [start] does; on Android also when updating a running one while
+  /// notifications are turned off for the app or for its channel (as
+  /// [LiveUpdate.update]).
   ///
   /// [pushUpdates] and [iosChannelId] only apply when a new activity is
   /// started: an existing activity keeps the push setting it was started
@@ -351,7 +353,9 @@ abstract final class LiveUpdates {
   /// do.
   ///
   /// iOS (26 and later): the system starts the Live Activity and presents
-  /// an alert, [IosLiveUpdateOptions.alert] or else the title and body.
+  /// an alert: [IosLiveUpdateOptions.alert], else [LiveUpdateContent.alert],
+  /// else the public text ([LiveUpdateContent.publicContent]) or the title
+  /// and body.
   /// Call this while the app is in the foreground; it throws
   /// [LiveUpdateException] in the background and before iOS 26 (check
   /// [canSchedule]). [pushUpdates] requests a per-activity APNs token, which

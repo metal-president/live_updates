@@ -269,7 +269,8 @@ differently.
   remote message. ([source][android-permission]) While notifications are
   turned off for the app or for its channel, `start`, `startOrUpdate` and
   `update` throw a `LiveUpdateException`, as on iOS with Live Activities
-  turned off (from 0.4.0). `isSupported()` tells you beforehand
+  turned off (from 0.4.0), and so do `schedule` and `reschedule` for a time
+  that has passed. A schedule whose time comes then shows nothing. `isSupported()` tells you beforehand
   whether notifications are on for the app; a turned-off channel shows only
   in the exception.
 - **After `end`:** from 0.4.0 the final content (or the content shown last)
@@ -722,7 +723,8 @@ Set `alert` on content the user must notice, such as "Your order is here".
 The device plays a sound and may light up the screen or show a banner:
 
 ```dart
-await update.update(
+await LiveUpdates.startOrUpdate(
+  'order-1234',
   const LiveUpdateContent(
     title: 'Order #1234',
     body: 'At your door',
@@ -1196,7 +1198,8 @@ apply them again:
   `"live_updates_dismiss_after": 0`). `endAll()` removes these too.
 - **Android `start`, `startOrUpdate` and `update` throw a
   `LiveUpdateException`** while notifications are turned off for the app or
-  its channel, as on iOS. Before, they returned as if the update were
+  its channel, as on iOS (`schedule` and `reschedule` too, for a time that
+  has passed). Before, they returned as if the update were
   shown. Check `isSupported()` first, or catch the exception.
 - **What stays after `end` has no buttons or running timers** on either
   platform (the final content, or the content shown last).

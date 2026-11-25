@@ -29,8 +29,9 @@
   `LiveUpdateException` while notifications are turned off for the app or
   for its channel (or its channel group), as iOS does with Live Activities
   turned off. Before, they returned as if the update were shown (`start`
-  even reported `started`). Scheduled updates whose time comes then are
-  still dropped without an error.
+  even reported `started`). `schedule` and `reschedule` throw too for a time
+  that has passed (they show the update now). Scheduled updates whose time
+  comes while notifications are off are still dropped without an error.
 - **Breaking (Android remote payloads):** an `alert` object in
   `live_updates_content` now alerts (sound and vibration), so one content
   alerts on both platforms. Send `"androidAlert": false` to keep such an

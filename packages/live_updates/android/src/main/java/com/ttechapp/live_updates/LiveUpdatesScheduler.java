@@ -115,6 +115,15 @@ final class LiveUpdatesScheduler {
    * Moves the schedule with {@code key} to {@code atMillis}, with {@code json} as its content
    * when given. Throws when nothing is scheduled with {@code key}.
    */
+  /** Stored content of the schedule with {@code key}, or {@code null}. */
+  @Nullable
+  static String storedJson(Context c, String key) {
+    synchronized (lock) {
+      JSONObject entry = read(c).optJSONObject(key);
+      return entry == null ? null : entry.optString("json", null);
+    }
+  }
+
   static void reschedule(Context c, String key, @Nullable String json, long atMillis)
       throws JSONException {
     JSONObject entry;

@@ -287,14 +287,21 @@ public final class LiveUpdatesBridge: NSObject {
           ? .default
           : dismissAfter == 0 ? .immediate : .after(Date().addingTimeInterval(dismissAfter))
         // What stays on the Lock Screen has no buttons or running timers, as
-        // on Android: the final content, else the content shown last.
-        let running = activity.activityState == .active || activity.activityState == .stale
-        let shown = finalContent ?? (running ? activity.content : nil)
-        let content = shown.map {
-          ActivityContent(
-            state: $0.state.liveUpdatesEnded, staleDate: $0.staleDate,
-            relevanceScore: $0.relevanceScore)
-        }
+        // on Android: the final content, else the content shown last. When
+        // nothing needs to change, nil keeps what the system shows (which
+        // may be newer than this process's copy, after a push).
+        let shown = finalContent ?? activity.content
+        let stale = shown.staleDate.map { $0 <= Date() } ?? false
+        var state = shown.state.liveUpdatesEnded
+        // endedContent shows from endAt on: kept only when it already shows,
+        // as Android keeps the ended look it shows (and drops endAt).
+        if !stale { state.endedContent = nil }
+        let content: ActivityContent<LiveUpdatesAttributes.ContentState>? =
+          finalContent == nil && state == shown.state && (stale || shown.staleDate == nil)
+          ? nil
+          : ActivityContent(
+            state: state, staleDate: stale ? shown.staleDate : nil,
+            relevanceScore: shown.relevanceScore)
         noteEndedByApp(activity.id)
         await activity.end(content, dismissalPolicy: policy)
         await MainActor.run { tokenTasks.removeValue(forKey: id)?.cancel() }

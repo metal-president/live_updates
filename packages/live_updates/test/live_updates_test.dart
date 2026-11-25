@@ -36,6 +36,9 @@ class FakePlatform extends NoopLiveUpdatesPlatform {
   Future<List<String>> activeIds() async => ['a1', 'a2'];
 
   @override
+  Future<bool> isPromoted(String id) async => id == 'a1';
+
+  @override
   Stream<String> get taps => taps$.stream;
 }
 
@@ -50,6 +53,12 @@ void main() {
     await u.update(const LiveUpdateContent(title: 'Pizza', progress: .5));
     await u.end(dismissAfter: const Duration(seconds: 3));
     expect(fake.calls, ['start:Pizza', 'update:a1:0.5', 'end:a1:3']);
+  });
+
+  test('isPromoted asks the platform for that update', () async {
+    final [a1, a2] = await LiveUpdates.active();
+    expect(await a1.isPromoted(), isTrue);
+    expect(await a2.isPromoted(), isFalse);
   });
 
   test('active returns handles', () async {
@@ -73,6 +82,7 @@ void main() {
     final u = await LiveUpdates.start(const LiveUpdateContent(title: 'x'));
     await u.update(const LiveUpdateContent(title: 'y'));
     await u.end();
+    expect(await u.isPromoted(), isFalse);
     expect(await LiveUpdates.active(), isEmpty);
   });
 }

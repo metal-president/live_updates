@@ -227,13 +227,17 @@ differently.
   channel whose importance is above "min". If you pass your own
   `channelId`, do not create that channel with `IMPORTANCE_MIN`. Device
   makers can apply additional criteria. ([source][android-live-update])
+  `LiveUpdate.isPromoted()` tells you whether a shown update was promoted:
+  unlike `LiveUpdates.canPostPromotedNotifications()`, which only reports
+  the permission, it reflects the system's decision for that notification.
 - **User settings:** users can demote or dismiss a Live Update and turn off
   Live Updates for your app in Settings. Updates then appear as regular
   ongoing notifications; `LiveUpdates.canPostPromotedNotifications()` tells
   you which. To send users to the setting, open the
-  `Settings.ACTION_APP_NOTIFICATION_PROMOTION_SETTINGS` intent with
-  `Settings.EXTRA_APP_PACKAGE`; some devices have no matching screen, so
-  handle that case. ([source][android-live-update],
+  `Settings.ACTION_APP_NOTIFICATION_PROMOTION_SETTINGS` intent (the Live
+  Update guide names it `ACTION_MANAGE_APP_PROMOTED_NOTIFICATIONS`, which is
+  not in the SDK) with `Settings.EXTRA_APP_PACKAGE`; some devices have no
+  matching screen, so handle that case. ([source][android-live-update],
   [source][android-promotion-settings])
 - **Status bar chip:** the chip is at most 96 dp wide. `shortCriticalText`
   is shown in full only if it is shorter than 7 characters; longer text is

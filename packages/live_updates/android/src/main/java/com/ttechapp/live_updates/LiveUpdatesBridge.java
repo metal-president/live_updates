@@ -155,6 +155,35 @@ public final class LiveUpdatesBridge {
   }
 
   /**
+   * Whether the system promoted the shown live update {@code id} to a Live
+   * Update ({@code Notification.FLAG_PROMOTED_ONGOING}). This is the system's
+   * actual decision, which also depends on the promotion requirements, the
+   * user's settings and device maker criteria, unlike {@code
+   * canPostPromotedNotifications()}. It reflects the notification as the
+   * system currently lists it: the system decides on promotion after posting
+   * and updates its list asynchronously, so this may be {@code false} for a
+   * moment after a start or update. {@code false} below Android 16, when not
+   * attached, or when {@code id} is not shown.
+   */
+  public static boolean isPromoted(@NonNull String id) {
+    Context c = context;
+    if (c == null || Build.VERSION.SDK_INT < 36) return false;
+    // Ended in this process: the system may still list it for a moment, as
+    // in activeIds().
+    long now = SystemClock.uptimeMillis();
+    synchronized (recentlyPosted) {
+      recentlyEnded.values().removeIf(t -> now - t > RECENT_MS);
+      if (recentlyEnded.containsKey(id)) return false;
+    }
+    for (StatusBarNotification n : manager(c).getActiveNotifications()) {
+      if (n.getId() == NOTIFICATION_ID && (TAG_PREFIX + id).equals(n.getTag())) {
+        return (n.getNotification().flags & Notification.FLAG_PROMOTED_ONGOING) != 0;
+      }
+    }
+    return false;
+  }
+
+  /**
    * Requests the notification permission (Android 13+). {@code listener} is
    * called with the result; immediately when no prompt is needed.
    */
@@ -694,13 +723,13 @@ public final class LiveUpdatesBridge {
       case "start":
         if (content == null) return false;
         clearDismissed(requireContext(), id);
-        post(id, new JSONObject(content), true);
+        post(id, warnIfUntitled(new JSONObject(content)), true);
         return true;
       case "update":
         if (content == null) return false;
         // Do not bring back an update that ended or that the user dismissed.
         if (!isDismissed(requireContext(), id) && isShown(id)) {
-          post(id, new JSONObject(content), true);
+          post(id, warnIfUntitled(new JSONObject(content)), true);
         }
         return true;
       case "end":
@@ -1158,6 +1187,22 @@ public final class LiveUpdatesBridge {
     if ("ongoing".equals(mode) || "classic".equals(mode)) return mode;
     if (mode == null && !content.optBoolean("requestPromotion", true)) return "ongoing";
     return "liveUpdate";
+  }
+
+  /**
+   * Logs a warning when remote {@code content} asks for promotion without a
+   * title, which Android requires to promote a notification; returns {@code
+   * content}.
+   */
+  private static JSONObject warnIfUntitled(JSONObject content) {
+    if ("liveUpdate".equals(androidMode(content))
+        && content.optString("title").isEmpty()) {
+      Log.w(
+          LOG_TAG,
+          "title is empty; Android only promotes a notification to a Live Update when it has"
+              + " a title.");
+    }
+    return content;
   }
 
   /** Time an app opened by a button gets to start listening to {@code onAction}. */

@@ -102,11 +102,16 @@ class AndroidLiveUpdatesPlatform extends LiveUpdatesPlatform
       LiveUpdatesBridge.canPostPromotedNotifications();
 
   @override
+  Future<bool> isPromoted(String id) async =>
+      _call(() => LiveUpdatesBridge.isPromoted(_j(id)));
+
+  @override
   Future<String> start(
     LiveUpdateContent content, {
     bool pushUpdates = false,
     String? iosChannelId,
   }) async {
+    warnIfUntitled(content);
     final json = await encodeContent(content);
     return _call(
       () =>
@@ -121,6 +126,7 @@ class AndroidLiveUpdatesPlatform extends LiveUpdatesPlatform
     bool pushUpdates = false,
     String? iosChannelId,
   }) async {
+    warnIfUntitled(content);
     final json = await encodeContent(content);
     return _call(
       () => LiveUpdatesBridge.startOrUpdate(
@@ -170,6 +176,7 @@ class AndroidLiveUpdatesPlatform extends LiveUpdatesPlatform
 
   @override
   Future<void> update(String id, LiveUpdateContent content) async {
+    warnIfUntitled(content);
     final json = await encodeContent(content);
     _call(() => LiveUpdatesBridge.update(_j(id), _j(json)));
   }

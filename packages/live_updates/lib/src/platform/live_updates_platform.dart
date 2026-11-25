@@ -23,6 +23,9 @@ abstract class LiveUpdatesPlatform {
   /// See [LiveUpdates.canPostPromotedNotifications].
   Future<bool> canPostPromotedNotifications() async => false;
 
+  /// See [LiveUpdate.isPromoted].
+  Future<bool> isPromoted(String id) async => false;
+
   /// Starts a live update and returns its id.
   Future<String> start(
     LiveUpdateContent content, {

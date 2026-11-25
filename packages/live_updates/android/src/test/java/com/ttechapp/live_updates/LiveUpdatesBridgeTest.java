@@ -809,4 +809,60 @@ public class LiveUpdatesBridgeTest {
     assertEquals(null, n.extras.getCharSequence(Notification.EXTRA_BIG_TEXT));
   }
 
+  /** Shows {@code id} as the system would after deciding on promotion. */
+  private void showWithFlags(String id, int flags) {
+    Notification n =
+        new Notification.Builder(app, "live_updates")
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setContentTitle("Order")
+            .build();
+    n.flags |= flags;
+    manager.notify(LiveUpdatesBridge.TAG_PREFIX + id, LiveUpdatesBridge.NOTIFICATION_ID, n);
+  }
+
+  @Test
+  public void isPromotedReadsThePromotedFlag() {
+    showWithFlags("promoted", Notification.FLAG_ONGOING_EVENT | Notification.FLAG_PROMOTED_ONGOING);
+    assertTrue(LiveUpdatesBridge.isPromoted("promoted"));
+  }
+
+  @Test
+  public void isPromotedIsFalseWithoutTheFlag() throws Exception {
+    showWithFlags("demoted", Notification.FLAG_ONGOING_EVENT);
+    assertFalse(LiveUpdatesBridge.isPromoted("demoted"));
+    // Requesting promotion is not being promoted.
+    assertFalse(LiveUpdatesBridge.isPromoted(LiveUpdatesBridge.start("{\"title\":\"Order\"}")));
+  }
+
+  @Test
+  public void isPromotedIsFalseRightAfterEnd() throws Exception {
+    showWithFlags("ended", Notification.FLAG_ONGOING_EVENT | Notification.FLAG_PROMOTED_ONGOING);
+    LiveUpdatesBridge.end("ended", null, 0);
+    // The system may still list the notification for a moment.
+    showWithFlags("ended", Notification.FLAG_ONGOING_EVENT | Notification.FLAG_PROMOTED_ONGOING);
+    assertFalse(LiveUpdatesBridge.isPromoted("ended"));
+  }
+
+  @Test
+  public void isPromotedIsFalseForAnUnknownId() {
+    showWithFlags("other", Notification.FLAG_PROMOTED_ONGOING);
+    assertFalse(LiveUpdatesBridge.isPromoted("missing"));
+  }
+
+  @Test
+  public void remotePayloadsWithoutTitleAreWarnedAbout() throws Exception {
+    org.robolectric.shadows.ShadowLog.clear();
+    assertTrue(remote("start", "untitled", "{}"));
+    // Android promotes a title of only spaces.
+    assertTrue(remote("start", "spaces", "{\"title\":\"  \"}"));
+    assertTrue(remote("start", "titled", "{\"title\":\"Order\"}"));
+    assertTrue(remote("start", "plain", "{\"title\":\"\",\"androidMode\":\"ongoing\"}"));
+    long warnings =
+        org.robolectric.shadows.ShadowLog.getLogsForTag("live_updates").stream()
+            .filter(l -> l.msg.startsWith("title is empty"))
+            .count();
+    assertEquals(1, warnings);
+    // Still posted.
+    assertNotNull(shown("untitled"));
+  }
 }

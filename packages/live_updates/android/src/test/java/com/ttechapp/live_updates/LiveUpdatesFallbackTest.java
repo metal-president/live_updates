@@ -131,8 +131,15 @@ public class LiveUpdatesFallbackTest {
   }
 
   @Test
-  public void promotionIsNeverAvailable() {
+  public void promotionIsNeverAvailable() throws Exception {
     assertFalse(LiveUpdatesBridge.canPostPromotedNotifications());
+    // Even with Notification.FLAG_PROMOTED_ONGOING set, which older versions
+    // never do.
+    Notification n =
+        new Notification.Builder(app).setSmallIcon(android.R.drawable.ic_dialog_info).build();
+    n.flags |= 0x00040000;
+    manager.notify(LiveUpdatesBridge.TAG_PREFIX + "promoted", LiveUpdatesBridge.NOTIFICATION_ID, n);
+    assertFalse(LiveUpdatesBridge.isPromoted("promoted"));
   }
 
   @Test

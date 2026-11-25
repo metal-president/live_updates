@@ -355,6 +355,42 @@ public final class LiveUpdatesBridge {
   }
 
   /**
+   * State of the live update {@code id} as the system shows it: {@code active}, {@code stale}
+   * (past its endAt), {@code ended} (the notification kept after the end) or, when it is not
+   * shown, {@code dismissed} if the user swiped it away (remembered until the app ends it); else
+   * {@code null}. The id of a keyed update is its key.
+   */
+  @Nullable
+  public static String stateOf(@NonNull String id) {
+    Context c = context;
+    if (c == null) return null;
+    for (StatusBarNotification n : manager(c).getActiveNotifications()) {
+      if (n.getId() != NOTIFICATION_ID || !(TAG_PREFIX + id).equals(n.getTag())) continue;
+      Notification notification = n.getNotification();
+      boolean ongoing = (notification.flags & Notification.FLAG_ONGOING_EVENT) != 0;
+      if (notification.extras.getBoolean(EXTRA_STALE, false)) return "stale";
+      if (!ongoing) return "ended";
+      long endAt = notification.extras.getLong(EXTRA_END_AT, 0);
+      boolean stale;
+      synchronized (staleIds) {
+        stale = staleIds.contains(id);
+      }
+      return stale || (endAt > 0 && System.currentTimeMillis() >= endAt) ? "stale" : "active";
+    }
+    // Posted a moment ago: the system lists it only after a moment.
+    long now = SystemClock.uptimeMillis();
+    synchronized (recentlyPosted) {
+      Long posted = recentlyPosted.get(id);
+      Long ended = recentlyEnded.get(id);
+      if (posted != null && now - posted <= RECENT_MS && ended == null) return "active";
+    }
+    return isDismissed(c, id) ? "dismissed" : null;
+  }
+
+  /** Notification extra with the endAt time (epoch ms) of an update that becomes stale then. */
+  private static final String EXTRA_END_AT = "com.ttechapp.live_updates.END_AT";
+
+  /**
    * Calls {@code listener} with presses of {@code updateIds} ({@code null}:
    * all) while the app is in the foreground, starting with queued ones in
    * order. Other presses stay queued for the background handler.
@@ -1336,6 +1372,8 @@ public final class LiveUpdatesBridge {
     android.os.Bundle extras = new android.os.Bundle();
     if (keyed || keyForId(id) != null) extras.putBoolean(EXTRA_KEYED, true);
     if (stale) extras.putBoolean(EXTRA_STALE, true);
+    // Lets stateOf() tell a stale update after a process restart.
+    if (staleAtEnd) extras.putLong(EXTRA_END_AT, endAt);
     if (!extras.isEmpty()) b.addExtras(extras);
     if (!stale) addActions(c, b, id, content);
     synchronized (lastPosted) {

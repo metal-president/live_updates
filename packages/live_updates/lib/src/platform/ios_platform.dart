@@ -151,6 +151,14 @@ class IosLiveUpdatesPlatform extends LiveUpdatesPlatform with ContentEncoder {
       LiveUpdatesBridge.keyForId(_ns(id))?.toDartString();
 
   @override
+  Future<String?> stateForId(String id) async =>
+      LiveUpdatesBridge.stateForId(_ns(id))?.toDartString();
+
+  @override
+  Future<String?> stateForKey(String key) async =>
+      LiveUpdatesBridge.stateForKey(_ns(key))?.toDartString();
+
+  @override
   Stream<(String, String)> actions({String? updateId}) =>
       _actions.stream(updateId);
 

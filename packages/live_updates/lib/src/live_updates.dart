@@ -54,6 +54,22 @@ final class LiveUpdate {
   /// [LiveUpdates.start] or [update].
   Future<bool> isPromoted() => _platform.isPromoted(id);
 
+  /// The current state of this live update, or `null` when the platform no
+  /// longer knows it (it ended and is no longer shown, or was never shown).
+  /// Use it to set up your UI, for example after an app restart, and [states]
+  /// for later changes.
+  ///
+  /// [LiveUpdateState.ended] means it ended and is still shown (see
+  /// [end]). [LiveUpdateState.dismissed] is reported on iOS while the system
+  /// still lists the dismissed activity; on Android until the app ends the
+  /// update (the plugin remembers the dismissal, see
+  /// [LiveUpdates.startOrUpdate]).
+  Future<LiveUpdateState?> state() async =>
+      switch (await _platform.stateForId(id)) {
+        final name? => _stateFromName(name),
+        null => null,
+      };
+
   /// Lifecycle changes of this live update, such as the user dismissing it or
   /// the update becoming stale at [LiveUpdateContent.endAt].
   Stream<LiveUpdateState> get states => _platform.events
@@ -255,6 +271,16 @@ abstract final class LiveUpdates {
       key,
     );
   }
+
+  /// The current state of the live update with [key], as [LiveUpdate.state]:
+  /// a running one if there is one, else one that ended and is still shown,
+  /// else one the user dismissed. Unlike [find], it also reports updates that
+  /// have ended.
+  static Future<LiveUpdateState?> stateOf(String key) async =>
+      switch (await _platform.stateForKey(key)) {
+        final name? => _stateFromName(name),
+        null => null,
+      };
 
   /// The running live update identified by [key], if any.
   static Future<LiveUpdate?> find(String key) async =>

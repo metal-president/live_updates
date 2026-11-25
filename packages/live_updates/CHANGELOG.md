@@ -51,6 +51,12 @@
   stops at zero); the update reports `ended`. The timer of a countdown that
   is already over is left out. `AndroidLiveUpdateOptions.removeAtCountdownEnd: false`
   (remote: `"removeAtCountdownEnd": false`) keeps the notification.
+- `LiveUpdate.state()` and `LiveUpdates.stateOf(key)`: the current state
+  (`active`, `stale`, `ended` while still shown, `dismissed`) without
+  waiting for `states`, for example to set up the UI after a restart.
+  `stateOf` also reports updates that have ended. Android keeps reporting
+  `dismissed` until the app ends the update; iOS while it lists the
+  activity.
 
 ## 0.3.0
 

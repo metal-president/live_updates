@@ -260,6 +260,27 @@ void main() {
     await LiveUpdates.endAll(includeScheduled: false);
   });
 
+  testWidgets('state and stateOf follow the lifecycle', (tester) async {
+    if (!await LiveUpdates.isSupported()) return;
+    const key = 'order-state-it';
+    expect(await LiveUpdates.stateOf(key), isNull);
+    final u = await LiveUpdates.startOrUpdate(
+      key,
+      const LiveUpdateContent(title: 'State'),
+    );
+    await Future<void>.delayed(const Duration(seconds: 1));
+    expect(await u.state(), LiveUpdateState.active);
+    expect(await LiveUpdates.stateOf(key), LiveUpdateState.active);
+    await u.end();
+    await Future<void>.delayed(const Duration(seconds: 1));
+    expect(await u.state(), LiveUpdateState.ended);
+    expect(await LiveUpdates.stateOf(key), LiveUpdateState.ended);
+    await u.end(dismissAfter: Duration.zero);
+    await Future<void>.delayed(const Duration(seconds: 1));
+    // iOS may still list the dismissed activity for a moment.
+    expect(await u.state(), anyOf(isNull, LiveUpdateState.dismissed));
+  });
+
   testWidgets('Android options do not affect iOS push settings', (
     tester,
   ) async {

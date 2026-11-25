@@ -183,6 +183,41 @@ public class LiveUpdatesEndTest {
   }
 
   @Test
+  public void stateOfReportsWhatTheSystemShows() throws Exception {
+    assertNull(LiveUpdatesBridge.stateOf("st-order"));
+    long endAt = System.currentTimeMillis() + 20 * MINUTE;
+    LiveUpdatesBridge.startOrUpdate(
+        "st-order", "{\"title\":\"Order\",\"endAt\":" + seconds(endAt) + "}");
+    assertEquals("active", LiveUpdatesBridge.stateOf("st-order"));
+    fireEndAlarm();
+    assertEquals("stale", LiveUpdatesBridge.stateOf("st-order"));
+    // After a process restart: from the endAt on the shown notification.
+    LiveUpdatesBridge.forgetPostsInProcess("st-order");
+    assertEquals("stale", LiveUpdatesBridge.stateOf("st-order"));
+    LiveUpdatesBridge.end("st-order", null, -1);
+    assertEquals("ended", LiveUpdatesBridge.stateOf("st-order"));
+    LiveUpdatesBridge.end("st-order", null, 0);
+    assertNull(LiveUpdatesBridge.stateOf("st-order"));
+    // A dismissal is remembered until the app ends the update.
+    LiveUpdatesBridge.startOrUpdate("d", "{\"title\":\"D\"}");
+    manager.cancel(LiveUpdatesBridge.TAG_PREFIX + "d", LiveUpdatesBridge.NOTIFICATION_ID);
+    LiveUpdatesBridge.markDismissed(app, "d");
+    LiveUpdatesBridge.forgetPostsInProcess("d");
+    assertEquals("dismissed", LiveUpdatesBridge.stateOf("d"));
+  }
+
+  @Test
+  public void endedContentAtEndAtIsStale() throws Exception {
+    long endAt = System.currentTimeMillis() + 20 * MINUTE;
+    LiveUpdatesBridge.startOrUpdate(
+        "order",
+        "{\"title\":\"Order\",\"endAt\":" + seconds(endAt)
+            + ",\"endedContent\":{\"title\":\"Delivered\"}}");
+    fireEndAlarm();
+    assertEquals("stale", LiveUpdatesBridge.stateOf("order"));
+  }
+
+  @Test
   public void maxDurationZeroMeansNoLimit() throws Exception {
     LiveUpdatesBridge.startOrUpdate("order", "{\"title\":\"Order\",\"maxDurationMillis\":0}");
     assertEquals(0, shown("order").getTimeoutAfter());

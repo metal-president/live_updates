@@ -525,9 +525,10 @@ extension type LiveUpdatesBridge._(objc.ObjCObject object$)
   }
 
   /// Updates the activity whose key is <code>key</code>, or requests a new one with that
-  /// key. An activity with the key that has ended or was dismissed is not
-  /// replaced while the system still lists it, so the user does not get it
-  /// back. <code>completion</code> receives the activity id, or an error.
+  /// key. An activity with the key that the user dismissed is not replaced
+  /// while the system still lists it, so the user does not get it back; one
+  /// that ended is replaced. <code>completion</code> receives the activity id, or an
+  /// error.
   /// Runs on the main actor so that concurrent calls for one key cannot both
   /// request an activity (the lookup and <code>request</code> happen without suspending).
   static void startOrUpdate(
@@ -546,6 +547,35 @@ extension type LiveUpdatesBridge._(objc.ObjCObject object$)
       _$$ref$1.pointer,
       _$$ref$2.pointer,
     );
+  }
+
+  /// State of the activity with <code>id</code> as ActivityKit reports it (“active”,
+  /// “stale”, “ended” or “dismissed”), or <code>nil</code> when the system no longer
+  /// lists it or it is scheduled and has not started.
+  static objc.NSString? stateForId(objc.NSString id) {
+    final _$$ref = id.ref;
+    final $ret = _objc_msgSend_1sotr3r(
+      _class_LiveUpdatesBridge,
+      _sel_stateForId_,
+      _$$ref.pointer,
+    );
+    return $ret.address == 0
+        ? null
+        : objc.NSString.fromPointer($ret, retain: true, release: true);
+  }
+
+  /// State of the activity whose key is <code>key</code>: a running one first, else an
+  /// ended one, else a dismissed one; <code>nil</code> when the system lists none.
+  static objc.NSString? stateForKey(objc.NSString key) {
+    final _$$ref = key.ref;
+    final $ret = _objc_msgSend_1sotr3r(
+      _class_LiveUpdatesBridge,
+      _sel_stateForKey_,
+      _$$ref.pointer,
+    );
+    return $ret.address == 0
+        ? null
+        : objc.NSString.fromPointer($ret, retain: true, release: true);
   }
 
   /// Removes and returns queued presses as <code>"<activity id>\n<action id>"</code>.
@@ -1882,6 +1912,8 @@ late final _sel_startOrUpdate_json_completion_ = objc.registerName(
   "startOrUpdate:json:completion:",
 );
 late final _sel_start_error_ = objc.registerName("start:error:");
+late final _sel_stateForId_ = objc.registerName("stateForId:");
+late final _sel_stateForKey_ = objc.registerName("stateForKey:");
 late final _sel_takeQueuedActions = objc.registerName("takeQueuedActions");
 late final _sel_unobserveActions_ = objc.registerName("unobserveActions:");
 late final _sel_update_json_completion_ = objc.registerName(

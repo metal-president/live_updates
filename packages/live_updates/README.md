@@ -363,6 +363,10 @@ LiveUpdates.onTap.listen((route) => router.go(route));
 // Live updates still running, e.g. after an app restart.
 final running = await LiveUpdates.active();
 
+// The current state, to set up your UI after a restart (null when gone):
+// active, stale (past endAt), ended (still shown after end) or dismissed.
+final state = await LiveUpdates.stateOf('order-1234'); // or update.state()
+
 // Live updates that appear while the app runs, including remote starts.
 LiveUpdates.onStarted.listen((update) => track(update));
 

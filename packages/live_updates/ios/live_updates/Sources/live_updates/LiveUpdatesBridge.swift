@@ -237,6 +237,31 @@ public final class LiveUpdatesBridge: NSObject {
     return findByKey(key)?.id
   }
 
+  /// State of the activity with `id` as ActivityKit reports it ("active",
+  /// "stale", "ended" or "dismissed"), or `nil` when the system no longer
+  /// lists it or it is scheduled and has not started.
+  @objc public static func stateForId(_ id: String) -> String? {
+    guard #available(iOS 17.2, *) else { return nil }
+    return Activity<LiveUpdatesAttributes>.activities.first { $0.id == id }.flatMap(stateName)
+  }
+
+  /// State of the activity whose key is `key`: a running one first, else an
+  /// ended one, else a dismissed one; `nil` when the system lists none.
+  @objc public static func stateForKey(_ key: String) -> String? {
+    guard #available(iOS 17.2, *) else { return nil }
+    let names = Activity<LiveUpdatesAttributes>.activities
+      .filter { $0.attributes.key == key }
+      .compactMap(stateName)
+    return ["active", "stale", "ended", "dismissed"].first(where: names.contains)
+  }
+
+  @available(iOS 17.2, *)
+  private static func stateName(_ activity: Activity<LiveUpdatesAttributes>) -> String? {
+    if isPending(activity) { return nil }
+    let state = name(of: activity.activityState)
+    return state == "unknown" ? nil : state
+  }
+
   /// Key of the activity with `id` (from `startOrUpdate` or the push-to-start
   /// `attributes`), or `nil`.
   @objc public static func keyForId(_ id: String) -> String? {

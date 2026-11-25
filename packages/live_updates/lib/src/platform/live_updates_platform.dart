@@ -47,6 +47,13 @@ abstract class LiveUpdatesPlatform {
   /// Key of the live update [id], or `null` when it was started without one.
   Future<String?> keyForId(String id) async => null;
 
+  /// Current state name of the live update [id] (`active`, `stale`, `ended`,
+  /// `dismissed`), or `null` when the platform no longer knows it.
+  Future<String?> stateForId(String id) async => null;
+
+  /// Current state name of the live update with key [key], as [stateForId].
+  Future<String?> stateForKey(String key) async => null;
+
   /// Button presses as `(update id, action id)`, of update [updateId] only
   /// when given. Presses go to the app only while one of these streams is
   /// listened to; otherwise the background action handler runs.

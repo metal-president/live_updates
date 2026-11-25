@@ -669,11 +669,14 @@ public final class LiveUpdatesBridge {
     }
     // Whether it is running: posted a moment ago (the system lists a new
     // notification only after a moment) or listed as running.
+    // An update ended a moment ago may still be listed as running.
     boolean recent;
+    boolean endedJustNow;
     synchronized (recentlyPosted) {
-      recent = recentlyPosted.containsKey(id) && !recentlyEnded.containsKey(id);
+      endedJustNow = recentlyEnded.containsKey(id);
+      recent = recentlyPosted.containsKey(id) && !endedJustNow;
     }
-    Notification shown = recent ? null : activeNotification(c, id);
+    Notification shown = recent || endedJustNow ? null : activeNotification(c, id);
     boolean running = recent || shown != null;
     synchronized (recentlyPosted) {
       recentlyPosted.remove(id);
@@ -697,7 +700,7 @@ public final class LiveUpdatesBridge {
     Notification.Builder builder = null;
     boolean keep = dismissAfterSeconds != 0;
     if (json != null && keep) {
-      builder = builder(c, new JSONObject(json), remote, true);
+      builder = builder(c, endedContent(new JSONObject(json)), remote, true);
     } else if (keep && emit && running && Build.VERSION.SDK_INT >= 26) {
       if (last != null) {
         // The content posted last, also when the system does not list it yet.
@@ -711,6 +714,9 @@ public final class LiveUpdatesBridge {
       if (Build.VERSION.SDK_INT >= 26) {
         builder.setTimeoutAfter(keepEndedMillis(dismissAfterSeconds));
       }
+      synchronized (keptEnded) {
+        keptEnded.add(id);
+      }
       manager(c).notify(TAG_PREFIX + id, NOTIFICATION_ID, builder.build());
     } else if (json == null && keep && !running) {
       // Ended before (for example a repeated remote end): an ended
@@ -719,6 +725,9 @@ public final class LiveUpdatesBridge {
       manager(c).cancel(TAG_PREFIX + id, NOTIFICATION_ID);
     }
   }
+
+  /** Ids whose ended notification this process posted (endAll removes them). */
+  private static final Set<String> keptEnded = new java.util.HashSet<>();
 
   /** Content and remote flag of the latest post of each running update, in this process. */
   private static final Map<String, Object[]> lastPosted = new HashMap<>();
@@ -744,12 +753,26 @@ public final class LiveUpdatesBridge {
   };
 
   /**
-   * {@code content} as an ended update shows it: without the timer (a countdown would run past
-   * zero), buttons and running-only options.
+   * {@code content} as an ended update shows it: without running timers (a countdown would run
+   * past zero), buttons and running-only options.
    */
   static JSONObject endedContent(JSONObject content) throws JSONException {
     JSONObject out = new JSONObject(content.toString());
     for (String key : RUNNING_ONLY_KEYS) out.remove(key);
+    org.json.JSONArray metrics = out.optJSONArray("metrics");
+    if (metrics != null) {
+      org.json.JSONArray still = new org.json.JSONArray();
+      for (int i = 0; i < metrics.length(); i++) {
+        JSONObject m = metrics.optJSONObject(i);
+        String type = m == null ? "" : m.optString("type");
+        if (!type.equals("timer") && !type.equals("stopwatch")) still.put(metrics.get(i));
+      }
+      if (still.length() != metrics.length()) {
+        out.remove("criticalMetric");
+        if (still.length() == 0) out.remove("metrics");
+        else out.put("metrics", still);
+      }
+    }
     return out;
   }
 
@@ -761,7 +784,7 @@ public final class LiveUpdatesBridge {
    * negative value (no duration given) keeps it the longest.
    */
   static long keepEndedMillis(double dismissAfterSeconds) {
-    if (dismissAfterSeconds < 0) return MAX_ENDED_MS;
+    if (dismissAfterSeconds < 0 || Double.isNaN(dismissAfterSeconds)) return MAX_ENDED_MS;
     return Math.max(1, Math.min((long) (dismissAfterSeconds * 1000), MAX_ENDED_MS));
   }
 
@@ -803,7 +826,11 @@ public final class LiveUpdatesBridge {
             .setDeleteIntent(null)
             .setUsesChronometer(false)
             .setChronometerCountDown(false)
+            .setWhen(System.currentTimeMillis())
             .setActions();
+    // Time metrics (Android 17) would keep running: no metric style.
+    String template = copy.extras.getString(Notification.EXTRA_TEMPLATE);
+    if (template != null && template.endsWith("MetricStyle")) b.setStyle(null);
     requestPromotedOngoing(b, false);
     android.os.Bundle extras = b.getExtras();
     extras.remove(EXTRA_STALE);
@@ -988,6 +1015,12 @@ public final class LiveUpdatesBridge {
   public static void endAll() throws JSONException {
     for (String id : activeIds()) end(id, null, 0);
     Context c = requireContext();
+    List<String> kept;
+    synchronized (keptEnded) {
+      kept = new ArrayList<>(keptEnded);
+      keptEnded.clear();
+    }
+    for (String id : kept) manager(c).cancel(TAG_PREFIX + id, NOTIFICATION_ID);
     for (StatusBarNotification n : manager(c).getActiveNotifications()) {
       String tag = n.getTag();
       if (n.getId() == NOTIFICATION_ID && tag != null && tag.startsWith(TAG_PREFIX)) {

@@ -307,6 +307,45 @@ public class LiveUpdatesBridgeTest {
   }
 
   @Test
+  public void finalContentDropsRunningTimersAndTimeMetrics() throws Exception {
+    String id = LiveUpdatesBridge.start("{\"title\":\"Order\"}");
+    LiveUpdatesBridge.end(
+        id,
+        "{\"title\":\"Arrived\",\"timerEnd\":1893456000,\"criticalMetric\":1,"
+            + "\"metrics\":[{\"label\":\"Stops\",\"type\":\"integer\",\"value\":3},"
+            + "{\"label\":\"ETA\",\"type\":\"timer\",\"value\":1893456000000}]}",
+        -1);
+    assertFalse(shown(id).extras.getBoolean(Notification.EXTRA_SHOW_CHRONOMETER));
+    JSONObject ended =
+        LiveUpdatesBridge.endedContent(
+            new JSONObject(
+                "{\"criticalMetric\":1,\"metrics\":[{\"type\":\"integer\",\"value\":3},"
+                    + "{\"type\":\"stopwatch\",\"value\":1}]}"));
+    assertEquals(1, ended.getJSONArray("metrics").length());
+    assertFalse(ended.has("criticalMetric"));
+    assertFalse(
+        LiveUpdatesBridge.endedContent(
+                new JSONObject("{\"metrics\":[{\"type\":\"timer\",\"value\":1}]}"))
+            .has("metrics"));
+  }
+
+  @Test
+  public void aNonFiniteDismissTimeUsesTheDefault() throws Exception {
+    assertEquals(4 * HOUR, LiveUpdatesBridge.keepEndedMillis(Double.NaN));
+    assertEquals(4 * HOUR, LiveUpdatesBridge.keepEndedMillis(Double.POSITIVE_INFINITY));
+  }
+
+  @Test
+  public void aSecondEndRightAfterTheFirstKeepsTheFinalContent() throws Exception {
+    String id = LiveUpdatesBridge.start("{\"title\":\"Order\"}");
+    LiveUpdatesBridge.end(id, "{\"title\":\"Delivered\"}", 300);
+    LiveUpdatesBridge.end(id, null, -1);
+    Notification n = shown(id);
+    assertEquals("Delivered", n.extras.getString(Notification.EXTRA_TITLE));
+    assertEquals(300_000, n.getTimeoutAfter());
+  }
+
+  @Test
   public void endAllAlsoRemovesEndedUpdates() throws Exception {
     String a = LiveUpdatesBridge.start("{\"title\":\"A\"}");
     String b = LiveUpdatesBridge.start("{\"title\":\"B\"}");

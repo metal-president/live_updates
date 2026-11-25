@@ -7,8 +7,10 @@
   buttons) instead of removing it at once, and `dismissAfter: null` (or a
   remote `end` without `live_updates_dismiss_after`) means four hours
   instead of until the user dismisses it. `dismissAfter` is capped at four
-  hours. Pass `Duration.zero` to remove it at once. See Upgrading in the
-  README.
+  hours. Pass `Duration.zero` to remove it at once. Running timers and
+  timer or stopwatch metrics are left out of the ended notification, also
+  from `finalContent`. `endAll()` removes ended notifications too. See
+  Upgrading in the README.
 
 ## 0.3.0
 

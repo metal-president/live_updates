@@ -168,6 +168,13 @@ public final class LiveUpdatesBridge {
   public static boolean isPromoted(@NonNull String id) {
     Context c = context;
     if (c == null || Build.VERSION.SDK_INT < 36) return false;
+    // Ended in this process: the system may still list it for a moment, as
+    // in activeIds().
+    long now = SystemClock.uptimeMillis();
+    synchronized (recentlyPosted) {
+      recentlyEnded.values().removeIf(t -> now - t > RECENT_MS);
+      if (recentlyEnded.containsKey(id)) return false;
+    }
     for (StatusBarNotification n : manager(c).getActiveNotifications()) {
       if (n.getId() == NOTIFICATION_ID && (TAG_PREFIX + id).equals(n.getTag())) {
         return (n.getNotification().flags & Notification.FLAG_PROMOTED_ONGOING) != 0;

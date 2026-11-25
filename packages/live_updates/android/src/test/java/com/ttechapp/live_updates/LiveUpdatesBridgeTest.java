@@ -835,6 +835,15 @@ public class LiveUpdatesBridgeTest {
   }
 
   @Test
+  public void isPromotedIsFalseRightAfterEnd() throws Exception {
+    showWithFlags("ended", Notification.FLAG_ONGOING_EVENT | Notification.FLAG_PROMOTED_ONGOING);
+    LiveUpdatesBridge.end("ended", null, 0);
+    // The system may still list the notification for a moment.
+    showWithFlags("ended", Notification.FLAG_ONGOING_EVENT | Notification.FLAG_PROMOTED_ONGOING);
+    assertFalse(LiveUpdatesBridge.isPromoted("ended"));
+  }
+
+  @Test
   public void isPromotedIsFalseForAnUnknownId() {
     showWithFlags("other", Notification.FLAG_PROMOTED_ONGOING);
     assertFalse(LiveUpdatesBridge.isPromoted("missing"));

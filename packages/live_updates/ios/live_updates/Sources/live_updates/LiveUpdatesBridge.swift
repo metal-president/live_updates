@@ -33,10 +33,11 @@ public final class LiveUpdatesBridge: NSObject {
   /// Whether the app's Live Activity widget extension supports the running
   /// iOS. An extension that targets a newer iOS (17.2 before live_updates
   /// 0.4.0) is not loaded, and no activity would show. The extension made by
-  /// `create_widget` has `LiveUpdatesWidget` in its Info.plist; without that
-  /// key (older extensions) every widget extension of the app must support
-  /// the running iOS. `true` when the app has no widget extension (as before;
-  /// ActivityKit then reports the problem).
+  /// `create_widget` has `LiveUpdatesWidget` in its Info.plist (a Boolean, or
+  /// the string YES). Without that key (an extension not set up again since
+  /// live_updates 0.4.0) any widget extension that supports the running iOS
+  /// will do, as before. `true` when the app has no widget extension (as
+  /// before; ActivityKit then reports the problem).
   static let widgetExtensionRuns: Bool = {
     guard let dir = Bundle.main.builtInPlugInsURL,
       let items = try? FileManager.default.contentsOfDirectory(
@@ -53,14 +54,16 @@ public final class LiveUpdatesBridge: NSObject {
       let minimum = OperatingSystemVersion(
         majorVersion: parts.first ?? 0, minorVersion: parts.count > 1 ? parts[1] : 0,
         patchVersion: parts.count > 2 ? parts[2] : 0)
+      let flag = info["LiveUpdatesWidget"]
+      let marked =
+        (flag as? Bool)
+        ?? (flag as? String).map { ["yes", "true", "1"].contains($0.lowercased()) } ?? false
       widgets.append(
-        (
-          marked: info["LiveUpdatesWidget"] as? Bool ?? false,
-          runs: ProcessInfo.processInfo.isOperatingSystemAtLeast(minimum)
-        ))
+        (marked: marked, runs: ProcessInfo.processInfo.isOperatingSystemAtLeast(minimum)))
     }
     let marked = widgets.filter(\.marked)
-    return (marked.isEmpty ? widgets : marked).allSatisfy(\.runs)
+    if !marked.isEmpty { return marked.allSatisfy(\.runs) }
+    return widgets.isEmpty || widgets.contains(where: \.runs)
   }()
 
   /// Error for calls below iOS 16.2.

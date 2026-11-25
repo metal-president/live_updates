@@ -136,6 +136,19 @@ Future<int> createWidget(List<String> args, {Directory? templates}) async {
     f.writeAsStringSync(content);
     stdout.writeln('write  ${f.path}');
   }
+  // A kept Info.plist (made before 0.4.0) gets the marker the plugin uses to
+  // find its widget extension (see LiveUpdatesBridge.widgetExtensionRuns).
+  final widgetPlist = '${out.path}/Info.plist';
+  if (!_plistBuddy('Print :LiveUpdatesWidget', widgetPlist)) {
+    if (_plistBuddy('Add :LiveUpdatesWidget bool true', widgetPlist)) {
+      stdout.writeln('update $widgetPlist (LiveUpdatesWidget = true)');
+    } else {
+      stderr.writeln(
+        'Could not add LiveUpdatesWidget to $widgetPlist; add it as a '
+        'Boolean set to YES.',
+      );
+    }
+  }
 
   if (editXcode) {
     if (!_enableLiveActivities('${ios.path}/Runner/Info.plist')) return 1;

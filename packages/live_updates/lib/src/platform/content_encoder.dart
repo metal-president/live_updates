@@ -56,20 +56,36 @@ mixin ContentEncoder {
     // A picture that cannot be stored is left out (with a warning), not the
     // whole content.
     if (storesIconAssets && (content.ios?.extraImages.isNotEmpty ?? false)) {
-      final names = <String, String>{};
-      for (final MapEntry(:key, :value) in content.ios!.extraImages.entries) {
-        try {
-          // Inside the try: without an App Group there is no store.
-          final store = _store ??= ImageStore(_directory);
-          names[key] = await store.store(value, keepUntil: showAt);
-        } on Object catch (e) {
-          // Such as a missing file or asset (a FlutterError), a failed
-          // download or no App Group; programming errors still surface.
-          if (e is Error && e is! FlutterError) rethrow;
-          debugPrint('live_updates: extra image "$key" left out: $e');
+      final images = content.ios!.extraImages;
+      // A wrong size is a mistake in the code, as for the main image.
+      for (final MapEntry(:key, :value) in images.entries) {
+        if (value.maxDimension <= 0) {
+          throw LiveUpdateException(
+            'extraImages["$key"]: maxDimension must be positive, got '
+            '${value.maxDimension}',
+          );
         }
       }
-      if (names.isNotEmpty) json['extraImages'] = names;
+      if (imageDirectory == null) {
+        debugPrint(
+          'live_updates: extra images ${images.keys.join(', ')} left out: '
+          '$missingImageDirectoryHint',
+        );
+      } else {
+        final store = _store ??= ImageStore(_directory);
+        final names = <String, String>{};
+        for (final MapEntry(:key, :value) in images.entries) {
+          try {
+            names[key] = await store.store(value, keepUntil: showAt);
+          } on Object catch (e) {
+            // Such as a missing file or asset (a FlutterError) or a failed
+            // download; other errors are mistakes in the code.
+            if (e is Error && e is! FlutterError) rethrow;
+            debugPrint('live_updates: extra image "$key" left out: $e');
+          }
+        }
+        if (names.isNotEmpty) json['extraImages'] = names;
+      }
     }
     if (content.endedContent?.image case final image?) {
       final store = _store ??= ImageStore(_directory);

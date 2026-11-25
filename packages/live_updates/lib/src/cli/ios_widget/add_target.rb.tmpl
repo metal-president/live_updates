@@ -127,8 +127,9 @@ def report_deployment_target(project, target, name)
          "To support iOS 16, lower the deployment target of #{name} to 16.2 in Xcode " \
          'and check that your layout builds for it (until then live_updates reports ' \
          'isSupported() false on older iOS versions).'
-  elsif unknown.any?
-    puts "Could not read the deployment target of #{name} (#{unknown.join(', ')}). " \
+  elsif unknown.any? || values.empty?
+    shown = unknown.any? ? " (#{unknown.join(', ')})" : ''
+    puts "Could not read the deployment target of #{name}#{shown}. " \
          'Live Activities can show from iOS 16.2 when it is 16.2 or lower.'
   end
 end

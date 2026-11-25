@@ -160,9 +160,9 @@ activity token for that key (or the push-to-start token to start one).
   older than the last one it applied.
 - `start` (with the push-to-start token) also needs
   `"attributes-type": "LiveUpdatesAttributes"`, `"attributes": {"key": "order-1234"}`
-  and an `alert` with `title` and `body`. Prefer a key that no running
-  activity on the device has: iOS shows both until the app runs, then the
-  plugin ends the older one (Android replaces the notification at once).
+  and an `alert` with `title` and `body`. Use a key that no running
+  activity on the device has: iOS adds a second activity (Android replaces
+  the notification); update a running one with its activity token instead.
 - `end` takes `dismissal-date` (a UNIX time in seconds); `stale-date`
   (also a UNIX time), `relevance-score` and
   `alert` go next to `content-state`, not inside it. The content of an

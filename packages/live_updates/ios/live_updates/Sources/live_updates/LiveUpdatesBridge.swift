@@ -56,16 +56,6 @@ public final class LiveUpdatesBridge: NSObject {
   static func request(_ payload: Payload, key: String?, start: Date? = nil) throws
     -> Activity<LiveUpdatesAttributes>
   {
-    let activity = try requestActivity(payload, key: key, start: start)
-    // This app's own activity: never taken for a push-to-start duplicate.
-    noteSeen(activity.id)
-    return activity
-  }
-
-  @available(iOS 17.2, *)
-  private static func requestActivity(_ payload: Payload, key: String?, start: Date?) throws
-    -> Activity<LiveUpdatesAttributes>
-  {
     let wantsPush = payload.enablePushUpdates ?? false
     var pushType: PushType? = wantsPush ? .token : nil
     if let channel = payload.broadcastChannelId {
@@ -142,13 +132,8 @@ public final class LiveUpdatesBridge: NSObject {
   @available(iOS 17.2, *)
   @MainActor
   static func startOrUpdateNow(_ key: String, payload: Payload) async throws -> String {
-    // A push-to-start may have added a newer activity with the key: update
-    // that one, not the one about to be ended.
-    await endDuplicateKeys()
-    // One the app is ending (such as an older duplicate) is not updated.
     let withKey = Activity<LiveUpdatesAttributes>.activities.filter {
       $0.attributes.key == key && !isPending($0)
-        && !(($0.activityState == .active || $0.activityState == .stale) && endedByApp($0.id))
     }
     if let activity = withKey.first(where: {
       $0.activityState == .active || $0.activityState == .stale
@@ -341,82 +326,6 @@ public final class LiveUpdatesBridge: NSObject {
     if final == nil && state == base.state && staleDate == base.staleDate { return nil }
     return ActivityContent(
       state: state, staleDate: staleDate, relevanceScore: base.relevanceScore)
-  }
-
-  /// UserDefaults key with the ids of activities the plugin has seen, so a
-  /// new activity (such as one started by a push-to-start) can be told from
-  /// older ones with its key. Pruned to the activities the system lists.
-  static let seenIdsKey = "live_updates.seenIds"
-
-  /// Watches for activities that share a key, as a push-to-start with the
-  /// key of a running activity creates: the newest one stays and the older
-  /// ones end, as `startOrUpdate` and Android keep one update per key. Runs
-  /// once now and then for every activity that appears while the app runs.
-  static func watchDuplicateKeys() {
-    guard #available(iOS 17.2, *) else { return }
-    // Every engine registers the plugin: one watcher per process.
-    guard duplicateWatcher == nil else { return }
-    duplicateWatcher = Task { @MainActor in
-      await endDuplicateKeys()
-      for await _ in Activity<LiveUpdatesAttributes>.activityUpdates {
-        await endDuplicateKeys()
-      }
-    }
-  }
-
-  private static var duplicateWatcher: Task<Void, Never>?
-  private static let seenLock = NSLock()
-
-  /// Adds `id` to the activities the plugin has seen.
-  static func noteSeen(_ id: String) { addSeen([id]) }
-
-  private static func seenIds() -> Set<String> {
-    seenLock.lock()
-    defer { seenLock.unlock() }
-    return Set(UserDefaults.standard.stringArray(forKey: seenIdsKey) ?? [])
-  }
-
-  /// Adds `ids` to the seen ones, keeping only activities the system lists.
-  private static func addSeen(_ ids: [String]) {
-    guard #available(iOS 17.2, *) else { return }
-    let listed = Set(Activity<LiveUpdatesAttributes>.activities.map(\.id))
-    seenLock.lock()
-    defer { seenLock.unlock() }
-    var seen = Set(UserDefaults.standard.stringArray(forKey: seenIdsKey) ?? [])
-    seen.formUnion(ids)
-    seen = seen.filter { listed.contains($0) || ids.contains($0) }
-    UserDefaults.standard.set(Array(seen), forKey: seenIdsKey)
-  }
-
-  /// Ends the older activities of every key that more than one running
-  /// activity has (ended ones with that key are removed too). The newest is
-  /// the one running activity of the key that the plugin has not seen
-  /// before: activities this app requests are seen at once, so an unseen
-  /// one came from a push-to-start. When it cannot tell (several unseen,
-  /// such as two push-to-starts while the app was not running, or the first
-  /// launch with this version), nothing is ended: the system lists
-  /// activities in no documented order.
-  @available(iOS 17.2, *)
-  @MainActor
-  static func endDuplicateKeys() async {
-    // One snapshot for the decision and for what counts as seen afterwards.
-    let all = Activity<LiveUpdatesAttributes>.activities
-    let listed = all.filter { !isPending($0) }
-    let seen = seenIds()
-    // Seen only once the older ones are ending (endNow marks them before its
-    // first suspension), so a concurrent pass makes the same decision.
-    defer { addSeen(all.map(\.id)) }
-    let keyed = listed.filter {
-      $0.attributes.key != nil && $0.activityState != .dismissed && !endedByApp($0.id)
-    }
-    for (_, group) in Dictionary(grouping: keyed, by: { $0.attributes.key ?? "" }) {
-      let running = group.filter { $0.activityState == .active || $0.activityState == .stale }
-      let unseen = running.filter { !seen.contains($0.id) }
-      guard group.count > 1, unseen.count == 1, let keep = unseen.first else { continue }
-      let others = group.filter { $0.id != keep.id }
-      guard others.allSatisfy({ seen.contains($0.id) }) else { continue }
-      for other in others { await endNow(other) }
-    }
   }
 
   /// Directory for images shared with the widget, or `nil` when the

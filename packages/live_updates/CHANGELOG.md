@@ -40,12 +40,8 @@
   public text, unless set) and to Android's alert. The platform options
   still work and the iOS one takes precedence. `copyWith` does not carry it
   over.
-- iOS: a push-to-start with the key of a running activity no longer leaves
-  two activities: when the app runs, the plugin ends the older one (the
-  plugin remembers the activities it has seen in UserDefaults). A
-  `LiveUpdate` the app held for the older one then reports it ended: get the
-  current one with `LiveUpdates.find(key)`. The default alert of a scheduled
-  start uses the public text when the content has one.
+- iOS: the default alert of a scheduled start uses the public text when
+  the content has one.
 - Docs: `stale` is reported on both platforms (since 0.3.0), and `ended`
   also after Android's `maxDuration` and `removeAtEnd`.
 

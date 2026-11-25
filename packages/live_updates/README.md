@@ -381,13 +381,11 @@ final update = await LiveUpdates.find('order-1234');
 On Android the key is the update's id and is the same as `live_updates_id`
 in remote payloads, so the app and the server address the same notification.
 On iOS the key is stored in the activity's attributes; a push-to-start can set
-it with `"attributes": {"key": "order-1234"}`. A push-to-start with the key of
-a running activity adds a second one, as iOS cannot replace it; the plugin
-ends the older one when the app runs (on Android a remote `start` replaces the
-notification at once). It cannot tell which is newer when several
-push-to-starts with the key arrived while the app was not running: then both
-stay, so prefer a new key. A `LiveUpdate` the app held for the older one then
-fails to update: call `find` again after a push-to-start.
+it with `"attributes": {"key": "order-1234"}`. Unlike a remote `start` on Android,
+which replaces the notification, a push-to-start with the key of a running
+activity adds a second one (iOS cannot replace an activity, and does not say
+which of the two is newer). Send a push-to-start only for a key that is not
+running, and update a running one with its push token instead.
 
 ### Scheduling
 
@@ -1204,8 +1202,7 @@ apply them again:
   platform (the final content, or the content shown last).
 - **iOS `startOrUpdate` replaces an ended activity** with the key that is
   still on the Lock Screen, instead of doing nothing; only an activity the
-  user dismissed still keeps the key from starting. A push-to-start with
-  the key of a running activity ends the older one when the app runs.
+  user dismissed still keeps the key from starting.
 - **Android remote `alert`:** an `alert` object in `live_updates_content`
   now alerts. Send `"androidAlert": false` to keep such an update silent.
 

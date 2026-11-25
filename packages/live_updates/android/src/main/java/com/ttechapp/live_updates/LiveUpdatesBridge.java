@@ -299,10 +299,8 @@ public final class LiveUpdatesBridge {
     Context c = requireContext();
     // A key the user dismissed stays hidden until the app ends it.
     if (isDismissed(c, key)) return key;
-    // Only a new update fails. One that started and has not ended is updated
-    // (a no-op while nothing can be shown), as update() does: the system
-    // stops listing the notifications of a blocked app or channel.
-    if (strict && !isShown(key) && !hasStartTime(c, key)) requireShowable(c, json);
+    // Nothing can be shown: fail, as start() and update() do.
+    if (strict) requireShowable(c, json);
     post(key, new JSONObject(json), false, true);
     return key;
   }
@@ -671,11 +669,9 @@ public final class LiveUpdatesBridge {
     if (isDismissed(c, id)) {
       throw new IllegalStateException("Live update " + id + " was dismissed by the user");
     }
-    // When notifications were blocked after the start nothing is shown;
-    // posting is a harmless no-op then.
-    if (!isShown(id) && manager(c).areNotificationsEnabled() && !channelBlocked(c, json)) {
-      throw new IllegalStateException("Unknown live update " + id);
-    }
+    // Nothing can be shown (the system also stops listing the update).
+    requireShowable(c, json);
+    if (!isShown(id)) throw new IllegalStateException("Unknown live update " + id);
     post(id, new JSONObject(json));
   }
 
@@ -1355,13 +1351,6 @@ public final class LiveUpdatesBridge {
       }
       prefs(c).edit().putString(PREF_START_TIMES, times.toString()).apply();
       return now;
-    }
-  }
-
-  /** Whether {@code id} started and has not ended (its start time is kept until then). */
-  private static boolean hasStartTime(Context c, String id) {
-    synchronized (actionLock) {
-      return readObject(prefs(c), PREF_START_TIMES).has(id);
     }
   }
 

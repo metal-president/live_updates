@@ -20,7 +20,9 @@ final class LiveUpdate {
 
   LiveUpdatesPlatform get _platform => LiveUpdatesPlatform.instance;
 
-  /// Replaces the shown content.
+  /// Replaces the shown content. Throws a [LiveUpdateException] when the
+  /// update has ended, and on Android also while notifications are turned
+  /// off for the app or for its channel.
   Future<void> update(LiveUpdateContent content) =>
       _platform.update(id, content);
 

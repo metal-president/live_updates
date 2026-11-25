@@ -154,6 +154,9 @@ final class LiveUpdateContent {
   /// and vibration of the notification channel, as
   /// [AndroidLiveUpdateOptions.alert] does; the first post of an update
   /// alerts anyway. Android allows one alert per update every 10 seconds.
+  ///
+  /// [LiveUpdate.end] never alerts, also with this set on its final
+  /// content: [LiveUpdate.update] with the alert first.
   final LiveUpdateAlert? alert;
 
   /// iOS-only options.

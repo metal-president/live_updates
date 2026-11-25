@@ -610,14 +610,34 @@ public class LiveUpdatesBridgeTest {
   }
 
   @Test
-  public void startOrUpdateOfAShownKeyDoesNotFailOnABlockedChannel() throws Exception {
+  public void updatesFailOnceTheChannelIsTurnedOff() throws Exception {
     LiveUpdatesBridge.startOrUpdate("shown-key", "{\"title\":\"A\",\"channelId\":\"later-off\"}");
     manager.getNotificationChannel("later-off").setImportance(NotificationManager.IMPORTANCE_NONE);
-    // The system no longer lists the notifications of a blocked channel.
-    manager.cancel(LiveUpdatesBridge.TAG_PREFIX + "shown-key", LiveUpdatesBridge.NOTIFICATION_ID);
-    LiveUpdatesBridge.forgetPostsInProcess("shown-key");
-    // As update(): the started update is updated (a no-op), not an error.
-    LiveUpdatesBridge.startOrUpdate("shown-key", "{\"title\":\"B\",\"channelId\":\"later-off\"}");
+    for (Runnable call :
+        new Runnable[] {
+          () -> {
+            try {
+              LiveUpdatesBridge.startOrUpdate(
+                  "shown-key", "{\"title\":\"B\",\"channelId\":\"later-off\"}");
+            } catch (org.json.JSONException e) {
+              throw new AssertionError(e);
+            }
+          },
+          () -> {
+            try {
+              LiveUpdatesBridge.update("shown-key", "{\"title\":\"B\",\"channelId\":\"later-off\"}");
+            } catch (org.json.JSONException e) {
+              throw new AssertionError(e);
+            }
+          },
+        }) {
+      try {
+        call.run();
+        org.junit.Assert.fail("must fail while nothing can be shown");
+      } catch (IllegalStateException expected) {
+        // As start().
+      }
+    }
   }
 
   @Test
@@ -653,15 +673,6 @@ public class LiveUpdatesBridgeTest {
     } catch (IllegalStateException expected) {
       // The user turned that channel off.
     }
-  }
-
-  @Test
-  public void updateToABlockedChannelDoesNotThrow() throws Exception {
-    // The user turned the channel off: the system never lists the posts.
-    manager.createNotificationChannel(
-        new android.app.NotificationChannel(
-            "off", "Off", NotificationManager.IMPORTANCE_NONE));
-    LiveUpdatesBridge.update("never-listed", "{\"title\":\"A\",\"channelId\":\"off\"}");
   }
 
   @Test

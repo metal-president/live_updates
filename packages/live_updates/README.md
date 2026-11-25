@@ -267,9 +267,9 @@ differently.
 - **Permissions:** on Android 13 and later nothing is shown until the user
   grants the notification permission, including updates started by a
   remote message. ([source][android-permission]) While notifications are
-  turned off for the app or for its channel, `start` and `startOrUpdate`
-  throw a `LiveUpdateException` for a new update, as on iOS with Live
-  Activities turned off (from 0.4.0). `isSupported()` tells you beforehand
+  turned off for the app or for its channel, `start`, `startOrUpdate` and
+  `update` throw a `LiveUpdateException`, as on iOS with Live Activities
+  turned off (from 0.4.0). `isSupported()` tells you beforehand
   whether notifications are on for the app; a turned-off channel shows only
   in the exception.
 - **After `end`:** from 0.4.0 the final content (or the content shown last)
@@ -384,7 +384,9 @@ On iOS the key is stored in the activity's attributes; a push-to-start can set
 it with `"attributes": {"key": "order-1234"}`. A push-to-start with the key of
 a running activity adds a second one, as iOS cannot replace it; the plugin
 ends the older one when the app runs (on Android a remote `start` replaces the
-notification at once). A `LiveUpdate` the app held for the older one then
+notification at once). It cannot tell which is newer when several
+push-to-starts with the key arrived while the app was not running: then both
+stay, so prefer a new key. A `LiveUpdate` the app held for the older one then
 fails to update: call `find` again after a push-to-start.
 
 ### Scheduling
@@ -746,6 +748,8 @@ await update.update(
   one content works for both; on iOS the alert goes in `aps.alert`, next to
   `content-state`.
 - `copyWith` does not carry `alert` over: it belongs to one post.
+- `end` never alerts (iOS ends a Live Activity silently): to announce
+  "Delivered", `update` with an alert first, then `end`.
 
 ### Android progress stages, timeout and alerts
 
@@ -1192,10 +1196,10 @@ apply them again:
   `live_updates_dismiss_after`) means 4 hours instead of "until dismissed".
   To remove it at once as before, pass `dismissAfter: Duration.zero` (remote:
   `"live_updates_dismiss_after": 0`). `endAll()` removes these too.
-- **Android `start` and `startOrUpdate` throw a `LiveUpdateException`** while
-  notifications are turned off for the app or its channel, as on iOS.
-  Before, they returned an update that was never shown. Check
-  `isSupported()` first, or catch the exception.
+- **Android `start`, `startOrUpdate` and `update` throw a
+  `LiveUpdateException`** while notifications are turned off for the app or
+  its channel, as on iOS. Before, they returned as if the update were
+  shown. Check `isSupported()` first, or catch the exception.
 - **What stays after `end` has no buttons or running timers** on either
   platform (the final content, or the content shown last).
 - **iOS `startOrUpdate` replaces an ended activity** with the key that is

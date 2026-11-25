@@ -101,6 +101,7 @@ void main() {
             ),
             // Cannot be stored: left out, not the whole content.
             'missing': LiveUpdateImage.file('example/assets/none.png'),
+            'missingAsset': LiveUpdateImage.asset('assets/none.png'),
           },
         ),
       );
@@ -119,6 +120,12 @@ void main() {
         await _Encoder(dir).encodeContent(content),
       ) as Map<String, Object?>;
       expect(android.containsKey('extraImages'), isFalse);
+      // Without an App Group the pictures are left out, not the content.
+      final noGroup = jsonDecode(
+        await _Encoder(null, ios: true).encodeContent(content),
+      ) as Map<String, Object?>;
+      expect(noGroup.containsKey('extraImages'), isFalse);
+      expect(noGroup['extra'], {'map': 'text'});
     });
   });
 
@@ -147,14 +154,14 @@ void main() {
 class _Encoder with ContentEncoder {
   _Encoder(this.dir, {this.ios = false});
 
-  final Directory dir;
+  final Directory? dir;
   final bool ios;
 
   @override
   bool get storesIconAssets => ios;
 
   @override
-  String? get imageDirectory => dir.path;
+  String? get imageDirectory => dir?.path;
 
   @override
   String get missingImageDirectoryHint => '';

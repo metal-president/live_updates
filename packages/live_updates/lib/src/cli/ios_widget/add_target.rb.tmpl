@@ -111,24 +111,33 @@ def ensure_assets(project, target, name, ext_dir)
   target.resources_build_phase.add_file_reference(ref)
 end
 
-# Live Activities need iOS 16.2: an extension created for a higher target
-# (17.2 before live_updates 0.4.0) is lowered, so iOS 16.2+ can show them.
-def lower_deployment_target(target)
-  lowered = false
-  target.build_configurations.each do |config|
-    current = config.build_settings['IPHONEOS_DEPLOYMENT_TARGET']
-    next unless current && Gem::Version.new(current) > Gem::Version.new('16.2')
-    config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '16.2'
-    lowered = true
+# Live Activities can show from iOS 16.2. An existing extension (created
+# for 17.2 before live_updates 0.4.0) is not changed, as layout code kept in
+# it may need a newer iOS: this only tells the user how to support 16.2.
+def report_deployment_target(project, target, name)
+  values = target.build_configurations.map do |config|
+    config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] ||
+      project.build_configurations.find { |c| c.name == config.name }
+        &.build_settings&.[]('IPHONEOS_DEPLOYMENT_TARGET')
+  end.compact.uniq
+  higher = values.select { |v| Gem::Version.correct?(v) && Gem::Version.new(v) > Gem::Version.new('16.2') }
+  unknown = values.reject { |v| Gem::Version.correct?(v) }
+  if higher.any?
+    puts "#{name} targets iOS #{higher.join(', ')}; Live Activities can show from iOS 16.2. " \
+         "To support iOS 16, lower the deployment target of #{name} to 16.2 in Xcode " \
+         'and check that your layout builds for it (until then live_updates reports ' \
+         'isSupported() false on older iOS versions).'
+  elsif unknown.any?
+    puts "Could not read the deployment target of #{name} (#{unknown.join(', ')}). " \
+         'Live Activities can show from iOS 16.2 when it is 16.2 or lower.'
   end
-  lowered
 end
 
 if (existing = project.targets.find { |t| t.name == name })
   ensure_widget_files(project, existing, name, ext_dir)
   ensure_assets(project, existing, name, ext_dir)
   ensure_shared_intent(project, [runner, existing], name)
-  puts "Lowered the deployment target of #{name} to iOS 16.2." if lower_deployment_target(existing)
+  report_deployment_target(project, existing, name)
   project.save
   if use_group
     configure_app_group(project, runner, ios_dir, 'Runner/Runner.entitlements', groups)
@@ -136,7 +145,7 @@ if (existing = project.targets.find { |t| t.name == name })
     project.save
     puts "Target #{name} already exists; configured App Groups #{groups.values.uniq.join(', ')}."
   else
-    puts "Target #{name} already exists; skipping Xcode changes."
+    puts "Target #{name} already exists; refreshed its files."
   end
   exit 0
 end

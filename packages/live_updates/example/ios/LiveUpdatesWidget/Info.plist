@@ -8,6 +8,8 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LiveUpdatesAppGroup</key>
 	<string>$(LIVE_UPDATES_APP_GROUP)</string>
+	<key>LiveUpdatesWidget</key>
+	<true/>
 	<key>NSExtension</key>
 	<dict>
 		<key>NSExtensionPointIdentifier</key>

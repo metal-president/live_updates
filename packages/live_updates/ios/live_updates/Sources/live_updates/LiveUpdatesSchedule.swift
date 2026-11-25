@@ -223,7 +223,8 @@ extension LiveUpdatesBridge {
     set { UserDefaults.standard.set(newValue, forKey: schedulesKey) }
   }
 
-  /// Protects the images that `json` names (`image`, `endedContent.image`)
+  /// Protects the images that `json` names (`image`, `endedContent.image`,
+  /// `extraImages`)
   /// from the clean-up of unused images (Dart's ImageStore, which deletes
   /// files a day after their modification date) until `date`.
   static func keepImages(of json: String, until date: Date) {

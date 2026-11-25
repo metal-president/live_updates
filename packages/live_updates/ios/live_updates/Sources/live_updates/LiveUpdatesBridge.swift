@@ -30,30 +30,37 @@ public final class LiveUpdatesBridge: NSObject {
     return false
   }
 
-  /// Whether a widget extension of the app supports the running iOS. An
-  /// extension that targets a newer iOS (17.2 before live_updates 0.4.0) is
-  /// not loaded, and no activity would show. `true` when the app has no
-  /// widget extension (as before; ActivityKit then reports the problem).
+  /// Whether the app's Live Activity widget extension supports the running
+  /// iOS. An extension that targets a newer iOS (17.2 before live_updates
+  /// 0.4.0) is not loaded, and no activity would show. The extension made by
+  /// `create_widget` has `LiveUpdatesWidget` in its Info.plist; without that
+  /// key (older extensions) every widget extension of the app must support
+  /// the running iOS. `true` when the app has no widget extension (as before;
+  /// ActivityKit then reports the problem).
   static let widgetExtensionRuns: Bool = {
     guard let dir = Bundle.main.builtInPlugInsURL,
       let items = try? FileManager.default.contentsOfDirectory(
         at: dir, includingPropertiesForKeys: nil)
     else { return true }
-    var found = false
+    var widgets: [(marked: Bool, runs: Bool)] = []
     for url in items where url.pathExtension == "appex" {
       guard let info = Bundle(url: url)?.infoDictionary,
         let ext = info["NSExtension"] as? [String: Any],
         ext["NSExtensionPointIdentifier"] as? String == "com.apple.widgetkit-extension"
       else { continue }
-      found = true
       let parts = ((info["MinimumOSVersion"] as? String) ?? "0").split(separator: ".")
         .map { Int($0) ?? 0 }
       let minimum = OperatingSystemVersion(
         majorVersion: parts.first ?? 0, minorVersion: parts.count > 1 ? parts[1] : 0,
         patchVersion: parts.count > 2 ? parts[2] : 0)
-      if ProcessInfo.processInfo.isOperatingSystemAtLeast(minimum) { return true }
+      widgets.append(
+        (
+          marked: info["LiveUpdatesWidget"] as? Bool ?? false,
+          runs: ProcessInfo.processInfo.isOperatingSystemAtLeast(minimum)
+        ))
     }
-    return !found
+    let marked = widgets.filter(\.marked)
+    return (marked.isEmpty ? widgets : marked).allSatisfy(\.runs)
   }()
 
   /// Error for calls below iOS 16.2.

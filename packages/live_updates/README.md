@@ -130,6 +130,8 @@ With `--no-xcode` only the widget sources are written. Then, in Xcode:
 4. For images: add the App Groups capability with the same group to both
    targets and set `LiveUpdatesAppGroup` to that group in both Info.plist
    files.
+5. In the widget's `Info.plist`, add `LiveUpdatesWidget` = YES, so the plugin
+   checks that this extension supports the running iOS.
 
 ### Android
 
@@ -1291,10 +1293,14 @@ apply them again:
   a countdown that is already over. Pass
   `AndroidLiveUpdateOptions(removeAtCountdownEnd: false)` to keep it.
 - **iOS 16.2 and later:** Live Activities now work from iOS 16.2. Run
-  `create_widget` again: it lowers the deployment target of an existing
-  `LiveUpdatesWidget` target to 16.2 (with `--no-xcode`, lower it in Xcode).
-  Until then, `isSupported()` stays `false` on iOS 16, so the app does not
-  start activities that no widget can show.
+  `create_widget` again, then lower the deployment target of the
+  `LiveUpdatesWidget` target to 16.2 in Xcode and check that your layout file
+  builds for it (`create_widget` does not change an existing target, and
+  says when it is higher). Also add `LiveUpdatesWidget` = YES to the widget's
+  `Info.plist` (new widgets have it), so the plugin checks that extension.
+  Until the extension supports the device's iOS, `isSupported()` stays
+  `false` there, so the app does not start activities that no widget can
+  show.
 - **What stays after `end` has no buttons or running timers** on either
   platform (the final content, or the content shown last).
 - **iOS `startOrUpdate` replaces an ended activity** with the key that is

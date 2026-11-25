@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:flutter/foundation.dart' show debugPrint;
+import 'package:flutter/foundation.dart' show FlutterError, debugPrint;
 import 'package:flutter/services.dart' show AssetManifest, rootBundle;
 
 import '../icon_checks.dart';
@@ -56,13 +56,16 @@ mixin ContentEncoder {
     // A picture that cannot be stored is left out (with a warning), not the
     // whole content.
     if (storesIconAssets && (content.ios?.extraImages.isNotEmpty ?? false)) {
-      final store = _store ??= ImageStore(_directory);
       final names = <String, String>{};
       for (final MapEntry(:key, :value) in content.ios!.extraImages.entries) {
         try {
+          // Inside the try: without an App Group there is no store.
+          final store = _store ??= ImageStore(_directory);
           names[key] = await store.store(value, keepUntil: showAt);
-        } on Exception catch (e) {
-          // Such as a missing file or asset, or a failed download.
+        } on Object catch (e) {
+          // Such as a missing file or asset (a FlutterError), a failed
+          // download or no App Group; programming errors still surface.
+          if (e is Error && e is! FlutterError) rethrow;
           debugPrint('live_updates: extra image "$key" left out: $e');
         }
       }

@@ -59,9 +59,10 @@
   activity.
 - Live Activities on iOS 16.2 and later (was 17.2): everything works
   except buttons (iOS 17.0; none are shown before) and push-to-start (iOS
-  17.2). Run `create_widget` again: it lowers the deployment target of an
-  existing widget extension to 16.2. Until the extension supports the
-  device's iOS, `isSupported()` stays `false` there.
+  17.2). For an existing widget extension, lower its deployment target to
+  16.2 in Xcode (`create_widget` says when it is higher) and add
+  `LiveUpdatesWidget` = YES to its Info.plist. Until the extension supports
+  the device's iOS, `isSupported()` stays `false` there.
 - `IosLiveUpdateOptions.extraImages`: more pictures for custom iOS layouts,
   stored like `image` and read in the widget with
   `LiveUpdatesImages.url(context.state.extraImages["key"])`. Run

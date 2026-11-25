@@ -42,6 +42,26 @@ void main() {
     });
   });
 
+  testWidgets('keeps images of scheduled content until it is shown', (
+    tester,
+  ) async {
+    await tester.runAsync(() async {
+      final later = DateTime.now().add(const Duration(days: 3));
+      final name = await store.store(
+        LiveUpdateImage.file('example/assets/parcel.png'),
+        keepUntil: later,
+      );
+      final file = File('${dir.path}/$name');
+      expect(file.lastModifiedSync().difference(later).inSeconds.abs(), 0);
+      // Storing it again for content shown now does not shorten that.
+      await store.store(LiveUpdateImage.file('example/assets/parcel.png'));
+      expect(file.lastModifiedSync().difference(later).inSeconds.abs(), 0);
+      // Another write cleans up, but not this file.
+      await store.store(LiveUpdateImage.memory(png, maxDimension: 32));
+      expect(file.existsSync(), isTrue);
+    });
+  });
+
   testWidgets('removes stale files', (tester) async {
     await tester.runAsync(() async {
       final stale = File('${dir.path}/${ImageStore.prefix}old.png')

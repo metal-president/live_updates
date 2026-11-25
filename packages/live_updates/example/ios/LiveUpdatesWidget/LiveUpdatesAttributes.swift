@@ -55,6 +55,9 @@ public struct LiveUpdatesAttributes: ActivityAttributes {
     /// `LiveUpdateContent.publicContent`: shown instead of this content while
     /// the system hides private data on the Lock Screen.
     public var publicContent: LiveUpdatesPublicContent?
+    /// `LiveUpdateContent.endedContent`: shown instead of this content once
+    /// the activity is stale (`LiveUpdateContent.endAt`).
+    public var endedContent: LiveUpdatesEndedContent?
 
     public init(
       title: String, body: String? = nil, progress: Double? = nil,
@@ -65,7 +68,8 @@ public struct LiveUpdatesAttributes: ActivityAttributes {
       compactTrailing: String? = nil, compactLeading: String? = nil, minimal: String? = nil,
       tintArgb: Int? = nil, backgroundArgb: Int? = nil, foregroundArgb: Int? = nil,
       layout: String? = nil, metrics: [LiveUpdatesMetric] = [], steps: LiveUpdatesSteps? = nil,
-      journey: LiveUpdatesJourney? = nil, publicContent: LiveUpdatesPublicContent? = nil
+      journey: LiveUpdatesJourney? = nil, publicContent: LiveUpdatesPublicContent? = nil,
+      endedContent: LiveUpdatesEndedContent? = nil
     ) {
       self.title = title
       self.body = body
@@ -90,6 +94,7 @@ public struct LiveUpdatesAttributes: ActivityAttributes {
       self.steps = steps
       self.journey = journey
       self.publicContent = publicContent
+      self.endedContent = endedContent
     }
 
     // Lenient decoding so APNs `content-state` may omit optional keys.
@@ -131,6 +136,9 @@ public struct LiveUpdatesAttributes: ActivityAttributes {
       } else {
         publicContent = nil
       }
+      // Ended content that does not decode is left out: the content stays.
+      endedContent =
+        (try? c.decodeIfPresent(LiveUpdatesEndedContent.self, forKey: .endedContent)) ?? nil
     }
   }
 
@@ -272,6 +280,25 @@ public struct LiveUpdatesPublicContent: Codable, Hashable {
   private static func keep(_ c: KeyedDecodingContainer<CodingKeys>, _ key: CodingKeys) -> Bool {
     guard c.contains(key), (try? c.decodeNil(forKey: key)) == false else { return true }
     return (try? c.decode(Bool.self, forKey: key)) ?? false
+  }
+}
+
+/// `LiveUpdateContent.endedContent`: what the activity shows once it is
+/// stale (`LiveUpdateContent.endAt`).
+public struct LiveUpdatesEndedContent: Codable, Hashable {
+  public var title: String
+  public var body: String?
+
+  public init(title: String, body: String? = nil) {
+    self.title = title
+    self.body = body
+  }
+
+  public init(from decoder: Decoder) throws {
+    let c = try decoder.container(keyedBy: CodingKeys.self)
+    title = try c.decode(String.self, forKey: .title)
+    // A body that does not decode is left out, not the ended content.
+    body = (try? c.decodeIfPresent(String.self, forKey: .body)) ?? nil
   }
 }
 

@@ -37,6 +37,13 @@ extension LiveUpdateContentJson on LiveUpdateContent {
         'keepProgress': p.keepProgress,
         'keepTimer': p.keepTimer,
       },
+    // Seconds since 1970, as the timer.
+    if (endAt case final e?) 'endAt': e.millisecondsSinceEpoch / 1000,
+    if (endedContent case final e?)
+      'endedContent': {'title': e.title, 'body': ?e.body},
+    // iOS: the stale date, which endAt sets unless the iOS option does.
+    if (ios?.staleDate ?? endAt case final d?)
+      'staleDate': d.millisecondsSinceEpoch / 1000,
     if (actions.isNotEmpty)
       'actions': [
         for (final a in actions)
@@ -52,8 +59,6 @@ extension LiveUpdateContentJson on LiveUpdateContent {
       ],
     if (ios case final ios?) ...{
       'extra': ios.extra,
-      if (ios.staleDate case final d?)
-        'staleDate': d.millisecondsSinceEpoch / 1000,
       'relevanceScore': ?ios.relevanceScore,
       if (ios.alert case final a?)
         'alert': {'title': a.title, 'body': a.body, 'sound': ?a.sound},
@@ -105,6 +110,14 @@ extension LiveUpdateContentJson on LiveUpdateContent {
       if (a.alert) 'androidAlert': true,
       if (a.lockScreenVisibility != AndroidLockScreenVisibility.private)
         'androidLockScreenVisibility': a.lockScreenVisibility.name,
+      // Absent means the default (8 hours); 0 means no limit.
+      if (a.maxDuration != const Duration(hours: 8))
+        'maxDurationMillis': switch (a.maxDuration) {
+          null => 0,
+          // At least 1: 0 stands for no limit.
+          final d => d.inMilliseconds < 1 ? 1 : d.inMilliseconds,
+        },
+      if (a.removeAtEnd) 'removeAtEnd': true,
     },
   };
 }

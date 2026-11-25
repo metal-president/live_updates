@@ -1,4 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Scheduled live updates on time (exact alarms). live_updates does not
+         declare it; from Android 14 on the user allows it in Settings. -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <application
         android:label="live_updates_example"
         android:name="${applicationName}"

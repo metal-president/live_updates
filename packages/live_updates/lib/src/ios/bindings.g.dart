@@ -178,6 +178,27 @@ extension type LiveUpdatesBridge._(objc.ObjCObject object$)
     _objc_msgSend_1pl9qdv(_class_LiveUpdatesBridge, _sel_backgroundActionsDone);
   }
 
+  /// Whether live updates can be scheduled: iOS 26+ and Live Activities
+  /// enabled for this app.
+  static bool canSchedule() {
+    return _objc_msgSend_91o635(_class_LiveUpdatesBridge, _sel_canSchedule);
+  }
+
+  /// Cancels the schedule with <code>key</code>, if any.
+  static void cancelScheduled(
+    objc.NSString key, {
+    required objc.ObjCBlock<ffi.Void Function()> completion,
+  }) {
+    final _$$ref = key.ref;
+    final _$$ref$1 = completion.ref;
+    _objc_msgSend_o762yo(
+      _class_LiveUpdatesBridge,
+      _sel_cancelScheduled_completion_,
+      _$$ref.pointer,
+      _$$ref$1.pointer,
+    );
+  }
+
   /// Ends the activity with <code>id</code>. <code>dismissAfter</code> < 0 uses the system default
   /// policy, 0 dismisses immediately, otherwise seconds from now.
   static void end(
@@ -199,7 +220,8 @@ extension type LiveUpdatesBridge._(objc.ObjCObject object$)
     );
   }
 
-  /// Ends every activity of this app immediately.
+  /// Ends every activity of this app immediately, except scheduled ones
+  /// that have not started.
   static void endAll(objc.ObjCBlock<ffi.Void Function()> completion) {
     final _$$ref = completion.ref;
     _objc_msgSend_f167m6(
@@ -317,8 +339,9 @@ extension type LiveUpdatesBridge._(objc.ObjCObject object$)
   }
 
   /// Calls <code>handler</code> with <code>"<state>:<id>"</code> for activity lifecycle changes:
-  /// <code>started</code> (including activities started by push-to-start), then
-  /// <code>active</code>, <code>stale</code>, <code>ended</code>, <code>dismissed</code> or <code>pending</code>.
+  /// <code>started</code> (including activities started by push-to-start, and
+  /// scheduled activities when they start), then <code>active</code>, <code>stale</code>, <code>ended</code>
+  /// or <code>dismissed</code>. Scheduled activities report nothing before they start.
   /// Each engine (<code>engineId</code>) has its own handler, so a background engine
   /// does not take the events of the app’s engine.
   static void observeActivities(
@@ -386,6 +409,60 @@ extension type LiveUpdatesBridge._(objc.ObjCObject object$)
       _sel_requeueActions_,
       _$$ref.pointer,
     );
+  }
+
+  /// Moves the schedule with <code>key</code> to <code>at</code>, with <code>json</code> as its content when
+  /// given (the push setting of the schedule is kept). <code>completion</code> receives
+  /// an error message or <code>nil</code>.
+  static void reschedule(
+    objc.NSString key, {
+    objc.NSString? json,
+    required double at,
+    required objc.ObjCBlock<ffi.Void Function(objc.NSString?)> completion,
+  }) {
+    final _$$ref = key.ref;
+    final _$$ref$1 = json?.ref;
+    final _$$ref$2 = completion.ref;
+    _objc_msgSend_3hfsut(
+      _class_LiveUpdatesBridge,
+      _sel_reschedule_json_at_completion_,
+      _$$ref.pointer,
+      _$$ref$1?.pointer ?? ffi.nullptr,
+      at,
+      _$$ref$2.pointer,
+    );
+  }
+
+  /// Schedules <code>json</code> to start with <code>key</code> at <code>at</code> (epoch seconds), replacing
+  /// the schedule with that key. A time that is not in the future starts or
+  /// updates it now. <code>completion</code> receives an error message or <code>nil</code>.
+  static void schedule(
+    objc.NSString key, {
+    required objc.NSString json,
+    required double at,
+    required objc.ObjCBlock<ffi.Void Function(objc.NSString?)> completion,
+  }) {
+    final _$$ref = key.ref;
+    final _$$ref$1 = json.ref;
+    final _$$ref$2 = completion.ref;
+    _objc_msgSend_3hfsut(
+      _class_LiveUpdatesBridge,
+      _sel_schedule_json_at_completion_,
+      _$$ref.pointer,
+      _$$ref$1.pointer,
+      at,
+      _$$ref$2.pointer,
+    );
+  }
+
+  /// Scheduled live updates that have not started, as a JSON array of
+  /// <code>{"key": String, "at": epoch seconds}</code>.
+  static objc.NSString scheduledJson() {
+    final $ret = _objc_msgSend_151sglz(
+      _class_LiveUpdatesBridge,
+      _sel_scheduledJson,
+    );
+    return objc.NSString.fromPointer($ret, retain: true, release: true);
   }
 
   /// Limits the presses Dart takes to those of <code>activityIds</code> (<code>nil</code>: all).
@@ -1739,6 +1816,10 @@ late final _sel_backgroundActionHandler = objc.registerName(
 late final _sel_backgroundActionsDone = objc.registerName(
   "backgroundActionsDone",
 );
+late final _sel_canSchedule = objc.registerName("canSchedule");
+late final _sel_cancelScheduled_completion_ = objc.registerName(
+  "cancelScheduled:completion:",
+);
 late final _sel_endAll_ = objc.registerName("endAll:");
 late final _sel_end_json_dismissAfter_completion_ = objc.registerName(
   "end:json:dismissAfter:completion:",
@@ -1771,6 +1852,13 @@ late final _sel_observeTaps_engineId_ = objc.registerName(
   "observeTaps:engineId:",
 );
 late final _sel_requeueActions_ = objc.registerName("requeueActions:");
+late final _sel_reschedule_json_at_completion_ = objc.registerName(
+  "reschedule:json:at:completion:",
+);
+late final _sel_schedule_json_at_completion_ = objc.registerName(
+  "schedule:json:at:completion:",
+);
+late final _sel_scheduledJson = objc.registerName("scheduledJson");
 late final _sel_setActionFilter_engineId_ = objc.registerName(
   "setActionFilter:engineId:",
 );

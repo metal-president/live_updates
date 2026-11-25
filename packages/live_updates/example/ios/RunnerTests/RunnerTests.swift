@@ -42,6 +42,18 @@ struct ContentStateDecodingTests {
     #expect(state.journey == nil)
   }
 
+  @Test func endedContentDecodes() throws {
+    let state = try decode(#"{"title":"T","endedContent":{"title":"Done","body":"Enjoy"}}"#)
+    #expect(state.endedContent == LiveUpdatesEndedContent(title: "Done", body: "Enjoy"))
+    #expect(try decode(#"{"title":"T"}"#).endedContent == nil)
+  }
+
+  @Test func aMalformedEndedContentIsLeftOut() throws {
+    #expect(try decode(#"{"title":"T","endedContent":{"body":"x"}}"#).endedContent == nil)
+    let state = try decode(#"{"title":"T","endedContent":{"title":"Done","body":3}}"#)
+    #expect(state.endedContent == LiveUpdatesEndedContent(title: "Done"))
+  }
+
   @Test func theTitleIsRequired() {
     #expect(throws: (any Error).self) { try decode(#"{"body":"no title"}"#) }
   }
@@ -223,5 +235,47 @@ struct ForgedURLTests {
     #expect(LiveUpdatesBridge.handleURL(url))
     #expect(routes.isEmpty)
     LiveUpdatesBridge.engineDetached(1001)
+  }
+}
+
+/// Scheduling helpers that run without requesting activities.
+struct ScheduleTests {
+  private func object(_ json: String) throws -> [String: Any] {
+    try #require(try JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any])
+  }
+
+  @Test func newContentKeepsThePushSettingOfTheSchedule() throws {
+    let merged = try LiveUpdatesBridge.keepingPushSetting(
+      of: #"{"title":"Old","enablePushUpdates":true}"#,
+      in: #"{"title":"New","enablePushUpdates":false}"#)
+    let result = try object(merged)
+    #expect(result["title"] as? String == "New")
+    #expect(result["enablePushUpdates"] as? Bool == true)
+  }
+
+  @Test func withoutAStoredSettingNewContentHasNone() throws {
+    let merged = try LiveUpdatesBridge.keepingPushSetting(
+      of: nil, in: #"{"title":"New","enablePushUpdates":true}"#)
+    #expect(try object(merged)["enablePushUpdates"] == nil)
+  }
+
+  @Test func nothingScheduledIsAnEmptyList() throws {
+    UserDefaults.standard.removeObject(forKey: LiveUpdatesBridge.schedulesKey)
+    let list = try JSONSerialization.jsonObject(
+      with: Data(LiveUpdatesBridge.scheduledJson().utf8))
+    #expect((list as? [Any])?.isEmpty == true)
+  }
+
+  @Test func canScheduleNeedsIOS26() {
+    if #unavailable(iOS 26.0) {
+      #expect(!LiveUpdatesBridge.canSchedule())
+    }
+  }
+
+  @Test func rescheduleWithoutAScheduleReportsAnError() async {
+    let message = await withCheckedContinuation { done in
+      LiveUpdatesBridge.reschedule("no-such-key", json: nil, at: 0) { done.resume(returning: $0) }
+    }
+    #expect(message != nil)
   }
 }

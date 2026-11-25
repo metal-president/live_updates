@@ -755,6 +755,30 @@ extension LiveUpdatesAttributes.ContentState {
       tintArgb: tintArgb, backgroundArgb: backgroundArgb, foregroundArgb: foregroundArgb)
   }
 
+  /// The content to show: `liveUpdatesEndedState` once the activity is
+  /// stale (`LiveUpdateContent.endAt`) and has an `endedContent`, else this
+  /// content. Pass `context.isStale`.
+  func liveUpdatesShown(isStale: Bool) -> Self {
+    isStale && endedContent != nil ? liveUpdatesEndedState : self
+  }
+
+  /// `endedContent`'s title and body with this content's icons, colors, tap
+  /// route and layout-free Dynamic Island choices ("title" and "body" show
+  /// the ended text). No progress, timer, buttons, image or layout data.
+  var liveUpdatesEndedState: Self {
+    let e = endedContent
+    func island(_ choice: String?) -> String? {
+      guard let choice, choice == "title" || choice == "body" else { return nil }
+      return choice
+    }
+    return Self(
+      title: e?.title ?? title, body: e?.body, icon: icon, iosIcon: iosIcon,
+      islandIcon: islandIcon, route: route,
+      compactTrailing: island(compactTrailing), compactLeading: island(compactLeading),
+      minimal: island(minimal),
+      tintArgb: tintArgb, backgroundArgb: backgroundArgb, foregroundArgb: foregroundArgb)
+  }
+
   /// `IosLiveUpdateOptions.color` for the Dynamic Island keyline.
   var liveUpdatesKeylineTint: Color? { LiveUpdatesPalette.color(tintArgb) }
 

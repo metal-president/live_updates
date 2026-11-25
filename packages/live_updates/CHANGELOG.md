@@ -1,3 +1,41 @@
+## 0.3.0
+
+- **Breaking (Android):** live updates are removed 8 hours after they
+  started by default, like iOS ends Live Activities after at most 8 hours.
+  `AndroidLiveUpdateOptions.maxDuration` sets the limit (`null` for none);
+  later updates do not reset it. Remote payloads take `maxDurationMillis`
+  (missing: 8 hours, `0`: no limit). See Upgrading in the README.
+- Scheduled live updates: `LiveUpdates.schedule(key, content, at:)` shows the
+  content at that time as `startOrUpdate` would, even if the app is not
+  running, and returns a `ScheduledLiveUpdate` (`reschedule`, `cancel`).
+  `LiveUpdates.scheduled()`, `findScheduled(key)`, `cancelScheduled(key)`
+  and `canSchedule()`. `endAll` keeps schedules.
+  - iOS 26 and later: a Live Activity requested with a start date, which the
+    system starts and announces with an alert (`IosLiveUpdateOptions.alert`,
+    or the title and body). `schedule` throws a `LiveUpdateException` before
+    iOS 26 and in the background. When it starts while an update with the
+    key runs, the plugin ends the older one once the app runs.
+  - Android: an alarm per key, kept across reboots, app updates, clock and
+    time zone changes and force stops (set again at the next app start).
+    Exact with `SCHEDULE_EXACT_ALARM`, which apps declare themselves
+    (`canScheduleExactly()`, `openExactAlarmSettings()`); otherwise within
+    `AndroidScheduleOptions.window` (default 10 minutes). The plugin adds
+    `RECEIVE_BOOT_COMPLETED` to the manifest.
+- `LiveUpdateContent.endAt` and `endedContent` (`LiveUpdateEndedContent`):
+  from `endAt` on the update shows the ended content, even if the app is not
+  running; without it nothing visible changes.
+  - iOS: `endAt` is the stale date unless `IosLiveUpdateOptions.staleDate` is
+    set. The building blocks switch with
+    `context.state.liveUpdatesShown(isStale:)` in the layout file: run
+    `create_widget` again, and update a layout file generated before (it is
+    not overwritten; see Upgrading in the README).
+  - Android: an alarm swaps the notification for the ended content (a regular
+    notification) and the update reports `ended`.
+    `AndroidLiveUpdateOptions.removeAtEnd` removes it at `endAt` instead.
+- `onStarted` reports scheduled updates when they start, not when they are
+  scheduled, and reports each activity once.
+- Images of scheduled content are kept until it is shown.
+
 ## 0.2.2
 
 - `LiveUpdate.isPromoted()`: whether Android promoted the shown update to a

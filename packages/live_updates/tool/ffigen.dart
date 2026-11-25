@@ -11,6 +11,7 @@ import 'package:ffigen/ffigen.dart';
 const _swiftSources = [
   'ios/live_updates/Sources/live_updates/LiveUpdatesAttributes.swift',
   'ios/live_updates/Sources/live_updates/LiveUpdatesBridge.swift',
+  'ios/live_updates/Sources/live_updates/LiveUpdatesSchedule.swift',
 ];
 
 Future<void> main() async {

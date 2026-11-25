@@ -47,11 +47,15 @@ public final class LiveUpdatesBridge: NSObject {
   /// Requests a new activity and returns its id.
   @objc public static func start(_ json: String) throws -> String {
     guard #available(iOS 17.2, *) else { throw unavailableError }
-    return try request(try Payload.decode(json), key: nil)
+    return try request(try Payload.decode(json), key: nil).id
   }
 
+  /// Requests an activity; with `start` (iOS 26+) a scheduled one that the
+  /// system starts at that time.
   @available(iOS 17.2, *)
-  private static func request(_ payload: Payload, key: String?) throws -> String {
+  static func request(_ payload: Payload, key: String?, start: Date? = nil) throws
+    -> Activity<LiveUpdatesAttributes>
+  {
     let wantsPush = payload.enablePushUpdates ?? false
     var pushType: PushType? = wantsPush ? .token : nil
     if let channel = payload.broadcastChannelId {
@@ -63,12 +67,32 @@ public final class LiveUpdatesBridge: NSObject {
       pushType = .channel(channel)
     }
     do {
-      let activity = try Activity<LiveUpdatesAttributes>.request(
+      if let start, #available(iOS 26.0, *) {
+        do {
+          return try Activity<LiveUpdatesAttributes>.request(
+            attributes: LiveUpdatesAttributes(key: key),
+            content: payload.content,
+            pushType: pushType,
+            style: .standard,
+            alertConfiguration: payload.alertConfiguration ?? payload.defaultAlertConfiguration,
+            start: start
+          )
+        } catch let error as ActivityAuthorizationError where error == .visibility {
+          throw NSError(
+            domain: "live_updates", code: 5,
+            userInfo: [
+              NSLocalizedDescriptionKey:
+                "Live updates can only be scheduled while the app is in the foreground."
+            ])
+        }
+      }
+      return try Activity<LiveUpdatesAttributes>.request(
         attributes: LiveUpdatesAttributes(key: key),
         content: payload.content,
         pushType: pushType
       )
-      return activity.id
+    } catch let error as NSError where error.domain == "live_updates" {
+      throw error
     } catch where pushType != nil {
       throw NSError(
         domain: "live_updates", code: 1,
@@ -95,21 +119,66 @@ public final class LiveUpdatesBridge: NSObject {
     guard #available(iOS 17.2, *) else { return completion(nil, unavailableMessage) }
     Task { @MainActor in
       do {
-        let payload = try Payload.decode(json)
-        let withKey = Activity<LiveUpdatesAttributes>.activities.filter { $0.attributes.key == key }
-        if let activity = withKey.first(where: {
-          $0.activityState == .active || $0.activityState == .stale
-        }) ?? withKey.first {
-          if activity.activityState == .active || activity.activityState == .stale {
-            await activity.update(payload.content, alertConfiguration: payload.alertConfiguration)
-          }
-          return completion(activity.id, nil)
-        }
-        completion(try request(payload, key: key), nil)
+        completion(try await startOrUpdateNow(key, payload: try Payload.decode(json)), nil)
       } catch {
         completion(nil, error.localizedDescription)
       }
     }
+  }
+
+  /// `startOrUpdate` on the main actor; returns the activity id. Scheduled
+  /// activities that have not started are left alone.
+  @available(iOS 17.2, *)
+  @MainActor
+  static func startOrUpdateNow(_ key: String, payload: Payload) async throws -> String {
+    let withKey = Activity<LiveUpdatesAttributes>.activities.filter {
+      $0.attributes.key == key && !isPending($0)
+    }
+    if let activity = withKey.first(where: {
+      $0.activityState == .active || $0.activityState == .stale
+    }) ?? withKey.first {
+      if activity.activityState == .active || activity.activityState == .stale {
+        await activity.update(payload.content, alertConfiguration: payload.alertConfiguration)
+      }
+      return activity.id
+    }
+    return try request(payload, key: key).id
+  }
+
+  /// Whether `activity` is scheduled and has not started yet (iOS 26+).
+  @available(iOS 17.2, *)
+  static func isPending(_ activity: Activity<LiveUpdatesAttributes>) -> Bool {
+    if #available(iOS 26.0, *) { return activity.activityState == .pending }
+    return false
+  }
+
+  // MARK: Scheduling (LiveUpdatesSchedule.swift)
+
+  /// Whether live updates can be scheduled: iOS 26+ and Live Activities
+  /// enabled for this app.
+  @objc public static func canSchedule() -> Bool { canScheduleNow() }
+
+  /// Schedules `json` to start with `key` at `at` (epoch seconds), replacing
+  /// the schedule with that key. A time that is not in the future starts or
+  /// updates it now. `completion` receives an error message or `nil`.
+  @objc public static func schedule(
+    _ key: String, json: String, at: Double, completion: @escaping (String?) -> Void
+  ) { scheduleFromDart(key, json: json, at: at, completion: completion) }
+
+  /// Moves the schedule with `key` to `at`, with `json` as its content when
+  /// given (the push setting of the schedule is kept). `completion` receives
+  /// an error message or `nil`.
+  @objc public static func reschedule(
+    _ key: String, json: String?, at: Double, completion: @escaping (String?) -> Void
+  ) { rescheduleFromDart(key, json: json, at: at, completion: completion) }
+
+  /// Scheduled live updates that have not started, as a JSON array of
+  /// `{"key": String, "at": epoch seconds}`.
+  @objc public static func scheduledJson() -> String { scheduledFromDart() }
+
+  /// Cancels the schedule with `key`, if any.
+  @objc public static func cancelScheduled(_ key: String, completion: @escaping () -> Void) {
+    cancelScheduledFromDart(key, completion: completion)
   }
 
   /// Id of the running activity whose key is `key`.
@@ -219,11 +288,12 @@ public final class LiveUpdatesBridge: NSObject {
   private static var activityTask: Task<Void, Never>?
   private static var stateTasks: [String: Task<Void, Never>] = [:]
 
-  /// Ends every activity of this app immediately.
+  /// Ends every activity of this app immediately, except scheduled ones
+  /// that have not started.
   @objc public static func endAll(_ completion: @escaping () -> Void) {
     guard #available(iOS 17.2, *) else { return completion() }
     Task {
-      for activity in Activity<LiveUpdatesAttributes>.activities {
+      for activity in Activity<LiveUpdatesAttributes>.activities where !isPending(activity) {
         await activity.end(nil, dismissalPolicy: .immediate)
       }
       completion()
@@ -231,8 +301,9 @@ public final class LiveUpdatesBridge: NSObject {
   }
 
   /// Calls `handler` with `"<state>:<id>"` for activity lifecycle changes:
-  /// `started` (including activities started by push-to-start), then
-  /// `active`, `stale`, `ended`, `dismissed` or `pending`.
+  /// `started` (including activities started by push-to-start, and
+  /// scheduled activities when they start), then `active`, `stale`, `ended`
+  /// or `dismissed`. Scheduled activities report nothing before they start.
   ///
   /// Each engine (`engineId`) has its own handler, so a background engine
   /// does not take the events of the app's engine.
@@ -246,20 +317,43 @@ public final class LiveUpdatesBridge: NSObject {
       func emit(_ event: String) {
         DispatchQueue.main.async { activityHandlers.values.forEach { $0(event) } }
       }
+      // `activityUpdates` can list an activity again (seen when another
+      // activity with its key ends it), so each one is reported once.
+      func emitStarted(_ id: String) {
+        DispatchQueue.main.async {
+          guard startedIds.insert(id).inserted else { return }
+          activityHandlers.values.forEach { $0("started:\(id)") }
+        }
+      }
       func watch(_ activity: Activity<LiveUpdatesAttributes>) {
         guard stateTasks[activity.id] == nil else { return }
         stateTasks[activity.id] = Task {
+          var pending = isPending(activity)
           for await state in activity.activityStateUpdates {
+            if name(of: state) == "pending" {
+              pending = true
+              continue
+            }
+            // A scheduled activity appears when it starts; one cancelled
+            // before that never appeared.
+            if pending {
+              guard state == .active || state == .stale else { break }
+              pending = false
+              emitStarted(activity.id)
+            }
             emit("\(name(of: state)):\(activity.id)")
             // An ended activity stays listed until it is dismissed.
             if state == .dismissed { break }
           }
         }
       }
-      Activity<LiveUpdatesAttributes>.activities.forEach(watch)
+      Activity<LiveUpdatesAttributes>.activities.forEach {
+        if !isPending($0) { startedIds.insert($0.id) }
+        watch($0)
+      }
       activityTask = Task {
         for await activity in Activity<LiveUpdatesAttributes>.activityUpdates {
-          emit("started:\(activity.id)")
+          if !isPending(activity) { emitStarted(activity.id) }
           await MainActor.run { watch(activity) }
         }
       }
@@ -267,6 +361,8 @@ public final class LiveUpdatesBridge: NSObject {
   }
 
   private static var activityHandlers: [Int64: (String) -> Void] = [:]
+  /// Activities reported as `started` (main thread).
+  private static var startedIds: Set<String> = []
 
   /// Called when an engine goes away: its isolate's handlers are dead, so
   /// presses are queued again and taps wait for the next listener.
@@ -415,7 +511,8 @@ public final class LiveUpdatesBridge: NSObject {
   {
     // Only accept presses of buttons the activity actually shows.
     guard #available(iOS 17.2, *),
-      let state = find(activityId)?.content.state,
+      let activity = find(activityId), !isPending(activity),
+      case let state = activity.content.state,
       state.actions.contains(where: { $0.id == actionId })
     else { return false }
     let defaults = UserDefaults.standard
@@ -510,7 +607,7 @@ public final class LiveUpdatesBridge: NSObject {
   }
 }
 
-private struct Payload: Decodable {
+struct Payload: Decodable {
   struct Alert: Decodable {
     var title: String
     var body: String
@@ -540,6 +637,7 @@ private struct Payload: Decodable {
   var steps: LiveUpdatesSteps?
   var journey: LiveUpdatesJourney?
   var publicContent: LiveUpdatesPublicContent?
+  var endedContent: LiveUpdatesEndedContent?
   var staleDate: Double?
   var relevanceScore: Double?
   var enablePushUpdates: Bool?
@@ -560,10 +658,19 @@ private struct Payload: Decodable {
         compactTrailing: compactTrailing, compactLeading: compactLeading, minimal: minimal,
         tintArgb: tintArgb, backgroundArgb: backgroundArgb, foregroundArgb: foregroundArgb,
         layout: layout, metrics: metrics ?? [], steps: steps, journey: journey,
-        publicContent: publicContent),
+        publicContent: publicContent, endedContent: endedContent),
       staleDate: staleDate.map { Date(timeIntervalSince1970: $0) },
       relevanceScore: relevanceScore ?? 0
     )
+  }
+
+  /// Alert for a scheduled activity's start when the content has none.
+  @available(iOS 17.2, *)
+  var defaultAlertConfiguration: AlertConfiguration {
+    AlertConfiguration(
+      title: LocalizedStringResource(stringLiteral: title),
+      body: LocalizedStringResource(stringLiteral: body ?? ""),
+      sound: .default)
   }
 
   @available(iOS 17.2, *)
@@ -600,7 +707,8 @@ extension LiveUpdatesBridge {
       // URL schemes are not authenticated: only accept an open-app action
       // that the activity actually shows, so other apps cannot forge presses.
       guard
-        let state = find(activity)?.content.state,
+        let shown = find(activity), !isPending(shown),
+        case let state = shown.content.state,
         state.actions.contains(where: { $0.id == action && $0.opensApp })
       else { return true }
       queueAction(activity, actionId: action, startBackground: false)
@@ -609,7 +717,11 @@ extension LiveUpdatesBridge {
     guard url.host == "tap", let route = item("route") else { return false }
     // URL schemes are not authenticated: only deliver a route that one of the
     // app's activities actually carries, so other apps cannot inject routes.
-    guard Activity<LiveUpdatesAttributes>.activities.contains(where: { $0.content.state.route == route })
+    // Not a scheduled activity's route: it is not shown yet.
+    guard
+      Activity<LiveUpdatesAttributes>.activities.contains(where: {
+        $0.content.state.route == route && !isPending($0)
+      })
     else { return true }
     if tapHandlers.isEmpty { pendingRoutes.append(route) } else { tapHandlers.values.forEach { $0(route) } }
     return true

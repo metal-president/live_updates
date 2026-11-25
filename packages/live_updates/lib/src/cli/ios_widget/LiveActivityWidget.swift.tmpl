@@ -17,47 +17,53 @@ import WidgetKit
 /// your own should do the same: read `@Environment(\.redactionReasons)` in
 /// it and, when `state.liveUpdatesShowsPublic(redactionReasons)` is true, show
 /// `LiveUpdatesPublicLockScreen(state: state)` instead.
+///
+/// From `LiveUpdateContent.endAt` on (the activity is stale), `state` is the
+/// `LiveUpdateContent.endedContent` when it is set
+/// (`liveUpdatesShown(isStale:)`).
 struct {{name}}LiveActivity: Widget {
   var body: some WidgetConfiguration {
     ActivityConfiguration(for: LiveUpdatesAttributes.self) { context in
+      let state = context.state.liveUpdatesShown(isStale: context.isStale)
       Group {
-        switch context.state.layout {
+        switch state.layout {
         // Layouts of your own, chosen with
         // IosLiveUpdateOptions(layout: IosLiveUpdateLayout.custom("name")):
-        // case "name": MyLayout(state: context.state)
+        // case "name": MyLayout(state: state)
         default:
           // The built-in patterns: standard, timer, metrics, stepper, journey.
-          LiveUpdatesLockScreen(state: context.state, activityID: context.activityID)
+          LiveUpdatesLockScreen(state: state, activityID: context.activityID)
         }
       }
       .padding()
-      .widgetURL(context.state.liveUpdatesTapURL)
+      .widgetURL(state.liveUpdatesTapURL)
     } dynamicIsland: { context in
-      DynamicIsland {
+      let state = context.state.liveUpdatesShown(isStale: context.isStale)
+      return DynamicIsland {
         DynamicIslandExpandedRegion(.leading) {
-          LiveUpdatesIslandIcon(state: context.state).frame(width: 36, height: 36)
+          LiveUpdatesIslandIcon(state: state).frame(width: 36, height: 36)
         }
         DynamicIslandExpandedRegion(.trailing) {
-          LiveUpdatesExpandedTrailing(state: context.state)
+          LiveUpdatesExpandedTrailing(state: state)
         }
         DynamicIslandExpandedRegion(.center) {
-          LiveUpdatesExpandedCenter(state: context.state)
+          LiveUpdatesExpandedCenter(state: state)
         }
         DynamicIslandExpandedRegion(.bottom) {
-          LiveUpdatesExpandedBottom(state: context.state, activityID: context.activityID)
+          LiveUpdatesExpandedBottom(state: state, activityID: context.activityID)
         }
       } compactLeading: {
         // IosLiveUpdateOptions.compactLeading chooses what appears here.
-        LiveUpdatesCompactLeading(state: context.state)
+        LiveUpdatesCompactLeading(state: state)
       } compactTrailing: {
         // IosLiveUpdateOptions.compactTrailing chooses what appears here.
-        LiveUpdatesCompactTrailing(state: context.state)
+        LiveUpdatesCompactTrailing(state: state)
       } minimal: {
         // IosLiveUpdateOptions.minimal chooses what appears here.
-        LiveUpdatesMinimal(state: context.state)
+        LiveUpdatesMinimal(state: state)
       }
-      .keylineTint(context.state.liveUpdatesKeylineTint)
-      .widgetURL(context.state.liveUpdatesTapURL)
+      .keylineTint(state.liveUpdatesKeylineTint)
+      .widgetURL(state.liveUpdatesTapURL)
     }
   }
 }

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:live_updates/live_updates.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -65,8 +66,11 @@ class _ExamplePageState extends State<ExamplePage> {
         LiveUpdates.pushToStartTokens.listen(
           (t) => _add('push-to-start: ${t.hex}'),
         ),
-      );
+      )
+      // Also reports scheduled updates when their time comes.
+      ..add(LiveUpdates.onStarted.listen((u) => _add('started: ${u.id}')));
     LiveUpdates.isSupported().then((s) => _add('supported: $s'));
+    LiveUpdates.canSchedule().then((s) => _add('can schedule: $s'));
   }
 
   @override
@@ -87,6 +91,12 @@ class _ExamplePageState extends State<ExamplePage> {
     body: _progress >= 1 ? 'Delivered' : 'On the way',
     progress: _progress,
     route: '/orders/1234',
+    // At the ETA the update shows "Delivered", even if the app is closed.
+    endAt: _eta,
+    endedContent: const LiveUpdateEndedContent(
+      title: 'Order #1234',
+      body: 'Delivered',
+    ),
     // Counted by the system: no update needed every second.
     timer: LiveUpdateTimer.countdown(_eta),
     // Data for the metrics, stepper and journey layouts, sent only with the
@@ -219,6 +229,34 @@ class _ExamplePageState extends State<ExamplePage> {
   Future<void> _listActive() => _run('active', () async {
     final active = await LiveUpdates.active();
     _add('active: ${active.map((u) => u.id).join(', ')}');
+    final scheduled = await LiveUpdates.scheduled();
+    _add(
+      'scheduled: ${scheduled.map((s) => '${s.key} at ${s.at}').join(', ')}',
+    );
+  });
+
+  /// Shows the order in a minute, even if the app is closed by then. The
+  /// same key as Start: a running update for the order is updated instead.
+  Future<void> _schedule() => _run('schedule', () async {
+    _progress = 0;
+    _eta = DateTime.now().add(const Duration(minutes: 16));
+    final at = DateTime.now().add(const Duration(minutes: 1));
+    final s = await LiveUpdates.schedule('order-1234', _content(), at: at);
+    _add('scheduled for ${s.at}');
+    // Android: on time only with exact alarms (this example declares
+    // SCHEDULE_EXACT_ALARM; the user allows it in Settings).
+    if (defaultTargetPlatform == TargetPlatform.android &&
+        !await LiveUpdates.canScheduleExactly()) {
+      _add('not exact: shown within 10 minutes; tap Exact alarms');
+    }
+  });
+
+  Future<void> _cancelSchedule() => _run('cancel schedule', () async {
+    await LiveUpdates.cancelScheduled('order-1234');
+  });
+
+  Future<void> _openExactAlarmSettings() => _run('exact alarms', () async {
+    _add('settings opened: ${await LiveUpdates.openExactAlarmSettings()}');
   });
 
   @override
@@ -233,6 +271,19 @@ class _ExamplePageState extends State<ExamplePage> {
             FilledButton(onPressed: _update, child: const Text('Update')),
             FilledButton(onPressed: _end, child: const Text('End')),
             OutlinedButton(onPressed: _listActive, child: const Text('Active')),
+            FilledButton.tonal(
+              onPressed: _schedule,
+              child: const Text('Schedule (1 min)'),
+            ),
+            OutlinedButton(
+              onPressed: _cancelSchedule,
+              child: const Text('Cancel schedule'),
+            ),
+            if (defaultTargetPlatform == TargetPlatform.android)
+              OutlinedButton(
+                onPressed: _openExactAlarmSettings,
+                child: const Text('Exact alarms'),
+              ),
           ],
         ),
         ListTile(

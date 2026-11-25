@@ -39,13 +39,23 @@ package README): `title`, `body`, `progress`, `route`, `timerEnd` /
 `timerStart` (seconds since 1970), `metrics`, `steps`, `journey`, `actions`,
 `extra`, `publicContent` (what a locked device shows while it hides
 sensitive content: `{"title": ..., "body": ..., "keepProgress": true,
-"keepTimer": true}`), Android options such as `channelId`,
+"keepTimer": true}`), `endAt` (seconds since 1970) with `endedContent`
+(`{"title": ..., "body": ...}`, shown from `endAt` on), Android options such as `channelId`,
 `shortCriticalText`, `progressSegments` or `"androidLockScreenVisibility":
 "secret"`, and the iOS options `layout` / `compactLeading` /
 `compactTrailing` / `minimal` / `tintArgb` / `backgroundArgb` /
 `foregroundArgb`. Each platform ignores the keys it does not use. iOS
 requires `title`, and `extra` must map strings to strings, or the activity
 rejects the content.
+
+Ending at a time: on Android, `endAt` with `endedContent` swaps the
+notification for the ended content at that time, and `"removeAtEnd": true`
+removes it then instead. `maxDurationMillis` limits how long an Android live
+update is shown, counted from its start: without the key the default of
+8 hours applies, and `0` means no limit. On iOS the widget shows
+`endedContent` once the activity is stale: send `stale-date` (the `endAt`
+time) next to `content-state`, as `endAt` inside `content-state` does not
+set it.
 
 Icons are objects with exactly one of `native` (a drawable on Android, an
 asset catalog image of the widget on iOS), `asset` (a Flutter asset; on iOS
@@ -153,7 +163,7 @@ activity token for that key (or the push-to-start token to start one).
   `alert` go next to `content-state`, not inside it.
 - A push replaces the whole content state: send every field that should stay,
   including `extra`, `layout`, `metrics`, `steps`, `journey`,
-  `publicContent`, `compactTrailing` and `minimal`.
+  `publicContent`, `endedContent`, `compactTrailing` and `minimal`.
 - Delete the activity token once the update has ended; it cannot be used
   again.
 

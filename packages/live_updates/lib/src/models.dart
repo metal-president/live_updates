@@ -1373,7 +1373,8 @@ enum LiveUpdateState {
   /// its dismissal time (see [LiveUpdate.end]).
   ended,
 
-  /// Removed from the screen, by the system or the user.
+  /// Removed from the screen, by the system or the user. On Android not
+  /// reported for the notification that stays after [LiveUpdate.end].
   dismissed,
 }
 

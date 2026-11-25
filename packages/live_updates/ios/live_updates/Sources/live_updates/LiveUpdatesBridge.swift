@@ -280,12 +280,19 @@ public final class LiveUpdatesBridge: NSObject {
     guard #available(iOS 17.2, *) else { return completion(nil) }
     Task {
       do {
-        let content = try json.map { try Payload.decode($0).content }
+        let finalContent = try json.map { try Payload.decode($0).content }
         guard let activity = find(id) else { return completion(nil) }
         let policy: ActivityUIDismissalPolicy =
           dismissAfter < 0
           ? .default
           : dismissAfter == 0 ? .immediate : .after(Date().addingTimeInterval(dismissAfter))
+        // What stays on the Lock Screen has no buttons or running timers, as
+        // on Android: the final content, else the content shown last. An
+        // activity that already ended (for example by a push) keeps what it
+        // shows; only the dismissal changes.
+        let running = activity.activityState == .active || activity.activityState == .stale
+        let content = endedContent(
+          final: finalContent, shown: running ? activity.content : nil, now: Date())
         noteEndedByApp(activity.id)
         await activity.end(content, dismissalPolicy: policy)
         await MainActor.run { tokenTasks.removeValue(forKey: id)?.cancel() }
@@ -294,6 +301,30 @@ public final class LiveUpdatesBridge: NSObject {
         completion(error.localizedDescription)
       }
     }
+  }
+
+  /// What an ended activity shows: `final` (else `shown`, the content shown
+  /// last as this process knows it) without buttons, the timer and timer or
+  /// stopwatch metrics. An `endedContent` that is not shown yet is dropped
+  /// with the stale date from `endAt` that would show it, as on Android; one
+  /// that already shows stays. `nil` when nothing needs to change, so the
+  /// system keeps what it shows (which may be newer, after a push).
+  @available(iOS 16.2, *)
+  static func endedContent(
+    final: ActivityContent<LiveUpdatesAttributes.ContentState>?,
+    shown: ActivityContent<LiveUpdatesAttributes.ContentState>?, now: Date
+  ) -> ActivityContent<LiveUpdatesAttributes.ContentState>? {
+    guard let base = final ?? shown else { return nil }
+    var state = base.state.liveUpdatesEnded
+    var staleDate = base.staleDate
+    let stale = staleDate.map { $0 <= now } ?? false
+    if !stale && state.endedContent != nil {
+      state.endedContent = nil
+      staleDate = nil
+    }
+    if final == nil && state == base.state && staleDate == base.staleDate { return nil }
+    return ActivityContent(
+      state: state, staleDate: staleDate, relevanceScore: base.relevanceScore)
   }
 
   /// Directory for images shared with the widget, or `nil` when the
@@ -775,5 +806,19 @@ extension LiveUpdatesBridge {
     else { return true }
     if tapHandlers.isEmpty { pendingRoutes.append(route) } else { tapHandlers.values.forEach { $0(route) } }
     return true
+  }
+}
+
+@available(iOS 16.1, *)
+extension LiveUpdatesAttributes.ContentState {
+  /// This content as an ended activity shows it: without buttons, the timer
+  /// and timer or stopwatch metrics, which would keep running.
+  var liveUpdatesEnded: Self {
+    var state = self
+    state.actions = []
+    state.timerStart = nil
+    state.timerEnd = nil
+    state.metrics = metrics.filter { $0.type != "timer" && $0.type != "stopwatch" }
+    return state
   }
 }

@@ -164,7 +164,9 @@ activity token for that key (or the push-to-start token to start one).
   on the device has.
 - `end` takes `dismissal-date` (a UNIX time in seconds); `stale-date`
   (also a UNIX time), `relevance-score` and
-  `alert` go next to `content-state`, not inside it.
+  `alert` go next to `content-state`, not inside it. The content of an
+  `end` stays on the Lock Screen: leave out `actions`, `timerStart` and
+  `timerEnd` (and timer or stopwatch metrics), as `LiveUpdate.end` does.
 - A push replaces the whole content state: send every field that should stay,
   including `extra`, `layout`, `metrics`, `steps`, `journey`,
   `publicContent`, `endedContent`, `compactTrailing` and `minimal`.

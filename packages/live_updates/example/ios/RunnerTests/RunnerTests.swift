@@ -1,3 +1,4 @@
+import ActivityKit
 import Foundation
 import Testing
 import UIKit
@@ -40,6 +41,66 @@ struct ContentStateDecodingTests {
   @Test func aMalformedJourneyIsLeftOut() throws {
     let state = try decode(#"{"title":"T","journey":{"from":1}}"#)
     #expect(state.journey == nil)
+  }
+
+  @Test func theEndedStateHasNoButtonsOrRunningTimers() throws {
+    let state = try decode(
+      #"{"title":"Order","progress":0.5,"timerEnd":1893456000,"timerStart":1,"#
+        + #""actions":[{"id":"call","title":"Call"}],"#
+        + #""metrics":[{"label":"Stops","type":"integer","value":3},"#
+        + #"{"label":"ETA","type":"timer","value":1893456000000},"#
+        + #"{"label":"Wait","type":"stopwatch","value":1},"#
+        + #"{"label":"Left","type":"pausedTimer","value":60000}]}"#)
+    #expect(!state.actions.isEmpty)
+    let ended = state.liveUpdatesEnded
+    #expect(ended.title == "Order")
+    #expect(ended.progress == 0.5)
+    #expect(ended.actions.isEmpty)
+    #expect(ended.timerStart == nil)
+    #expect(ended.timerEnd == nil)
+    #expect(ended.metrics.map(\.label) == ["Stops", "Left"])
+  }
+
+  private func content(_ json: String, staleIn seconds: Double? = nil, now: Date)
+    throws -> ActivityContent<LiveUpdatesAttributes.ContentState>
+  {
+    ActivityContent(
+      state: try decode(json), staleDate: seconds.map { now.addingTimeInterval($0) },
+      relevanceScore: 0)
+  }
+
+  @Test func endKeepsWhatTheSystemShowsWhenNothingChanges() throws {
+    let now = Date()
+    let shown = try content(#"{"title":"Order","progress":0.5}"#, now: now)
+    #expect(LiveUpdatesBridge.endedContent(final: nil, shown: shown, now: now) == nil)
+    #expect(LiveUpdatesBridge.endedContent(final: nil, shown: nil, now: now) == nil)
+    // A stale date without endedContent (endAt alone, or ios.staleDate) stays.
+    let dated = try content(#"{"title":"Order"}"#, staleIn: 600, now: now)
+    #expect(LiveUpdatesBridge.endedContent(final: nil, shown: dated, now: now) == nil)
+    let final = LiveUpdatesBridge.endedContent(final: dated, shown: shown, now: now)
+    #expect(final?.staleDate == dated.staleDate)
+  }
+
+  @Test func endStripsButtonsAndTimersFromTheShownContent() throws {
+    let now = Date()
+    let shown = try content(
+      #"{"title":"Order","timerEnd":1893456000,"actions":[{"id":"a","title":"A"}]}"#,
+      now: now)
+    let ended = try #require(LiveUpdatesBridge.endedContent(final: nil, shown: shown, now: now))
+    #expect(ended.state.title == "Order")
+    #expect(ended.state.actions.isEmpty)
+    #expect(ended.state.timerEnd == nil)
+  }
+
+  @Test func endDropsEndedContentNotShownYetButKeepsOneShown() throws {
+    let now = Date()
+    let json = #"{"title":"Order","endedContent":{"title":"Delivered"}}"#
+    let coming = try content(json, staleIn: 600, now: now)
+    let ended = try #require(LiveUpdatesBridge.endedContent(final: nil, shown: coming, now: now))
+    #expect(ended.state.endedContent == nil)
+    #expect(ended.staleDate == nil)
+    let past = try content(json, staleIn: -60, now: now)
+    #expect(LiveUpdatesBridge.endedContent(final: nil, shown: past, now: now) == nil)
   }
 
   @Test func endedContentDecodes() throws {

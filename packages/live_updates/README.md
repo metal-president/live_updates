@@ -201,7 +201,12 @@ differently.
   ([source][ios-activitykit])
 - **After `end`:** the final content stays on the Lock Screen for up to
   4 hours. `dismissAfter` longer than that is capped at 4 hours.
-  ([source][ios-activitykit])
+  ([source][ios-activitykit]) From 0.4.0 the plugin leaves out buttons, the
+  timer and timer or stopwatch metrics, which would keep running (as on
+  Android); an `end` sent by push shows what the server sends. Without
+  `finalContent` it starts from the content as the app last received it,
+  which can be older than a push update shown a moment ago: if you update
+  by push, pass `finalContent` to `end`.
 - **Size:** the attributes and the content together must stay under 4 KB,
   for local updates and push payloads alike. Long texts, many buttons and
   large `extra` maps count toward it. ([source][ios-activitykit])

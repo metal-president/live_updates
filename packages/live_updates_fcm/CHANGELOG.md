@@ -1,6 +1,7 @@
 ## 0.4.0
 
-- Requires live_updates 0.4.0.
+- Requires live_updates 0.4.0 (Live Activities from iOS 16.2, so activity
+  tokens come from iOS 16.2 too; push-to-start tokens still need iOS 17.2).
 - `tokens()` reports a token again when it changes back to an earlier value
   (A, B, A): before, the second A was dropped and the server kept B.
 

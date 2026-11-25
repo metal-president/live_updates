@@ -45,6 +45,8 @@
   the content has one.
 - Docs: `stale` is reported on both platforms (since 0.3.0), and `ended`
   also after Android's `maxDuration` and `removeAtEnd`.
+- Docs: how to keep an Android countdown from running below zero (`endAt`
+  at its end with `removeAtEnd: true`).
 
 ## 0.3.0
 

@@ -372,7 +372,9 @@ final class LiveUpdatePublicContent {
 /// A timer counted by the system (see [LiveUpdateContent.timer]).
 @immutable
 final class LiveUpdateTimer {
-  /// Counts down to [end] and stops at zero.
+  /// Counts down to [end]. iOS stops at zero; Android keeps counting below
+  /// zero, so remove the update at [end] there (see
+  /// [AndroidLiveUpdateOptions.removeAtEnd]) or update it.
   const LiveUpdateTimer.countdown(DateTime this.end) : start = null;
 
   /// Counts up from [start].

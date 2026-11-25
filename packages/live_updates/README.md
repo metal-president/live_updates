@@ -606,8 +606,25 @@ LiveUpdateContent(
 );
 ```
 
-On iOS a countdown stops at zero; Android keeps counting below zero, so update
-or end the live update when the time is up.
+On iOS a countdown stops at zero. Android has no way to stop a notification's
+countdown, so it keeps counting below zero. To avoid that, remove the
+notification when the time is up: set `endAt` to the countdown's end and
+`removeAtEnd: true` for Android. Android then removes it exactly at that time,
+even if the app is not running, with no extra permission
+([source][android-timeout-after]):
+
+```dart
+LiveUpdateContent(
+  title: 'Order #1234',
+  timer: LiveUpdateTimer.countdown(eta),
+  endAt: eta,
+  android: const AndroidLiveUpdateOptions(removeAtEnd: true),
+);
+```
+
+Or update the content from your server at that time, for example to "Arrived".
+Switching to `endedContent` at `endAt` instead also works, but without exact
+alarms it can come up to 10 minutes late (see [Ending at a time](#ending-at-a-time)).
 
 ### Layouts
 

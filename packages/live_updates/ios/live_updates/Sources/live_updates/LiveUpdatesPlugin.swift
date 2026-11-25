@@ -39,6 +39,9 @@ public class LiveUpdatesPlugin: NSObject, FlutterPlugin, FlutterSceneLifeCycleDe
     guard instances.isEmpty, !LiveUpdatesBackgroundRunner.registeringPlugins else { return }
     let instance = LiveUpdatesPlugin()
     instances.append(instance)
+    // Scheduled Live Activities may have started while the app was not
+    // running.
+    LiveUpdatesBridge.resumeSchedules()
     // Scene-based apps get URLs through the scene delegate only; registering
     // both would deliver every tap twice.
     if Bundle.main.object(forInfoDictionaryKey: "UIApplicationSceneManifest") == nil {

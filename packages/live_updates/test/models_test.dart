@@ -81,4 +81,55 @@ void main() {
       ),
     );
   });
+
+  test('endAt and ended content are part of the content', () {
+    const e = LiveUpdateEndedContent(title: 'Delivered', body: 'Enjoy');
+    expect(e, const LiveUpdateEndedContent(title: 'Delivered', body: 'Enjoy'));
+    expect(
+      e.hashCode,
+      const LiveUpdateEndedContent(title: 'Delivered', body: 'Enjoy').hashCode,
+    );
+    expect(e, isNot(const LiveUpdateEndedContent(title: 'Delivered')));
+    const withIcon = LiveUpdateEndedContent(
+      title: 'Delivered',
+      icon: LiveUpdateIcon.symbol('checkmark'),
+      image: LiveUpdateImage.asset('assets/done.png'),
+    );
+    expect(
+      withIcon,
+      const LiveUpdateEndedContent(
+        title: 'Delivered',
+        icon: LiveUpdateIcon.symbol('checkmark'),
+        image: LiveUpdateImage.asset('assets/done.png'),
+      ),
+    );
+    expect(
+      withIcon,
+      isNot(
+        const LiveUpdateEndedContent(
+          title: 'Delivered',
+          icon: LiveUpdateIcon.symbol('checkmark'),
+        ),
+      ),
+    );
+    final at = DateTime(2030);
+    final a = LiveUpdateContent(title: 'Order', endAt: at, endedContent: e);
+    expect(a, LiveUpdateContent(title: 'Order', endAt: at, endedContent: e));
+    expect(a, isNot(LiveUpdateContent(title: 'Order', endAt: at)));
+    expect(a, isNot(const LiveUpdateContent(title: 'Order', endedContent: e)));
+    expect(a.copyWith(progress: .5).endAt, at);
+    expect(a.copyWith(progress: .5).endedContent, e);
+    expect(
+      const LiveUpdateContent(title: 'x').copyWith(endAt: at, endedContent: e),
+      LiveUpdateContent(title: 'x', endAt: at, endedContent: e),
+    );
+  });
+
+  test('android maxDuration defaults to eight hours', () {
+    const options = AndroidLiveUpdateOptions();
+    expect(options.maxDuration, const Duration(hours: 8));
+    expect(options.removeAtEnd, isFalse);
+    expect(options, isNot(const AndroidLiveUpdateOptions(maxDuration: null)));
+    expect(options, isNot(const AndroidLiveUpdateOptions(removeAtEnd: true)));
+  });
 }

@@ -33,9 +33,12 @@ mixin ContentEncoder {
   };
 
   /// JSON for [content], with `image` set to the stored file name.
+  /// [showAt] is when content scheduled for later is shown: its image is
+  /// kept until then.
   Future<String> encodeContent(
     LiveUpdateContent content, [
     Map<String, Object?> extra = const {},
+    DateTime? showAt,
   ]) async {
     final json = {...content.toJson(), ...extra};
     assert(() {
@@ -46,13 +49,24 @@ mixin ContentEncoder {
     }());
     if (content.image case final image?) {
       final store = _store ??= ImageStore(_directory);
-      json['image'] = await store.store(image);
+      json['image'] = await store.store(image, keepUntil: showAt);
+    }
+    if (content.endedContent?.image case final image?) {
+      final store = _store ??= ImageStore(_directory);
+      // Shown from endAt on: kept until then.
+      final until = switch ((content.endAt, showAt)) {
+        (final a?, final b?) => a.isAfter(b) ? a : b,
+        (final a, final b) => a ?? b,
+      };
+      (json['endedContent']! as Map<String, Object?>)['image'] = await store
+          .store(image, keepUntil: until);
     }
     if (storesIconAssets) {
       // Only the icons the widget shows: the iOS option wins over the shared
       // one.
       await storeIconAssets([
         ?(content.ios?.icon ?? content.icon)?.assetName,
+        ?content.endedContent?.icon?.assetName,
         ?content.ios?.islandIcon?.assetName,
         for (final a in content.actions) ?(a.iosIcon ?? a.icon)?.assetName,
       ]);

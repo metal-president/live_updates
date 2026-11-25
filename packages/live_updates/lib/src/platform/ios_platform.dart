@@ -269,4 +269,70 @@ class IosLiveUpdatesPlatform extends LiveUpdatesPlatform with ContentEncoder {
 
   @override
   Future<bool> handleRemotePayload(Map<String, Object?> data) async => false;
+
+  @override
+  Future<bool> canSchedule() async => LiveUpdatesBridge.canSchedule();
+
+  @override
+  Future<void> schedule(
+    String key,
+    LiveUpdateContent content, {
+    required DateTime at,
+    bool pushUpdates = false,
+    AndroidScheduleOptions android = const AndroidScheduleOptions(),
+  }) async {
+    final json = await encodeContent(content, {
+      'enablePushUpdates': pushUpdates,
+    }, at);
+    await _await(
+      (cb) => LiveUpdatesBridge.schedule(
+        _ns(key),
+        json: _ns(json),
+        at: at.millisecondsSinceEpoch / 1000,
+        completion: cb,
+      ),
+    );
+  }
+
+  @override
+  Future<void> reschedule(
+    String key, {
+    required DateTime at,
+    LiveUpdateContent? content,
+  }) async {
+    final json = content == null
+        ? null
+        : await encodeContent(content, const {}, at);
+    await _await(
+      (cb) => LiveUpdatesBridge.reschedule(
+        _ns(key),
+        json: json == null ? null : _ns(json),
+        at: at.millisecondsSinceEpoch / 1000,
+        completion: cb,
+      ),
+    );
+  }
+
+  @override
+  Future<List<(String, DateTime)>> scheduled() async =>
+      parseSchedules(LiveUpdatesBridge.scheduledJson().toDartString());
+
+  @override
+  Future<void> cancelAllScheduled() async {
+    final done = Completer<void>();
+    LiveUpdatesBridge.cancelAllScheduled(
+      ObjCBlock_ffiVoid.listener(done.complete),
+    );
+    await done.future;
+  }
+
+  @override
+  Future<void> cancelScheduled(String key) async {
+    final done = Completer<void>();
+    LiveUpdatesBridge.cancelScheduled(
+      _ns(key),
+      completion: ObjCBlock_ffiVoid.listener(done.complete),
+    );
+    await done.future;
+  }
 }

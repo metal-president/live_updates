@@ -99,6 +99,43 @@ abstract class LiveUpdatesPlatform {
 
   /// Applies a remote payload; `false` if it is not a live_updates message.
   Future<bool> handleRemotePayload(Map<String, Object?> data);
+
+  /// See [LiveUpdates.canSchedule].
+  Future<bool> canSchedule() async => false;
+
+  /// See [LiveUpdates.canScheduleExactly].
+  Future<bool> canScheduleExactly() async => false;
+
+  /// See [LiveUpdates.openExactAlarmSettings].
+  Future<bool> openExactAlarmSettings() async => false;
+
+  /// Schedules [content] to be shown with [key] at [at], replacing a
+  /// schedule with that key. Shows it now when [at] is not in the future.
+  Future<void> schedule(
+    String key,
+    LiveUpdateContent content, {
+    required DateTime at,
+    bool pushUpdates = false,
+    AndroidScheduleOptions android = const AndroidScheduleOptions(),
+  }) async {}
+
+  /// Moves the schedule with [key] to [at], with [content] instead of the
+  /// scheduled content when given. Throws [LiveUpdateException] when no
+  /// live update with [key] is scheduled.
+  Future<void> reschedule(
+    String key, {
+    required DateTime at,
+    LiveUpdateContent? content,
+  }) async {}
+
+  /// Scheduled live updates as `(key, time)`.
+  Future<List<(String, DateTime)>> scheduled() async => const [];
+
+  /// Cancels the schedule with [key], if any.
+  Future<void> cancelScheduled(String key) async {}
+
+  /// Cancels every schedule.
+  Future<void> cancelAllScheduled() async {}
 }
 
 /// Backend for unsupported platforms: every call succeeds and does nothing.

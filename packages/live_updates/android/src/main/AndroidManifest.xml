@@ -2,6 +2,8 @@
   <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
   <!-- Android 16+: lets ongoing notifications be promoted to Live Updates. -->
   <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" />
+  <!-- Sets the alarms of scheduled live updates again after a reboot. -->
+  <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
   <application>
     <receiver
@@ -10,5 +12,17 @@
     <receiver
       android:name="com.ttechapp.live_updates.LiveUpdatesActionReceiver"
       android:exported="false" />
+    <!-- Scheduled live updates: alarms, and events that drop or move them. -->
+    <receiver
+      android:name="com.ttechapp.live_updates.LiveUpdatesScheduleReceiver"
+      android:exported="false">
+      <intent-filter>
+        <action android:name="android.intent.action.BOOT_COMPLETED" />
+        <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+        <action android:name="android.intent.action.TIME_SET" />
+        <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+        <action android:name="android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED" />
+      </intent-filter>
+    </receiver>
   </application>
 </manifest>

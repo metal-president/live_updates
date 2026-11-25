@@ -250,8 +250,23 @@ differently.
 - **Permissions:** on Android 13 and later nothing is shown until the user
   grants the notification permission, including updates started by a
   remote message. ([source][android-permission])
+- **Duration:** from 0.3.0 a live update is removed 8 hours after it
+  started by default, like on iOS (`AndroidLiveUpdateOptions.maxDuration`;
+  `null` for no limit).
+- **Exact alarms:** scheduled updates and `endedContent` are on time only
+  while the app may set exact alarms (`SCHEDULE_EXACT_ALARM`, denied by
+  default from Android 14 for most newly installed apps). If the user takes
+  the permission away, Android cancels the exact alarms without telling the
+  app; the plugin sets them again (inexact) the next time the app starts.
+  Otherwise Android delivers alarms within a window of at least 10 minutes.
+  ([source][android-alarms], [source][android-14-exact-alarms])
 
 [ios-activitykit]: https://developer.apple.com/documentation/activitykit/displaying-live-data-with-live-activities
+[ios-request-start]: https://developer.apple.com/documentation/activitykit/activity/request(attributes:content:pushtype:style:alertconfiguration:start:)
+[ios-stale-date]: https://developer.apple.com/documentation/activitykit/activitycontent/staledate
+[android-alarms]: https://developer.android.com/develop/background-work/services/alarms
+[android-14-exact-alarms]: https://developer.android.com/about/versions/14/changes/schedule-exact-alarms
+[android-timeout-after]: https://developer.android.com/reference/android/app/Notification.Builder#setTimeoutAfter(long)
 [ios-push]: https://developer.apple.com/documentation/activitykit/starting-and-updating-live-activities-with-activitykit-push-notifications
 [ios-hig]: https://developer.apple.com/design/human-interface-guidelines/live-activities
 [ios-hig-specs]: https://developer.apple.com/design/human-interface-guidelines/live-activities#Specifications
@@ -327,6 +342,120 @@ On Android the key is the update's id and is the same as `live_updates_id`
 in remote payloads, so the app and the server address the same notification.
 On iOS the key is stored in the activity's attributes; a push-to-start can set
 it with `"attributes": {"key": "order-1234"}`.
+
+### Scheduling
+
+`schedule` shows a live update at a later time, even if the app is not
+running then. At that time it behaves like `startOrUpdate`: a running update
+with the key is updated, otherwise one starts.
+
+```dart
+if (await LiveUpdates.canSchedule()) {
+  final scheduled = await LiveUpdates.schedule(
+    'order-1234',
+    content,
+    at: DateTime.now().add(const Duration(hours: 1)),
+  );
+  // Later: move it, change it or cancel it.
+  await scheduled.reschedule(at: DateTime.now().add(const Duration(hours: 2)));
+  await scheduled.cancel();
+}
+final pending = await LiveUpdates.scheduled();
+```
+
+- Scheduling again with the same key replaces the schedule. A time that is
+  not in the future shows the update now.
+- A scheduled update is not part of `active()` or `find` until it is shown;
+  then it appears on `onStarted` while the app runs. `startOrUpdate` does
+  not cancel a schedule; use `cancelScheduled`, `ScheduledLiveUpdate.cancel`
+  or `cancelAllScheduled`. `endAll()` ends running updates and cancels
+  schedules too, such as when the user logs out or switches accounts;
+  `endAll(includeScheduled: false)` leaves schedules alone.
+- Schedules live on the device, and only the app can cancel them. If the
+  user is logged out on the server or does not open the app, a schedule
+  still shows its update at its time; on iOS a push cannot cancel it either,
+  because a scheduled activity gets its push token only once it starts. Call
+  `endAll()` at logout and at app start when the session is no longer valid,
+  and keep sensitive details out of scheduled content (or give it a
+  `publicContent`, see [Hiding content on the Lock Screen](#hiding-content-on-the-lock-screen)).
+- **iOS 26 and later:** the system starts the Live Activity at that time
+  ([source][ios-request-start]) and presents an alert:
+  `IosLiveUpdateOptions.alert`, or else the title and body. Call `schedule`
+  and `reschedule` while the app is in the foreground; they throw a
+  `LiveUpdateException` in the background and before iOS 26 (check
+  `canSchedule`). ActivityKit drops content updates made before the start,
+  so `reschedule` replaces the scheduled activity. With `pushUpdates`, the
+  activity's push token is issued only once it starts. If an update with the
+  key is running at that time, the system shows both until the app runs; the
+  plugin then ends the older one. In tests the activity started 3 to 4
+  seconds after the requested time.
+- **Android:** an alarm posts the notification. It is on time only with
+  exact alarms: add `SCHEDULE_EXACT_ALARM` to your app's manifest (this
+  package does not declare it). From Android 14 it is denied by default for
+  most newly installed apps, so ask the user with
+  `LiveUpdates.openExactAlarmSettings()` and check
+  `LiveUpdates.canScheduleExactly()`
+  ([source][android-alarms], [source][android-14-exact-alarms]). Without it
+  the update appears within `AndroidScheduleOptions.window` (10 minutes by
+  default, which is also the shortest window Android allows from Android 12).
+  Schedules survive reboots, app updates and clock changes. A force-stopped
+  app gets no alarms; the plugin sets them again the next time the app
+  starts and then shows overdue updates.
+
+```xml
+<!-- android/app/src/main/AndroidManifest.xml, for exact timing -->
+<uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+```
+
+### Ending at a time
+
+`endAt` says when the activity is over, such as the delivery time.
+`endedContent` is what the update shows from then on, even if the app is not
+running:
+
+```dart
+await LiveUpdates.startOrUpdate(
+  'order-1234',
+  LiveUpdateContent(
+    title: 'Order #1234',
+    body: 'On the way',
+    timer: LiveUpdateTimer.countdown(eta),
+    endAt: eta,
+    endedContent: const LiveUpdateEndedContent(
+      title: 'Order #1234',
+      body: 'Delivered',
+    ),
+  ),
+);
+```
+
+- At `endAt` the update reports `LiveUpdateState.stale` on both platforms
+  and keeps running: it stays in `active()` and `find`, until the app ends
+  it or it reaches its time limit. Updating it with new content makes it
+  active again.
+- Without `endedContent`, nothing visible changes at `endAt`.
+- `LiveUpdateEndedContent` can also set an `icon` (used instead of the
+  content's icon; platform icon options still win) and an `image` (without
+  one, the ended display shows no image).
+- **iOS:** `endAt` becomes the activity's stale date (an explicit
+  `IosLiveUpdateOptions.staleDate` wins), and the generated widget shows
+  `endedContent` once the activity is stale ([source][ios-stale-date]). In
+  tests the system marked the activity stale about a minute after the stale
+  date. The activity keeps running until the app ends it or the system
+  removes it after at most 8 hours (see [Platform limits](#ios)). The
+  switch lives in your layout file: one generated before 0.3.0 needs it
+  added (see [Upgrading](#upgrading)).
+- **Android:** an alarm replaces the notification with `endedContent` as a
+  regular notification (title, body, icon, image, color and tap route; no
+  progress, timer or buttons) that is no longer ongoing or promoted, so the
+  user can swipe it away (reported as `dismissed`). Like scheduling, the
+  switch is on time only with exact alarms, otherwise within 10 minutes. `AndroidLiveUpdateOptions(removeAtEnd: true)` removes
+  the notification at `endAt` instead, exactly
+  ([source][android-timeout-after]).
+- **Android time limit:** `AndroidLiveUpdateOptions.maxDuration` removes the
+  notification that long after the update started (later updates do not
+  reset it), even if the app is not running. It defaults to 8 hours, like
+  the iOS limit; pass `maxDuration: null` for no limit.
 
 ### Buttons
 
@@ -968,7 +1097,21 @@ apply them again:
   `LiveUpdatesMinimal` and `LiveUpdatesIslandIcon` (in the expanded leading
   region), for the Dynamic Island options;
 - `LiveUpdatesExpandedCenter` (in the expanded center region), so the title
-  follows `publicContent`.
+  follows `publicContent`;
+- `let state = context.state.liveUpdatesShown(isStale: context.isStale)` at
+  the start of both the Lock Screen and the Dynamic Island closures, with
+  `state` passed to the building blocks instead of `context.state`, so the
+  activity shows `endedContent` from `endAt` on (0.3.0).
+
+### From 0.2.x to 0.3.0
+
+- **Android live updates are removed after 8 hours by default**
+  (`AndroidLiveUpdateOptions.maxDuration`), as iOS ends Live Activities after
+  at most 8 hours. To keep the old behavior, pass
+  `AndroidLiveUpdateOptions(maxDuration: null)`; remote payloads send
+  `"maxDurationMillis": 0`.
+- Run `create_widget` again (and update your layout file as above) to show
+  `endedContent` on iOS.
 
 ### From 0.1.x to 0.2.0
 

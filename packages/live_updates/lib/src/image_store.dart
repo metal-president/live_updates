@@ -30,7 +30,10 @@ class ImageStore {
   static const downloadTimeout = Duration(seconds: 15);
 
   /// Stores [image] and returns the file name relative to [directory].
-  Future<String> store(LiveUpdateImage image) async {
+  ///
+  /// [keepUntil] protects the file from clean-up until [maxAge] after that
+  /// time, for content that is shown later (a scheduled live update).
+  Future<String> store(LiveUpdateImage image, {DateTime? keepUntil}) async {
     if (image.maxDimension <= 0) {
       throw LiveUpdateException(
         'maxDimension must be positive, got ${image.maxDimension}',
@@ -39,8 +42,14 @@ class ImageStore {
     final source = await _load(image);
     final name = '$prefix${_hash(source, image.maxDimension)}.png';
     final file = File('${directory.path}/$name');
+    // The modification time is when the file may be cleaned up (plus
+    // maxAge); never moved earlier, as a schedule may still need the file.
+    final now = DateTime.now();
+    final until = keepUntil != null && keepUntil.isAfter(now) ? keepUntil : now;
     if (file.existsSync()) {
-      file.setLastModifiedSync(DateTime.now());
+      if (file.lastModifiedSync().isBefore(until)) {
+        file.setLastModifiedSync(until);
+      }
     } else {
       directory.createSync(recursive: true);
       final png = await _scaleToPng(source, image.maxDimension);
@@ -50,6 +59,7 @@ class ImageStore {
         '${file.path}.${DateTime.now().microsecondsSinceEpoch}.tmp',
       );
       await temp.writeAsBytes(png, flush: true);
+      if (until != now) temp.setLastModifiedSync(until);
       await temp.rename(file.path);
     }
     _cleanUp(keep: name);

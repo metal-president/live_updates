@@ -1,9 +1,11 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:live_updates/live_updates.dart';
 import 'package:live_updates/src/image_store.dart';
+import 'package:live_updates/src/platform/content_encoder.dart';
 
 void main() {
   late Directory dir;
@@ -42,6 +44,49 @@ void main() {
     });
   });
 
+  testWidgets('keeps images of scheduled content until it is shown', (
+    tester,
+  ) async {
+    await tester.runAsync(() async {
+      final later = DateTime.now().add(const Duration(days: 3));
+      final name = await store.store(
+        LiveUpdateImage.file('example/assets/parcel.png'),
+        keepUntil: later,
+      );
+      final file = File('${dir.path}/$name');
+      expect(file.lastModifiedSync().difference(later).inSeconds.abs(), 0);
+      // Storing it again for content shown now does not shorten that.
+      await store.store(LiveUpdateImage.file('example/assets/parcel.png'));
+      expect(file.lastModifiedSync().difference(later).inSeconds.abs(), 0);
+      // Another write cleans up, but not this file.
+      await store.store(LiveUpdateImage.memory(png, maxDimension: 32));
+      expect(file.existsSync(), isTrue);
+    });
+  });
+
+  testWidgets('the ended image is stored and kept until endAt', (tester) async {
+    await tester.runAsync(() async {
+      final endAt = DateTime.now().add(const Duration(days: 2));
+      final json = jsonDecode(
+        await _Encoder(dir).encodeContent(
+          LiveUpdateContent(
+            title: 'Order',
+            endAt: endAt,
+            endedContent: const LiveUpdateEndedContent(
+              title: 'Done',
+              image: LiveUpdateImage.file('example/assets/parcel.png'),
+            ),
+          ),
+        ),
+      ) as Map<String, Object?>;
+      final name = (json['endedContent']! as Map)['image'] as String;
+      expect(name, startsWith(ImageStore.prefix));
+      expect(json.containsKey('image'), isFalse);
+      final file = File('${dir.path}/$name');
+      expect(file.lastModifiedSync().difference(endAt).inSeconds.abs(), 0);
+    });
+  });
+
   testWidgets('removes stale files', (tester) async {
     await tester.runAsync(() async {
       final stale = File('${dir.path}/${ImageStore.prefix}old.png')
@@ -62,4 +107,16 @@ void main() {
       throwsA(isA<LiveUpdateException>()),
     );
   });
+}
+
+class _Encoder with ContentEncoder {
+  _Encoder(this.dir);
+
+  final Directory dir;
+
+  @override
+  String? get imageDirectory => dir.path;
+
+  @override
+  String get missingImageDirectoryHint => '';
 }

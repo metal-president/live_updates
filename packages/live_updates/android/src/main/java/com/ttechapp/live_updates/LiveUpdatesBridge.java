@@ -538,6 +538,8 @@ public final class LiveUpdatesBridge {
   static void engineAttached(Context c) {
     context = c.getApplicationContext();
     defaultIconRes = 0;
+    // Alarms are gone after a force stop, which sends no broadcast.
+    LiveUpdatesScheduler.restoreAll(context);
   }
 
   static void engineDetached(long engineId) {
@@ -558,6 +560,11 @@ public final class LiveUpdatesBridge {
 
   /** Records that the user swiped the update away (see DismissReceiver). */
   static void markDismissed(Context c, String id) {
+    LiveUpdatesScheduler.cancelEnd(c, id);
+    forgetStartTime(c, id);
+    synchronized (staleIds) {
+      staleIds.remove(id);
+    }
     synchronized (actionLock) {
       List<String> ids = readStrings(c, PREF_DISMISSED);
       ids.remove(id);
@@ -660,6 +667,11 @@ public final class LiveUpdatesBridge {
       keyedIds.remove(id);
     }
     clearDismissed(c, id);
+    LiveUpdatesScheduler.cancelEnd(c, id);
+    forgetStartTime(c, id);
+    synchronized (staleIds) {
+      staleIds.remove(id);
+    }
     if (json != null && dismissAfterSeconds != 0) {
       JSONObject content = new JSONObject(json);
       Notification.Builder builder =
@@ -679,6 +691,10 @@ public final class LiveUpdatesBridge {
     return c == null ? null : imageDir(c).getPath();
   }
 
+  static java.io.File imageDirectory(Context c) {
+    return imageDir(c);
+  }
+
   private static java.io.File imageDir(Context c) {
     return new java.io.File(c.getCacheDir(), "live_updates");
   }
@@ -692,7 +708,9 @@ public final class LiveUpdatesBridge {
     for (StatusBarNotification n : manager(c).getActiveNotifications()) {
       String tag = n.getTag();
       if (n.getId() == NOTIFICATION_ID && tag != null && tag.startsWith(TAG_PREFIX)) {
-        if ((n.getNotification().flags & Notification.FLAG_ONGOING_EVENT) != 0) {
+        Notification notification = n.getNotification();
+        if ((notification.flags & Notification.FLAG_ONGOING_EVENT) != 0
+            || notification.extras.getBoolean(EXTRA_STALE, false)) {
           ids.add(tag.substring(TAG_PREFIX.length()));
         }
       }
@@ -768,13 +786,76 @@ public final class LiveUpdatesBridge {
 
   /** Called by the dismiss receiver when a timeout removed the update. */
   static void timedOut(Context c, String id) {
+    LiveUpdatesScheduler.cancelEnd(c, id);
+    forgetStartTime(c, id);
+    synchronized (staleIds) {
+      staleIds.remove(id);
+    }
     synchronized (keyedIds) {
       keyedIds.remove(id);
     }
     emit("ended", id);
   }
 
-  /** Removes every live update of this app. */
+  /** Whether live updates can be scheduled: as {@link #isSupported}. */
+  public static boolean canSchedule() {
+    return isSupported();
+  }
+
+  /** Whether scheduled live updates are shown on time (exact alarms). */
+  public static boolean canScheduleExactly() {
+    Context c = context;
+    return c != null && LiveUpdatesScheduler.canScheduleExactly(c);
+  }
+
+  /**
+   * Opens the screen where the user allows exact alarms for this app (Android 12+); returns
+   * whether it was opened.
+   */
+  public static boolean openExactAlarmSettings() {
+    Context c = context;
+    return c != null && LiveUpdatesScheduler.openExactAlarmSettings(c, activity);
+  }
+
+  /**
+   * Shows {@code json} as the live update {@code key} at {@code atMillis} (epoch ms), as {@link
+   * #startOrUpdate} would then, replacing the schedule with that key. Uses an exact alarm when
+   * {@code exact} and allowed, else an alarm within {@code windowMillis}.
+   */
+  public static void schedule(
+      @NonNull String key, @NonNull String json, long atMillis, boolean exact, long windowMillis)
+      throws JSONException {
+    LiveUpdatesScheduler.schedule(requireContext(), key, json, atMillis, exact, windowMillis);
+  }
+
+  /**
+   * Moves the schedule with {@code key} to {@code atMillis}, with {@code json} as its content when
+   * given. Throws when nothing is scheduled with {@code key}.
+   */
+  public static void reschedule(@NonNull String key, @Nullable String json, long atMillis)
+      throws JSONException {
+    LiveUpdatesScheduler.reschedule(requireContext(), key, json, atMillis);
+  }
+
+  /** Scheduled live updates as a JSON array of {@code {"key", "at"}} (epoch seconds). */
+  @NonNull
+  public static String scheduledJson() {
+    Context c = context;
+    return c == null ? "[]" : LiveUpdatesScheduler.scheduledJson(c);
+  }
+
+  /** Cancels every schedule (not the endAt alarms of shown updates). */
+  public static void cancelAllScheduled() {
+    Context c = context;
+    if (c != null) LiveUpdatesScheduler.cancelAll(c);
+  }
+
+  /** Cancels the schedule with {@code key}, if any. */
+  public static void cancelScheduled(@NonNull String key) {
+    LiveUpdatesScheduler.cancel(requireContext(), key);
+  }
+
+  /** Removes every live update of this app (not the scheduled ones). */
   public static void endAll() throws JSONException {
     for (String id : activeIds()) end(id, null, 0);
   }
@@ -862,9 +943,69 @@ public final class LiveUpdatesBridge {
 
   /** {@code keyed}: the id is a key (startOrUpdate, remote payloads). */
   private static void post(String id, JSONObject content, boolean remote, boolean keyed) {
+    post(id, content, remote, keyed, false);
+  }
+
+  /**
+   * {@code stale}: {@code content} is the ended content shown from endAt on, as a regular
+   * notification that still counts as running (see {@link #EXTRA_STALE}).
+   */
+  private static void post(
+      String id, JSONObject content, boolean remote, boolean keyed, boolean stale) {
     Context c = requireContext();
     // Survives process restarts: a notification already shown is not new.
     boolean wasShown = isShown(id);
+    long now = System.currentTimeMillis();
+    // When the update must be removed (maxDuration from its start, or endAt
+    // with removeAtEnd), and when it becomes stale (endAt).
+    long started = startTime(c, id, wasShown, now);
+    long maxDuration = content.optLong("maxDurationMillis", DEFAULT_MAX_DURATION_MS);
+    long removeAt = maxDuration > 0 ? started + maxDuration : 0;
+    long endAt = epochMillis(content, "endAt");
+    JSONObject endedContent = content.optJSONObject("endedContent");
+    if (endedContent != null && optString(endedContent, "title") == null) endedContent = null;
+    boolean removeAtEnd = content.optBoolean("removeAtEnd", false);
+    if (endAt > 0 && removeAtEnd && (removeAt == 0 || endAt < removeAt)) removeAt = endAt;
+    boolean staleAtEnd = !stale && endAt > 0 && !removeAtEnd;
+    if (removeAt > 0 && removeAt <= now) {
+      // Already over: never posted, and ended if it was shown.
+      LiveUpdatesScheduler.cancelEnd(c, id);
+      try {
+        end(id, null, 0, remote, wasShown);
+      } catch (JSONException e) {
+        // Not without content.
+      }
+      return;
+    }
+    boolean staleNow = false;
+    if (staleAtEnd) {
+      JSONObject staleContent =
+          endedContent == null ? null : staleContent(content, endedContent);
+      if (endAt <= now) {
+        // Already over: shown as stale right away.
+        LiveUpdatesScheduler.cancelEnd(c, id);
+        if (staleContent != null) {
+          post(id, staleContent, remote, keyed, true);
+          markStale(id);
+          return;
+        }
+        staleNow = true;
+      } else {
+        LiveUpdatesScheduler.scheduleEnd(
+            c, id, endAt, staleContent == null ? "" : staleContent.toString(), remote);
+      }
+    } else if (!stale) {
+      LiveUpdatesScheduler.cancelEnd(c, id);
+    }
+    // New content that is not over makes a stale update active again.
+    boolean activeAgain = false;
+    if (!stale && !staleNow) {
+      synchronized (staleIds) {
+        activeAgain = staleIds.remove(id);
+      }
+      // After a process restart: the marker on the shown notification.
+      if (!activeAgain && wasShown) activeAgain = showsStale(c, id);
+    }
     synchronized (recentlyPosted) {
       recentlyEnded.remove(id);
       recentlyPosted.put(id, SystemClock.uptimeMillis());
@@ -880,27 +1021,172 @@ public final class LiveUpdatesBridge {
       }
     }
     if (isNew) emit("started", id);
-    Notification.Builder b = builder(c, content, remote);
+    // Stale: the ended content's look (not ongoing or promoted, dismissible),
+    // but not cancelled by a tap, as the update keeps running.
+    Notification.Builder b =
+        stale ? builder(c, content, remote, true).setAutoCancel(false) : builder(c, content, remote);
     if (content.optBoolean("androidAlert", false) && !mayAlert(id)) b.setOnlyAlertOnce(true);
     // The system sends the delete intent for timeouts too; the deadline lets
     // the receiver tell them from a swipe.
     long timeout = content.optLong("timeoutAfterMillis", 0);
-    long deadline =
-        timeout > 0 && Build.VERSION.SDK_INT >= 26
-            ? System.currentTimeMillis() + Math.max(timeout, MIN_TIMEOUT_MS)
-            : 0;
+    if (timeout > 0) timeout = Math.max(timeout, MIN_TIMEOUT_MS);
+    if (removeAt > 0 && (timeout <= 0 || removeAt - now < timeout)) timeout = removeAt - now;
+    long deadline = 0;
+    if (timeout > 0 && Build.VERSION.SDK_INT >= 26) {
+      b.setTimeoutAfter(timeout);
+      deadline = now + timeout;
+    }
     b.setDeleteIntent(LiveUpdatesDismissReceiver.intent(c, id, deadline));
     // update() keeps the marker of the shown notification.
-    if (keyed || keyForId(id) != null) {
-      android.os.Bundle extras = new android.os.Bundle();
-      extras.putBoolean(EXTRA_KEYED, true);
-      b.addExtras(extras);
-    }
-    addActions(c, b, id, content);
+    android.os.Bundle extras = new android.os.Bundle();
+    if (keyed || keyForId(id) != null) extras.putBoolean(EXTRA_KEYED, true);
+    if (stale) extras.putBoolean(EXTRA_STALE, true);
+    if (!extras.isEmpty()) b.addExtras(extras);
+    if (!stale) addActions(c, b, id, content);
     manager(c).notify(TAG_PREFIX + id, NOTIFICATION_ID, b.build());
+    if (staleNow) markStale(id);
+    if (activeAgain) emit("active", id);
+  }
+
+  /**
+   * Notification extra marking the ended content of a stale update: not ongoing, but still
+   * listed by {@link #activeIds}.
+   */
+  static final String EXTRA_STALE = "com.ttechapp.live_updates.STALE";
+
+  /** Updates reported stale in this process, so each change is reported once. */
+  private static final Set<String> staleIds = new java.util.HashSet<>();
+
+  private static boolean showsStale(Context c, String id) {
+    for (StatusBarNotification n : manager(c).getActiveNotifications()) {
+      if (n.getId() == NOTIFICATION_ID && (TAG_PREFIX + id).equals(n.getTag())) {
+        return n.getNotification().extras.getBoolean(EXTRA_STALE, false);
+      }
+    }
+    return false;
+  }
+
+  private static void markStale(String id) {
+    boolean changed;
+    synchronized (staleIds) {
+      changed = staleIds.add(id);
+    }
+    if (changed) emit("stale", id);
   }
 
   private static final String DEFAULT_CHANNEL = "live_updates";
+
+  /** {@code AndroidLiveUpdateOptions.maxDuration} when the content has none: 8 hours. */
+  static final long DEFAULT_MAX_DURATION_MS = 8 * 60 * 60_000L;
+
+  private static final String PREF_START_TIMES = "startTimes";
+
+  /**
+   * When the live update {@code id} started (epoch ms), for maxDuration: now for a new one, the
+   * stored time for one that is shown (later posts do not reset it).
+   */
+  private static long startTime(Context c, String id, boolean wasShown, long now) {
+    synchronized (actionLock) {
+      JSONObject times = readObject(prefs(c), PREF_START_TIMES);
+      long stored = times.optLong(id, 0);
+      if (wasShown && stored > 0 && stored <= now) return stored;
+      try {
+        if (!wasShown) {
+          // Drop updates that are no longer shown.
+          Set<String> shown = new java.util.HashSet<>(Arrays.asList(activeIds()));
+          List<String> stale = new ArrayList<>();
+          for (java.util.Iterator<String> it = times.keys(); it.hasNext(); ) {
+            String key = it.next();
+            if (!shown.contains(key)) stale.add(key);
+          }
+          for (String key : stale) times.remove(key);
+        }
+        times.put(id, now);
+      } catch (JSONException e) {
+        // Not for a number.
+      }
+      prefs(c).edit().putString(PREF_START_TIMES, times.toString()).apply();
+      return now;
+    }
+  }
+
+  private static void forgetStartTime(Context c, String id) {
+    synchronized (actionLock) {
+      JSONObject times = readObject(prefs(c), PREF_START_TIMES);
+      if (times.remove(id) != null) {
+        prefs(c).edit().putString(PREF_START_TIMES, times.toString()).apply();
+      }
+    }
+  }
+
+  private static JSONObject readObject(SharedPreferences prefs, String key) {
+    try {
+      return new JSONObject(prefs.getString(key, "{}"));
+    } catch (JSONException e) {
+      return new JSONObject();
+    }
+  }
+
+  /** {@code key} in seconds since 1970 as epoch ms, or 0 when missing or out of range. */
+  private static long epochMillis(JSONObject content, String key) {
+    double seconds = content.optDouble(key, Double.NaN);
+    return isTime(seconds) ? (long) (seconds * 1000) : 0;
+  }
+
+  /**
+   * The notification shown from endAt on: {@code ended}'s title, body, icon (else the content's)
+   * and image with the channel, small icon option, color, tap route, lock screen setting and time
+   * limits (maxDuration, timeoutAfter) of {@code content}.
+   */
+  static JSONObject staleContent(JSONObject content, JSONObject ended) {
+    JSONObject out = new JSONObject();
+    try {
+      copy(
+          content,
+          out,
+          new String[] {
+            "channelId",
+            "channelName",
+            "icon",
+            "androidSmallIcon",
+            "colorArgb",
+            "route",
+            "androidLockScreenVisibility",
+            "maxDurationMillis",
+            "timeoutAfterMillis"
+          });
+      out.put("title", ended.optString("title"));
+      String body = optString(ended, "body");
+      if (body != null) out.put("body", body);
+      // The ended icon replaces the content's icon (androidSmallIcon still
+      // wins); the ended image is the only image.
+      JSONObject icon = ended.optJSONObject("icon");
+      if (icon != null) out.put("icon", icon);
+      String image = optString(ended, "image");
+      if (image != null) out.put("image", image);
+    } catch (JSONException e) {
+      // Cannot happen: values come from parsed JSON.
+    }
+    return out;
+  }
+
+  /**
+   * The endAt alarm of {@code id} fired: the update becomes stale, showing its ended content
+   * ({@code json}, empty for none) if it is still shown.
+   */
+  static void endAlarmFired(Context c, String id, String json, boolean remote) {
+    if (context == null) context = c.getApplicationContext();
+    if (!isShown(id) || isDismissed(c, id)) return;
+    if (!json.isEmpty()) {
+      try {
+        post(id, new JSONObject(json), remote, keyForId(id) != null, true);
+      } catch (JSONException e) {
+        Log.w(LOG_TAG, "endedContent: " + e.getClass().getName());
+        return;
+      }
+    }
+    markStale(id);
+  }
 
   private static Notification.Builder builder(Context c, JSONObject content) {
     return builder(c, content, false);

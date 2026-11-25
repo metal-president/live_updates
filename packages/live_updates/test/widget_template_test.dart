@@ -68,7 +68,22 @@ void main() {
     }
     final layout = File('lib/src/cli/ios_widget/LiveActivityWidget.swift.tmpl')
         .readAsStringSync();
-    expect(layout, contains('LiveUpdatesExpandedCenter(state: context.state)'));
+    expect(layout, contains('LiveUpdatesExpandedCenter(state: state)'));
     expect(layout, contains('LiveUpdatesPublicLockScreen'));
+  });
+
+  test('the layout shows endedContent once the activity is stale', () {
+    final views = File('lib/src/cli/ios_widget/Views.swift.tmpl')
+        .readAsStringSync();
+    expect(views, contains('func liveUpdatesShown(isStale: Bool)'));
+    expect(views, contains('var liveUpdatesEndedState'));
+    final layout = File('lib/src/cli/ios_widget/LiveActivityWidget.swift.tmpl')
+        .readAsStringSync();
+    // Both the Lock Screen and the Dynamic Island use the switched state.
+    expect(
+      'liveUpdatesShown(isStale: context.isStale)'.allMatches(layout),
+      hasLength(2),
+    );
+    expect(layout, isNot(contains('(state: context.state')));
   });
 }

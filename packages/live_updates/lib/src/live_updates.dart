@@ -81,6 +81,55 @@ final class LiveUpdate {
   String toString() => 'LiveUpdate($id)';
 }
 
+/// A live update scheduled with [LiveUpdates.schedule] that has not been
+/// shown yet. It is identified by its [key]: scheduling again with that key
+/// replaces it.
+final class ScheduledLiveUpdate {
+  ScheduledLiveUpdate._(this.key, this.at);
+
+  /// The key the update is shown with ([LiveUpdate.key] once it is shown).
+  final String key;
+
+  /// When the update is shown.
+  final DateTime at;
+
+  LiveUpdatesPlatform get _platform => LiveUpdatesPlatform.instance;
+
+  /// Moves the update to [at] and, when given, replaces its content. With
+  /// neither, it is scheduled again unchanged. A time that is not in the
+  /// future shows it now.
+  ///
+  /// On iOS this ends the scheduled Live Activity and requests a new one
+  /// (ActivityKit does not change the content of an activity before it
+  /// starts), so it must be called while the app is in the foreground.
+  ///
+  /// Throws [LiveUpdateException] when nothing is scheduled with [key] any
+  /// more, for example because it was shown or cancelled.
+  Future<ScheduledLiveUpdate> reschedule({
+    DateTime? at,
+    LiveUpdateContent? content,
+  }) async {
+    final when = at ?? this.at;
+    await _platform.reschedule(key, at: when, content: content);
+    return ScheduledLiveUpdate._(key, when);
+  }
+
+  /// Cancels the update, if it is still scheduled. A live update that was
+  /// already shown keeps running: end it with [LiveUpdate.end].
+  Future<void> cancel() => _platform.cancelScheduled(key);
+
+  @override
+  bool operator ==(Object other) =>
+      other is ScheduledLiveUpdate && other.key == key && other.at == at;
+
+  @override
+  int get hashCode => Object.hash(key, at);
+
+  @override
+  // The key may be your own id, such as an order number: keep it out of logs.
+  String toString() => 'ScheduledLiveUpdate(at: $at)';
+}
+
 LiveUpdateState? _stateFromName(String name) => switch (name) {
   'active' => LiveUpdateState.active,
   'stale' => LiveUpdateState.stale,
@@ -233,14 +282,16 @@ abstract final class LiveUpdates {
 
   /// Currently running live updates started by this app, including ones
   /// started remotely with a push-to-start token. Ended and dismissed ones
-  /// are not included.
+  /// are not included, nor scheduled ones that have not been shown yet
+  /// (see [scheduled]).
   static Future<List<LiveUpdate>> active() async => [
     for (final id in await _platform.activeIds())
       LiveUpdate._(id, await _platform.keyForId(id)),
   ];
 
   /// Live updates that appear while the app runs, including ones started by
-  /// a push-to-start notification (iOS) or a remote payload (Android).
+  /// a push-to-start notification (iOS), a remote payload (Android) or a
+  /// schedule ([schedule]) when its time comes.
   static Stream<LiveUpdate> get onStarted => _platform.events
       .where((e) => e.$2 == 'started')
       .asyncMap((e) async => LiveUpdate._(e.$1, await _keyOrNull(e.$1)));
@@ -253,8 +304,120 @@ abstract final class LiveUpdates {
     }
   }
 
-  /// Ends every live update started by this app.
-  static Future<void> endAll() => _platform.endAll();
+  /// Ends every live update started by this app and, unless
+  /// [includeScheduled] is `false`, cancels every scheduled one that has not
+  /// been shown yet ([cancelAllScheduled]), for example when the user logs
+  /// out or switches accounts.
+  static Future<void> endAll({bool includeScheduled = true}) async {
+    if (includeScheduled) await _platform.cancelAllScheduled();
+    await _platform.endAll();
+  }
+
+  /// Whether live updates can be scheduled with [schedule] on this device
+  /// right now: on iOS 26 and later when Live Activities are enabled for the
+  /// app, on Android when [isSupported]. Always `false` before iOS 26 and on
+  /// platforms other than iOS and Android.
+  static Future<bool> canSchedule() => _platform.canSchedule();
+
+  /// Shows [content] as the live update identified by [key] at [at], as
+  /// [startOrUpdate] would at that time: a running live update with [key] is
+  /// updated, otherwise a new one starts. Scheduling again with the same key
+  /// replaces the earlier schedule. When [at] is not in the future, the
+  /// update is shown now.
+  ///
+  /// The app does not need to run at that time. A scheduled update is not
+  /// part of [active] or [find] until it is shown; it then appears on
+  /// [onStarted] while the app runs. Use [scheduled] and [findScheduled] to
+  /// list or look up schedules. [startOrUpdate] with the same key does not
+  /// cancel a schedule; [cancelScheduled], [cancelAllScheduled] and [endAll]
+  /// do.
+  ///
+  /// iOS (26 and later): the system starts the Live Activity and presents
+  /// an alert, [IosLiveUpdateOptions.alert] or else the title and body.
+  /// Call this while the app is in the foreground; it throws
+  /// [LiveUpdateException] in the background and before iOS 26 (check
+  /// [canSchedule]). [pushUpdates] requests a per-activity APNs token, which
+  /// is issued only once the activity starts ([LiveUpdate.pushTokens] of the
+  /// update from [onStarted] or [find]). If a live update with [key] is
+  /// running at that time, the system shows both until the app runs; the
+  /// plugin then ends the older one.
+  ///
+  /// Android: an alarm posts the notification. It is on time only with
+  /// exact alarms ([canScheduleExactly], [AndroidScheduleOptions]),
+  /// otherwise within [AndroidScheduleOptions.window]. Schedules survive
+  /// reboots, app updates and time zone changes. A force-stopped app gets no
+  /// alarms; the plugin sets them again the next time the app starts and
+  /// shows overdue ones then.
+  ///
+  /// On other platforms this does nothing.
+  static Future<ScheduledLiveUpdate> schedule(
+    String key,
+    LiveUpdateContent content, {
+    required DateTime at,
+    bool pushUpdates = false,
+    AndroidScheduleOptions android = const AndroidScheduleOptions(),
+  }) async {
+    if (android.window.isNegative) {
+      throw ArgumentError.value(
+        android.window,
+        'android.window',
+        'Must not be negative',
+      );
+    }
+    await _platform.schedule(
+      key,
+      content,
+      at: at,
+      pushUpdates: pushUpdates,
+      android: android,
+    );
+    return ScheduledLiveUpdate._(key, at);
+  }
+
+  /// Live updates scheduled with [schedule] that have not been shown yet,
+  /// in the order they are due.
+  static Future<List<ScheduledLiveUpdate>> scheduled() async {
+    final list = [...await _platform.scheduled()]
+      ..sort((a, b) => a.$2.compareTo(b.$2));
+    return [for (final (key, at) in list) ScheduledLiveUpdate._(key, at)];
+  }
+
+  /// The live update scheduled with [key] that has not been shown yet, if
+  /// any.
+  static Future<ScheduledLiveUpdate?> findScheduled(String key) async {
+    for (final (k, at) in await _platform.scheduled()) {
+      if (k == key) return ScheduledLiveUpdate._(k, at);
+    }
+    return null;
+  }
+
+  /// Cancels the live update scheduled with [key], if any. Same as
+  /// [ScheduledLiveUpdate.cancel].
+  static Future<void> cancelScheduled(String key) =>
+      _platform.cancelScheduled(key);
+
+  /// Cancels every live update scheduled with [schedule] that has not been
+  /// shown yet. Running live updates are not affected; [endAll] ends those
+  /// and cancels schedules too.
+  static Future<void> cancelAllScheduled() => _platform.cancelAllScheduled();
+
+  /// Whether scheduled live updates are shown on time on Android, which
+  /// needs exact alarms: the app must declare the `SCHEDULE_EXACT_ALARM`
+  /// permission (this package does not), and from Android 14 on the user
+  /// must allow it, as it is denied by default for most apps (see
+  /// [openExactAlarmSettings]). Always `true` below Android 12, where
+  /// every app may set exact alarms. When it is `false`, scheduled updates
+  /// appear within [AndroidScheduleOptions.window]. Always `false` on
+  /// other platforms.
+  static Future<bool> canScheduleExactly() => _platform.canScheduleExactly();
+
+  /// Opens the system screen where the user allows this app to set exact
+  /// alarms (Android 12 and later), and returns whether it was opened.
+  /// `false` below Android 12, when the app does not declare
+  /// `SCHEDULE_EXACT_ALARM`, and on other platforms. Check
+  /// [canScheduleExactly] again when the app returns to the foreground.
+  static Future<bool> openExactAlarmSettings() =>
+      _platform.openExactAlarmSettings();
 
   /// Copies Flutter assets used as [LiveUpdateIcon.asset] icons into the
   /// App Group shared with the iOS widget extension, so that content sent by

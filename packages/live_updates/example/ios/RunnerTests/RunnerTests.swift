@@ -42,6 +42,27 @@ struct ContentStateDecodingTests {
     #expect(state.journey == nil)
   }
 
+  @Test func endedContentDecodes() throws {
+    let state = try decode(#"{"title":"T","endedContent":{"title":"Done","body":"Enjoy"}}"#)
+    #expect(state.endedContent == LiveUpdatesEndedContent(title: "Done", body: "Enjoy"))
+    #expect(try decode(#"{"title":"T"}"#).endedContent == nil)
+  }
+
+  @Test func endedIconAndImageDecode() throws {
+    let state = try decode(
+      #"{"title":"T","endedContent":{"title":"Done","icon":{"symbol":"checkmark"},"image":"lu_b.png"}}"#)
+    #expect(state.endedContent?.icon == LiveUpdatesIcon(symbol: "checkmark"))
+    #expect(state.endedContent?.image == "lu_b.png")
+    let bad = try decode(#"{"title":"T","endedContent":{"title":"Done","icon":3,"image":[]}}"#)
+    #expect(bad.endedContent == LiveUpdatesEndedContent(title: "Done"))
+  }
+
+  @Test func aMalformedEndedContentIsLeftOut() throws {
+    #expect(try decode(#"{"title":"T","endedContent":{"body":"x"}}"#).endedContent == nil)
+    let state = try decode(#"{"title":"T","endedContent":{"title":"Done","body":3}}"#)
+    #expect(state.endedContent == LiveUpdatesEndedContent(title: "Done"))
+  }
+
   @Test func theTitleIsRequired() {
     #expect(throws: (any Error).self) { try decode(#"{"body":"no title"}"#) }
   }
@@ -223,5 +244,80 @@ struct ForgedURLTests {
     #expect(LiveUpdatesBridge.handleURL(url))
     #expect(routes.isEmpty)
     LiveUpdatesBridge.engineDetached(1001)
+  }
+}
+
+/// Scheduling helpers that run without requesting activities.
+struct ScheduleTests {
+  private func object(_ json: String) throws -> [String: Any] {
+    try #require(try JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any])
+  }
+
+  @Test func newContentKeepsThePushSettingOfTheSchedule() throws {
+    let merged = try LiveUpdatesBridge.keepingPushSetting(
+      of: #"{"title":"Old","enablePushUpdates":true}"#,
+      in: #"{"title":"New","enablePushUpdates":false}"#)
+    let result = try object(merged)
+    #expect(result["title"] as? String == "New")
+    #expect(result["enablePushUpdates"] as? Bool == true)
+  }
+
+  @Test func withoutAStoredSettingNewContentHasNone() throws {
+    let merged = try LiveUpdatesBridge.keepingPushSetting(
+      of: nil, in: #"{"title":"New","enablePushUpdates":true}"#)
+    #expect(try object(merged)["enablePushUpdates"] == nil)
+  }
+
+  @Test func reschedulingKeepsTheImagesOfTheScheduledContent() throws {
+    let directory = try #require(LiveUpdatesImages.directory)
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    let name = "lu_test_keep.png"
+    let url = directory.appendingPathComponent(name)
+    try Data([1]).write(to: url)
+    defer { try? FileManager.default.removeItem(at: url) }
+    try FileManager.default.setAttributes(
+      [.modificationDate: Date(timeIntervalSinceNow: -2 * 86_400)], ofItemAtPath: url.path)
+    let until = Date(timeIntervalSinceNow: 5 * 86_400)
+    LiveUpdatesBridge.keepImages(
+      of: #"{"title":"A","endedContent":{"title":"B","image":"\#(name)"}}"#, until: until)
+    let modified = try #require(
+      FileManager.default.attributesOfItem(atPath: url.path)[.modificationDate] as? Date)
+    #expect(abs(modified.timeIntervalSince(until)) < 1)
+  }
+
+  @Test func namesOutsideTheImageFilesAreNotTouched() throws {
+    let directory = try #require(LiveUpdatesImages.directory)
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    let url = directory.appendingPathComponent(".hidden_test")
+    try Data([1]).write(to: url)
+    defer { try? FileManager.default.removeItem(at: url) }
+    let old = Date(timeIntervalSinceNow: -2 * 86_400)
+    try FileManager.default.setAttributes([.modificationDate: old], ofItemAtPath: url.path)
+    LiveUpdatesBridge.keepImages(
+      of: #"{"title":"A","image":".hidden_test","endedContent":{"title":"B","image":"../x"}}"#,
+      until: Date(timeIntervalSinceNow: 86_400))
+    let modified = try #require(
+      FileManager.default.attributesOfItem(atPath: url.path)[.modificationDate] as? Date)
+    #expect(abs(modified.timeIntervalSince(old)) < 1)
+  }
+
+  @Test func nothingScheduledIsAnEmptyList() throws {
+    UserDefaults.standard.removeObject(forKey: LiveUpdatesBridge.schedulesKey)
+    let list = try JSONSerialization.jsonObject(
+      with: Data(LiveUpdatesBridge.scheduledJson().utf8))
+    #expect((list as? [Any])?.isEmpty == true)
+  }
+
+  @Test func canScheduleNeedsIOS26() {
+    if #unavailable(iOS 26.0) {
+      #expect(!LiveUpdatesBridge.canSchedule())
+    }
+  }
+
+  @Test func rescheduleWithoutAScheduleReportsAnError() async {
+    let message = await withCheckedContinuation { done in
+      LiveUpdatesBridge.reschedule("no-such-key", json: nil, at: 0) { done.resume(returning: $0) }
+    }
+    #expect(message != nil)
   }
 }

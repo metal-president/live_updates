@@ -1587,6 +1587,310 @@ extension type LiveUpdatesBridge._(jni$_.JObject _$this)
     ).check();
   }
 
+  static final _id_canSchedule = _class.staticMethodId(r'canSchedule', r'()Z');
+
+  static final _canSchedule =
+      jni$_.ProtectedJniExtensions.lookup<
+            jni$_.NativeFunction<
+              jni$_.JniResult Function(
+                jni$_.Pointer<jni$_.Void>,
+                jni$_.JMethodIDPtr,
+              )
+            >
+          >('globalEnv_CallStaticBooleanMethod')
+          .asFunction<
+            jni$_.JniResult Function(
+              jni$_.Pointer<jni$_.Void>,
+              jni$_.JMethodIDPtr,
+            )
+          >();
+
+  /// from: `static public boolean canSchedule()`
+  ///
+  /// Whether live updates can be scheduled: as \#isSupported.
+  static core$_.bool canSchedule() {
+    final _$$classRef = _class.reference;
+    return _canSchedule(_$$classRef.pointer, _id_canSchedule.pointer).boolean;
+  }
+
+  static final _id_canScheduleExactly = _class.staticMethodId(
+    r'canScheduleExactly',
+    r'()Z',
+  );
+
+  static final _canScheduleExactly =
+      jni$_.ProtectedJniExtensions.lookup<
+            jni$_.NativeFunction<
+              jni$_.JniResult Function(
+                jni$_.Pointer<jni$_.Void>,
+                jni$_.JMethodIDPtr,
+              )
+            >
+          >('globalEnv_CallStaticBooleanMethod')
+          .asFunction<
+            jni$_.JniResult Function(
+              jni$_.Pointer<jni$_.Void>,
+              jni$_.JMethodIDPtr,
+            )
+          >();
+
+  /// from: `static public boolean canScheduleExactly()`
+  ///
+  /// Whether scheduled live updates are shown on time (exact alarms).
+  static core$_.bool canScheduleExactly() {
+    final _$$classRef = _class.reference;
+    return _canScheduleExactly(
+      _$$classRef.pointer,
+      _id_canScheduleExactly.pointer,
+    ).boolean;
+  }
+
+  static final _id_openExactAlarmSettings = _class.staticMethodId(
+    r'openExactAlarmSettings',
+    r'()Z',
+  );
+
+  static final _openExactAlarmSettings =
+      jni$_.ProtectedJniExtensions.lookup<
+            jni$_.NativeFunction<
+              jni$_.JniResult Function(
+                jni$_.Pointer<jni$_.Void>,
+                jni$_.JMethodIDPtr,
+              )
+            >
+          >('globalEnv_CallStaticBooleanMethod')
+          .asFunction<
+            jni$_.JniResult Function(
+              jni$_.Pointer<jni$_.Void>,
+              jni$_.JMethodIDPtr,
+            )
+          >();
+
+  /// from: `static public boolean openExactAlarmSettings()`
+  ///
+  /// Opens the screen where the user allows exact alarms for this app (Android 12+); returns
+  /// whether it was opened.
+  static core$_.bool openExactAlarmSettings() {
+    final _$$classRef = _class.reference;
+    return _openExactAlarmSettings(
+      _$$classRef.pointer,
+      _id_openExactAlarmSettings.pointer,
+    ).boolean;
+  }
+
+  static final _id_schedule = _class.staticMethodId(
+    r'schedule',
+    r'(Ljava/lang/String;Ljava/lang/String;JZJ)V',
+  );
+
+  static final _schedule =
+      jni$_.ProtectedJniExtensions.lookup<
+            jni$_.NativeFunction<
+              jni$_.JThrowablePtr Function(
+                jni$_.Pointer<jni$_.Void>,
+                jni$_.JMethodIDPtr,
+                jni$_.VarArgs<
+                  (
+                    jni$_.Pointer<jni$_.Void>,
+                    jni$_.Pointer<jni$_.Void>,
+                    jni$_.Int64,
+                    jni$_.Int32,
+                    jni$_.Int64,
+                  )
+                >,
+              )
+            >
+          >('globalEnv_CallStaticVoidMethod')
+          .asFunction<
+            jni$_.JThrowablePtr Function(
+              jni$_.Pointer<jni$_.Void>,
+              jni$_.JMethodIDPtr,
+              jni$_.Pointer<jni$_.Void>,
+              jni$_.Pointer<jni$_.Void>,
+              core$_.int,
+              core$_.int,
+              core$_.int,
+            )
+          >();
+
+  /// from: `static public void schedule(java.lang.String key, java.lang.String json, long atMillis, boolean exact, long windowMillis)`
+  ///
+  /// Shows {@code json} as the live update {@code key} at {@code atMillis} (epoch ms), as \#startOrUpdate would then, replacing the schedule with that key. Uses an exact alarm when
+  /// {@code exact} and allowed, else an alarm within {@code windowMillis}.
+  static void schedule(
+    jni$_.JString key,
+    jni$_.JString json,
+    core$_.int atMillis,
+    core$_.bool exact,
+    core$_.int windowMillis,
+  ) {
+    final _$$classRef = _class.reference;
+    final _$key = key.reference;
+    final _$json = json.reference;
+    _schedule(
+      _$$classRef.pointer,
+      _id_schedule.pointer,
+      _$key.pointer,
+      _$json.pointer,
+      atMillis,
+      exact ? 1 : 0,
+      windowMillis,
+    ).check();
+  }
+
+  static final _id_reschedule = _class.staticMethodId(
+    r'reschedule',
+    r'(Ljava/lang/String;Ljava/lang/String;J)V',
+  );
+
+  static final _reschedule =
+      jni$_.ProtectedJniExtensions.lookup<
+            jni$_.NativeFunction<
+              jni$_.JThrowablePtr Function(
+                jni$_.Pointer<jni$_.Void>,
+                jni$_.JMethodIDPtr,
+                jni$_.VarArgs<
+                  (
+                    jni$_.Pointer<jni$_.Void>,
+                    jni$_.Pointer<jni$_.Void>,
+                    jni$_.Int64,
+                  )
+                >,
+              )
+            >
+          >('globalEnv_CallStaticVoidMethod')
+          .asFunction<
+            jni$_.JThrowablePtr Function(
+              jni$_.Pointer<jni$_.Void>,
+              jni$_.JMethodIDPtr,
+              jni$_.Pointer<jni$_.Void>,
+              jni$_.Pointer<jni$_.Void>,
+              core$_.int,
+            )
+          >();
+
+  /// from: `static public void reschedule(java.lang.String key, java.lang.String json, long atMillis)`
+  ///
+  /// Moves the schedule with {@code key} to {@code atMillis}, with {@code json} as its content when
+  /// given. Throws when nothing is scheduled with {@code key}.
+  static void reschedule(
+    jni$_.JString key,
+    jni$_.JString? json,
+    core$_.int atMillis,
+  ) {
+    final _$$classRef = _class.reference;
+    final _$key = key.reference;
+    final _$json = json?.reference ?? jni$_.jNullReference;
+    _reschedule(
+      _$$classRef.pointer,
+      _id_reschedule.pointer,
+      _$key.pointer,
+      _$json.pointer,
+      atMillis,
+    ).check();
+  }
+
+  static final _id_scheduledJson = _class.staticMethodId(
+    r'scheduledJson',
+    r'()Ljava/lang/String;',
+  );
+
+  static final _scheduledJson =
+      jni$_.ProtectedJniExtensions.lookup<
+            jni$_.NativeFunction<
+              jni$_.JniResult Function(
+                jni$_.Pointer<jni$_.Void>,
+                jni$_.JMethodIDPtr,
+              )
+            >
+          >('globalEnv_CallStaticObjectMethod')
+          .asFunction<
+            jni$_.JniResult Function(
+              jni$_.Pointer<jni$_.Void>,
+              jni$_.JMethodIDPtr,
+            )
+          >();
+
+  /// from: `static public java.lang.String scheduledJson()`
+  /// The returned object must be released after use, by calling the [release] method.
+  ///
+  /// Scheduled live updates as a JSON array of {@code {"key", "at"}} (epoch seconds).
+  static jni$_.JString scheduledJson() {
+    final _$$classRef = _class.reference;
+    return _scheduledJson(
+      _$$classRef.pointer,
+      _id_scheduledJson.pointer,
+    ).object<jni$_.JString>();
+  }
+
+  static final _id_cancelAllScheduled = _class.staticMethodId(
+    r'cancelAllScheduled',
+    r'()V',
+  );
+
+  static final _cancelAllScheduled =
+      jni$_.ProtectedJniExtensions.lookup<
+            jni$_.NativeFunction<
+              jni$_.JThrowablePtr Function(
+                jni$_.Pointer<jni$_.Void>,
+                jni$_.JMethodIDPtr,
+              )
+            >
+          >('globalEnv_CallStaticVoidMethod')
+          .asFunction<
+            jni$_.JThrowablePtr Function(
+              jni$_.Pointer<jni$_.Void>,
+              jni$_.JMethodIDPtr,
+            )
+          >();
+
+  /// from: `static public void cancelAllScheduled()`
+  ///
+  /// Cancels every schedule (not the endAt alarms of shown updates).
+  static void cancelAllScheduled() {
+    final _$$classRef = _class.reference;
+    _cancelAllScheduled(
+      _$$classRef.pointer,
+      _id_cancelAllScheduled.pointer,
+    ).check();
+  }
+
+  static final _id_cancelScheduled = _class.staticMethodId(
+    r'cancelScheduled',
+    r'(Ljava/lang/String;)V',
+  );
+
+  static final _cancelScheduled =
+      jni$_.ProtectedJniExtensions.lookup<
+            jni$_.NativeFunction<
+              jni$_.JThrowablePtr Function(
+                jni$_.Pointer<jni$_.Void>,
+                jni$_.JMethodIDPtr,
+                jni$_.VarArgs<(jni$_.Pointer<jni$_.Void>,)>,
+              )
+            >
+          >('globalEnv_CallStaticVoidMethod')
+          .asFunction<
+            jni$_.JThrowablePtr Function(
+              jni$_.Pointer<jni$_.Void>,
+              jni$_.JMethodIDPtr,
+              jni$_.Pointer<jni$_.Void>,
+            )
+          >();
+
+  /// from: `static public void cancelScheduled(java.lang.String key)`
+  ///
+  /// Cancels the schedule with {@code key}, if any.
+  static void cancelScheduled(jni$_.JString key) {
+    final _$$classRef = _class.reference;
+    final _$key = key.reference;
+    _cancelScheduled(
+      _$$classRef.pointer,
+      _id_cancelScheduled.pointer,
+      _$key.pointer,
+    ).check();
+  }
+
   static final _id_endAll = _class.staticMethodId(r'endAll', r'()V');
 
   static final _endAll =
@@ -1607,7 +1911,7 @@ extension type LiveUpdatesBridge._(jni$_.JObject _$this)
 
   /// from: `static public void endAll()`
   ///
-  /// Removes every live update of this app.
+  /// Removes every live update of this app (not the scheduled ones).
   static void endAll() {
     final _$$classRef = _class.reference;
     _endAll(_$$classRef.pointer, _id_endAll.pointer).check();

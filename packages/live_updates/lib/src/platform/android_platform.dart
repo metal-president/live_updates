@@ -245,4 +245,68 @@ class AndroidLiveUpdatesPlatform extends LiveUpdatesPlatform
   @override
   Future<bool> handleRemotePayload(Map<String, Object?> data) async =>
       _call(() => LiveUpdatesBridge.handleRemotePayload(_j(jsonEncode(data))));
+
+  @override
+  Future<bool> canSchedule() async => LiveUpdatesBridge.canSchedule();
+
+  @override
+  Future<bool> canScheduleExactly() async =>
+      LiveUpdatesBridge.canScheduleExactly();
+
+  @override
+  Future<bool> openExactAlarmSettings() async =>
+      LiveUpdatesBridge.openExactAlarmSettings();
+
+  @override
+  Future<void> schedule(
+    String key,
+    LiveUpdateContent content, {
+    required DateTime at,
+    bool pushUpdates = false,
+    AndroidScheduleOptions android = const AndroidScheduleOptions(),
+  }) async {
+    warnIfUntitled(content);
+    final json = await encodeContent(content, const {}, at);
+    _call(
+      () => LiveUpdatesBridge.schedule(
+        _j(key),
+        _j(json),
+        at.millisecondsSinceEpoch,
+        android.exact,
+        android.window.inMilliseconds,
+      ),
+    );
+  }
+
+  @override
+  Future<void> reschedule(
+    String key, {
+    required DateTime at,
+    LiveUpdateContent? content,
+  }) async {
+    if (content != null) warnIfUntitled(content);
+    final json = content == null
+        ? null
+        : await encodeContent(content, const {}, at);
+    _call(
+      () => LiveUpdatesBridge.reschedule(
+        _j(key),
+        json == null ? null : _j(json),
+        at.millisecondsSinceEpoch,
+      ),
+    );
+  }
+
+  @override
+  Future<List<(String, DateTime)>> scheduled() async => parseSchedules(
+    LiveUpdatesBridge.scheduledJson().toDartString(releaseOriginal: true),
+  );
+
+  @override
+  Future<void> cancelAllScheduled() async =>
+      _call(LiveUpdatesBridge.cancelAllScheduled);
+
+  @override
+  Future<void> cancelScheduled(String key) async =>
+      _call(() => LiveUpdatesBridge.cancelScheduled(_j(key)));
 }

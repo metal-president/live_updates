@@ -25,6 +25,8 @@ final class LiveUpdateContent {
     this.steps,
     this.journey,
     this.publicContent,
+    this.endAt,
+    this.endedContent,
     this.ios,
     this.android,
   }) : assert(progress == null || (progress >= 0 && progress <= 1)),
@@ -113,6 +115,33 @@ final class LiveUpdateContent {
   /// remove it, create a new [LiveUpdateContent] without it.
   final LiveUpdatePublicContent? publicContent;
 
+  /// When the activity this content describes is over, such as the
+  /// delivery time. At that time the live update reports
+  /// [LiveUpdateState.stale] and [endedContent] replaces this content, even
+  /// if the app is not running; without [endedContent] nothing visible
+  /// changes. The live update keeps running (it stays in
+  /// [LiveUpdates.active]) until the app ends it or the time limit removes
+  /// it; an update with new content makes it active again.
+  ///
+  /// iOS: it is the activity's stale date (unless
+  /// [IosLiveUpdateOptions.staleDate] is set, which wins), and the generated
+  /// widget shows [endedContent] once the activity is stale. The system
+  /// removes a Live Activity after at most eight hours (plus up to four
+  /// hours on the Lock Screen).
+  ///
+  /// Android: an alarm makes the update stale and shows [endedContent] as a
+  /// regular notification (no longer ongoing or promoted, so the user can
+  /// swipe it away); it is on time with exact alarms
+  /// ([LiveUpdates.canScheduleExactly]), otherwise within ten minutes.
+  /// [AndroidLiveUpdateOptions.removeAtEnd] removes the notification at
+  /// this time instead, and [AndroidLiveUpdateOptions.maxDuration] limits
+  /// how long it is shown.
+  final DateTime? endAt;
+
+  /// What is shown from [endAt] on, such as "Delivered". `null` keeps this
+  /// content.
+  final LiveUpdateEndedContent? endedContent;
+
   /// iOS-only options.
   final IosLiveUpdateOptions? ios;
 
@@ -136,6 +165,8 @@ final class LiveUpdateContent {
     LiveUpdateSteps? steps,
     LiveUpdateJourney? journey,
     LiveUpdatePublicContent? publicContent,
+    DateTime? endAt,
+    LiveUpdateEndedContent? endedContent,
     IosLiveUpdateOptions? ios,
     AndroidLiveUpdateOptions? android,
   }) => LiveUpdateContent(
@@ -152,6 +183,8 @@ final class LiveUpdateContent {
     steps: steps ?? this.steps,
     journey: journey ?? this.journey,
     publicContent: publicContent ?? this.publicContent,
+    endAt: endAt ?? this.endAt,
+    endedContent: endedContent ?? this.endedContent,
     ios: ios ?? this.ios,
     android: android ?? this.android,
   );
@@ -172,6 +205,8 @@ final class LiveUpdateContent {
       other.steps == steps &&
       other.journey == journey &&
       other.publicContent == publicContent &&
+      other.endAt == endAt &&
+      other.endedContent == endedContent &&
       other.ios == ios &&
       other.android == android;
 
@@ -190,6 +225,8 @@ final class LiveUpdateContent {
     steps,
     journey,
     publicContent,
+    endAt,
+    endedContent,
     ios,
     android,
   );
@@ -197,6 +234,53 @@ final class LiveUpdateContent {
   @override
   String toString() =>
       'LiveUpdateContent(title: $title, body: $body, progress: $progress)';
+}
+
+/// What a live update shows from [LiveUpdateContent.endAt] on, such as
+/// "Delivered" ([LiveUpdateContent.endedContent]).
+///
+/// Only [title], [body], the icon, [image], the colors and the tap route are
+/// shown; progress, the timer, buttons and layout data are left out.
+@immutable
+final class LiveUpdateEndedContent {
+  /// Creates ended content.
+  const LiveUpdateEndedContent({
+    required this.title,
+    this.body,
+    this.icon,
+    this.image,
+  });
+
+  /// Primary text.
+  final String title;
+
+  /// Secondary text.
+  final String? body;
+
+  /// Icon used instead of [LiveUpdateContent.icon] from
+  /// [LiveUpdateContent.endAt] on. Platform options still take precedence
+  /// ([IosLiveUpdateOptions.icon], [AndroidLiveUpdateOptions.smallIcon]).
+  /// `null` keeps the icon of the content.
+  final LiveUpdateIcon? icon;
+
+  /// Picture shown from [LiveUpdateContent.endAt] on, as
+  /// [LiveUpdateContent.image] is before. `null` shows no picture. It is
+  /// prepared when the content is posted and kept until it is shown.
+  final LiveUpdateImage? image;
+
+  @override
+  bool operator ==(Object other) =>
+      other is LiveUpdateEndedContent &&
+      other.title == title &&
+      other.body == body &&
+      other.icon == icon &&
+      other.image == image;
+
+  @override
+  int get hashCode => Object.hash(title, body, icon, image);
+
+  @override
+  String toString() => 'LiveUpdateEndedContent(title: $title, body: $body)';
 }
 
 /// Content shown on the Lock Screen instead of the full [LiveUpdateContent]
@@ -869,6 +953,8 @@ final class AndroidLiveUpdateOptions {
     this.timeoutAfter,
     this.alert = false,
     this.lockScreenVisibility = AndroidLockScreenVisibility.private,
+    this.maxDuration = const Duration(hours: 8),
+    this.removeAtEnd = false,
   });
 
   /// Notification channel id. The channel is created on first use.
@@ -960,6 +1046,22 @@ final class AndroidLiveUpdateOptions {
   /// [AndroidLockScreenVisibility].
   final AndroidLockScreenVisibility lockScreenVisibility;
 
+  /// How long the notification is shown at most, counted from when the
+  /// live update started (later updates do not reset it), even if the app
+  /// is not running. The update then reports [LiveUpdateState.ended]. `null`
+  /// means no limit. Android 8+.
+  ///
+  /// The default of eight hours matches iOS, where the system ends a Live
+  /// Activity after at most eight hours (and keeps it on the Lock Screen for
+  /// up to four more). Content without [LiveUpdateContent.android] and
+  /// remote payloads without `maxDurationMillis` use the default too.
+  final Duration? maxDuration;
+
+  /// Removes the notification at [LiveUpdateContent.endAt] (exactly, even
+  /// if the app is not running) instead of showing
+  /// [LiveUpdateContent.endedContent]. Android 8+.
+  final bool removeAtEnd;
+
   @override
   bool operator ==(Object other) =>
       other is AndroidLiveUpdateOptions &&
@@ -978,7 +1080,9 @@ final class AndroidLiveUpdateOptions {
       other.progressTrackerIcon == progressTrackerIcon &&
       other.timeoutAfter == timeoutAfter &&
       other.alert == alert &&
-      other.lockScreenVisibility == lockScreenVisibility;
+      other.lockScreenVisibility == lockScreenVisibility &&
+      other.maxDuration == maxDuration &&
+      other.removeAtEnd == removeAtEnd;
 
   @override
   int get hashCode => Object.hash(
@@ -998,6 +1102,8 @@ final class AndroidLiveUpdateOptions {
     timeoutAfter,
     alert,
     lockScreenVisibility,
+    maxDuration,
+    removeAtEnd,
   );
 }
 
@@ -1269,6 +1375,44 @@ enum LiveUpdateState {
 
   /// Removed from the screen, by the system or the user.
   dismissed,
+}
+
+/// How Android times a scheduled live update ([LiveUpdates.schedule]).
+///
+/// Android delivers alarms on time only to apps that may schedule exact
+/// alarms: the app has to declare the `SCHEDULE_EXACT_ALARM` permission in
+/// its manifest (this package does not), and from Android 14 on the user
+/// has to allow it, as it is denied by default for most apps (see
+/// [LiveUpdates.canScheduleExactly] and [LiveUpdates.openExactAlarmSettings]).
+/// Without it the update is shown within [window] after the scheduled time.
+@immutable
+final class AndroidScheduleOptions {
+  /// Creates Android scheduling options.
+  const AndroidScheduleOptions({
+    this.exact = true,
+    this.window = const Duration(minutes: 10),
+  });
+
+  /// Whether to use an exact alarm when the app may schedule one. When
+  /// `false`, or when it may not, the update is shown within [window].
+  final bool exact;
+
+  /// How late after the scheduled time Android may show the update when
+  /// it does not use an exact alarm. Android may stretch short windows
+  /// (by default to at least ten minutes) to save battery.
+  final Duration window;
+
+  @override
+  bool operator ==(Object other) =>
+      other is AndroidScheduleOptions &&
+      other.exact == exact &&
+      other.window == window;
+
+  @override
+  int get hashCode => Object.hash(exact, window);
+
+  @override
+  String toString() => 'AndroidScheduleOptions(exact: $exact, window: $window)';
 }
 
 /// A push token issued by the platform.

@@ -65,6 +65,83 @@ void main() {
     expect(await LiveUpdates.active(), isEmpty);
   });
 
+  testWidgets('scheduling before iOS 26 throws instead of crashing', (
+    tester,
+  ) async {
+    if (!Platform.isIOS || await LiveUpdates.canSchedule()) return;
+    // canSchedule is also false on iOS 26+ with Live Activities turned off,
+    // where schedule fails as well.
+    await expectLater(
+      LiveUpdates.schedule(
+        'old-ios',
+        const LiveUpdateContent(title: 'Later'),
+        at: DateTime.now().add(const Duration(hours: 1)),
+      ),
+      throwsA(isA<LiveUpdateException>()),
+    );
+    expect(await LiveUpdates.scheduled(), isEmpty);
+    await LiveUpdates.cancelScheduled('old-ios');
+  });
+
+  testWidgets('schedule, find, reschedule and cancel', (tester) async {
+    // iOS 26+ (or Android with notifications allowed).
+    if (!await LiveUpdates.canSchedule()) return;
+    const key = 'scheduled-order';
+    final at = DateTime.now().add(const Duration(hours: 1));
+    final s = await LiveUpdates.schedule(
+      key,
+      const LiveUpdateContent(title: 'Later'),
+      at: at,
+    );
+    final found = await LiveUpdates.findScheduled(key);
+    expect(found?.key, key);
+    expect(found!.at.difference(at).inSeconds.abs(), lessThanOrEqualTo(1));
+    // Not shown before its time.
+    expect(await LiveUpdates.find(key), isNull);
+    expect(
+      (await LiveUpdates.active()).map((u) => u.key),
+      isNot(contains(key)),
+    );
+    // endAll can leave schedules alone.
+    await LiveUpdates.endAll(includeScheduled: false);
+    expect(await LiveUpdates.findScheduled(key), isNotNull);
+
+    final later = at.add(const Duration(hours: 1));
+    final moved = await s.reschedule(
+      at: later,
+      content: const LiveUpdateContent(title: 'Even later'),
+    );
+    final again = await LiveUpdates.findScheduled(key);
+    expect(again!.at.difference(later).inSeconds.abs(), lessThanOrEqualTo(1));
+    expect(await LiveUpdates.scheduled(), hasLength(1));
+
+    await moved.cancel();
+    expect(await LiveUpdates.findScheduled(key), isNull);
+    // cancelAllScheduled clears every schedule.
+    await LiveUpdates.schedule(
+      key,
+      const LiveUpdateContent(title: 'Later'),
+      at: later,
+    );
+    await LiveUpdates.cancelAllScheduled();
+    expect(await LiveUpdates.scheduled(), isEmpty);
+    await expectLater(moved.reschedule(), throwsA(isA<LiveUpdateException>()));
+  });
+
+  testWidgets('a schedule that is due shows the update now', (tester) async {
+    if (!await LiveUpdates.canSchedule()) return;
+    const key = 'due-order';
+    await LiveUpdates.schedule(
+      key,
+      const LiveUpdateContent(title: 'Now'),
+      at: DateTime.now().subtract(const Duration(minutes: 1)),
+    );
+    final update = await LiveUpdates.find(key);
+    expect(update, isNotNull);
+    expect(await LiveUpdates.findScheduled(key), isNull);
+    await update!.end(dismissAfter: Duration.zero);
+  });
+
   testWidgets('images are stored and shown', (tester) async {
     if (!await LiveUpdates.isSupported()) return;
     final update = await LiveUpdates.start(

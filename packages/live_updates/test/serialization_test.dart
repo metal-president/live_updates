@@ -336,4 +336,82 @@ void main() {
     // Valid JSON for the native side and remote payloads.
     expect(jsonDecode(jsonEncode(json)), json);
   });
+
+  test('endAt, ended content and its stale date', () {
+    final endAt = DateTime.fromMillisecondsSinceEpoch(90000);
+    final json = LiveUpdateContent(
+      title: 'Order',
+      endAt: endAt,
+      endedContent: const LiveUpdateEndedContent(title: 'Delivered'),
+    ).toJson();
+    expect(json, {
+      'title': 'Order',
+      'endAt': 90.0,
+      'endedContent': {'title': 'Delivered'},
+      // endAt is the iOS stale date.
+      'staleDate': 90.0,
+    });
+    // An explicit iOS stale date wins.
+    final explicit = LiveUpdateContent(
+      title: 'Order',
+      endAt: endAt,
+      endedContent: const LiveUpdateEndedContent(title: 'Done', body: 'Enjoy'),
+      ios: IosLiveUpdateOptions(
+        staleDate: DateTime.fromMillisecondsSinceEpoch(60000),
+      ),
+    ).toJson();
+    expect(explicit['staleDate'], 60.0);
+    expect(
+      const LiveUpdateContent(
+        title: 'x',
+        endedContent: LiveUpdateEndedContent(
+          title: 'Done',
+          icon: LiveUpdateIcon.symbol('checkmark'),
+        ),
+      ).toJson()['endedContent'],
+      {
+        'title': 'Done',
+        'icon': {'symbol': 'checkmark'},
+      },
+    );
+    expect(explicit['endedContent'], {'title': 'Done', 'body': 'Enjoy'});
+    expect(jsonDecode(jsonEncode(explicit)), explicit);
+  });
+
+  test('android maxDuration and removeAtEnd', () {
+    // The default (8 hours) is not sent: the platform applies it.
+    expect(
+      const LiveUpdateContent(
+        title: 'T',
+        android: AndroidLiveUpdateOptions(),
+      ).toJson().containsKey('maxDurationMillis'),
+      isFalse,
+    );
+    Map<String, Object?> android(AndroidLiveUpdateOptions a) =>
+        LiveUpdateContent(title: 'T', android: a).toJson();
+    expect(
+      android(
+        const AndroidLiveUpdateOptions(maxDuration: null),
+      )['maxDurationMillis'],
+      0,
+    );
+    expect(
+      android(
+        const AndroidLiveUpdateOptions(maxDuration: Duration(hours: 1)),
+      )['maxDurationMillis'],
+      3600000,
+    );
+    // Zero is not "no limit".
+    expect(
+      android(
+        const AndroidLiveUpdateOptions(maxDuration: Duration.zero),
+      )['maxDurationMillis'],
+      1,
+    );
+    expect(android(const AndroidLiveUpdateOptions())['removeAtEnd'], isNull);
+    expect(
+      android(const AndroidLiveUpdateOptions(removeAtEnd: true))['removeAtEnd'],
+      isTrue,
+    );
+  });
 }

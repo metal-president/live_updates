@@ -58,10 +58,10 @@
   `dismissed` until the app ends the update; iOS while it lists the
   activity.
 - Live Activities on iOS 16.2 and later (was 17.2): everything works
-  except buttons that run without opening the app (iOS 17.0; `opensApp`
-  buttons are shown from 16.2) and push-to-start (iOS 17.2). Run
-  `create_widget` again; the widget extension's deployment target can be
-  lowered to 16.2 in Xcode (new extensions get 16.2).
+  except buttons (iOS 17.0; none are shown before) and push-to-start (iOS
+  17.2). Run `create_widget` again: it lowers the deployment target of an
+  existing widget extension to 16.2. Until the extension supports the
+  device's iOS, `isSupported()` stays `false` there.
 
 ## 0.3.0
 

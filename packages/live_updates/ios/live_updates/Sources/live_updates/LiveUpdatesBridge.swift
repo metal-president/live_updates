@@ -23,11 +23,38 @@ public final class LiveUpdatesBridge: NSObject {
   private static var tokenTasks: [String: Task<Void, Never>] = [:]
   private static var pushToStartTask: Task<Void, Never>?
 
-  /// Whether this iOS version supports live_updates (iOS 16.2 or later).
+  /// Whether this iOS version supports live_updates (iOS 16.2 or later) and
+  /// the app's widget extension can run on it, so started activities show.
   @objc public static func isAvailable() -> Bool {
-    if #available(iOS 16.2, *) { return true }
+    if #available(iOS 16.2, *) { return widgetExtensionRuns }
     return false
   }
+
+  /// Whether a widget extension of the app supports the running iOS. An
+  /// extension that targets a newer iOS (17.2 before live_updates 0.4.0) is
+  /// not loaded, and no activity would show. `true` when the app has no
+  /// widget extension (as before; ActivityKit then reports the problem).
+  static let widgetExtensionRuns: Bool = {
+    guard let dir = Bundle.main.builtInPlugInsURL,
+      let items = try? FileManager.default.contentsOfDirectory(
+        at: dir, includingPropertiesForKeys: nil)
+    else { return true }
+    var found = false
+    for url in items where url.pathExtension == "appex" {
+      guard let info = Bundle(url: url)?.infoDictionary,
+        let ext = info["NSExtension"] as? [String: Any],
+        ext["NSExtensionPointIdentifier"] as? String == "com.apple.widgetkit-extension"
+      else { continue }
+      found = true
+      let parts = ((info["MinimumOSVersion"] as? String) ?? "0").split(separator: ".")
+        .map { Int($0) ?? 0 }
+      let minimum = OperatingSystemVersion(
+        majorVersion: parts.first ?? 0, minorVersion: parts.count > 1 ? parts[1] : 0,
+        patchVersion: parts.count > 2 ? parts[2] : 0)
+      if ProcessInfo.processInfo.isOperatingSystemAtLeast(minimum) { return true }
+    }
+    return !found
+  }()
 
   /// Error for calls below iOS 16.2.
   private static var unavailableError: NSError {
@@ -40,7 +67,7 @@ public final class LiveUpdatesBridge: NSObject {
 
   /// Whether Live Activities are enabled for this app.
   @objc public static func isSupported() -> Bool {
-    guard #available(iOS 16.2, *) else { return false }
+    guard #available(iOS 16.2, *), widgetExtensionRuns else { return false }
     return ActivityAuthorizationInfo().areActivitiesEnabled
   }
 

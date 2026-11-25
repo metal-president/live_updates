@@ -547,11 +547,11 @@ struct LiveUpdatesActionButtons: View {
   let actions: [LiveUpdatesAction]
   let activityID: String
 
-  /// Buttons that run an intent need iOS 17: before that only `opensApp`
-  /// buttons (links) are shown.
+  /// Buttons need iOS 17 (App Intents in Live Activities): before that none
+  /// are shown, and a tap on the activity opens the app with its route.
   private var shown: [LiveUpdatesAction] {
     if #available(iOS 17.0, *) { return actions }
-    return actions.filter(\.opensApp)
+    return []
   }
 
   var body: some View {

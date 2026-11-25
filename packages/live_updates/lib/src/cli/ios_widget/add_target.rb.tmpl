@@ -111,10 +111,24 @@ def ensure_assets(project, target, name, ext_dir)
   target.resources_build_phase.add_file_reference(ref)
 end
 
+# Live Activities need iOS 16.2: an extension created for a higher target
+# (17.2 before live_updates 0.4.0) is lowered, so iOS 16.2+ can show them.
+def lower_deployment_target(target)
+  lowered = false
+  target.build_configurations.each do |config|
+    current = config.build_settings['IPHONEOS_DEPLOYMENT_TARGET']
+    next unless current && Gem::Version.new(current) > Gem::Version.new('16.2')
+    config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '16.2'
+    lowered = true
+  end
+  lowered
+end
+
 if (existing = project.targets.find { |t| t.name == name })
   ensure_widget_files(project, existing, name, ext_dir)
   ensure_assets(project, existing, name, ext_dir)
   ensure_shared_intent(project, [runner, existing], name)
+  puts "Lowered the deployment target of #{name} to iOS 16.2." if lower_deployment_target(existing)
   project.save
   if use_group
     configure_app_group(project, runner, ios_dir, 'Runner/Runner.entitlements', groups)

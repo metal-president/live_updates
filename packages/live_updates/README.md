@@ -52,9 +52,10 @@ Screenshots of the example app in this repository.
 
 **Requirements:** Flutter 3.50+, iOS 15.0+, Android 7.0 (API 24)+. Live
 Activities need iOS 16.2: on iOS 15.0 to 16.1 every call does nothing and
-`isSupported()` returns `false`. Some features need a newer iOS: buttons
-that run without opening the app need iOS 17.0 (before that only `opensApp`
-buttons are shown), and push-to-start needs iOS 17.2.
+`isSupported()` returns `false`, as it does on iOS 16 when the app's widget
+extension targets a newer iOS. Some features need a newer iOS: buttons need
+iOS 17.0 (before that none are shown; a tap on the activity still opens the
+app with its route), and push-to-start needs iOS 17.2.
 
 | | iOS 16.2+ | Android 16+ | Android 7–15 | iOS 15.0–16.1, other |
 | --- | --- | --- | --- | --- |
@@ -64,7 +65,7 @@ buttons are shown), and push-to-start needs iOS 17.2.
 | Metrics | `metrics` layout | Android 17 `MetricStyle`, else text | text | |
 | Steps, journey | `stepper`, `journey` layouts | progress segments and points, text | progress bar, text | |
 | Semantic colors | – | Android 17+ | – | |
-| Buttons (`actions`) | iOS 17+ (`opensApp` buttons from 16.2) | ✓ | ✓ | |
+| Buttons (`actions`) | iOS 17+ | ✓ | ✓ | |
 | Image | ✓ | large icon (not with Android 17 metrics) | large icon | |
 | Tap route (`onTap`) | ✓ | ✓ | ✓ | |
 | Scheduled start (`schedule`) | iOS 26+ | alarm | alarm | |
@@ -587,9 +588,9 @@ Where a press is delivered:
   `requiresUnlock: true` on buttons with consequences, such as cancelling an
   order: iOS asks for Face ID or the passcode first, and Android 12+ asks the
   user to unlock.
-- On iOS 16.2 to 16.x only `opensApp` buttons are shown: buttons that run
-  without opening the app use App Intents in Live Activities, which need
-  iOS 17 ([source][ios-button-intent]).
+- On iOS 16.2 to 16.x no buttons are shown: they use App Intents in Live
+  Activities, which need iOS 17 ([source][ios-button-intent]). A tap on the
+  activity still opens the app with its `route`.
 - Android shows up to three actions. On iOS keep labels short: the whole
   content must stay under ActivityKit's 4 KB limit.
 
@@ -1268,10 +1269,11 @@ apply them again:
   notification's countdown cannot stop at zero), and leaves out the timer of
   a countdown that is already over. Pass
   `AndroidLiveUpdateOptions(removeAtCountdownEnd: false)` to keep it.
-- **iOS 16.2 and later:** Live Activities now work from iOS 16.2. To use
-  them there, run `create_widget` again and lower the deployment target of
-  the `LiveUpdatesWidget` target to 16.2 in Xcode (an existing target keeps
-  17.2).
+- **iOS 16.2 and later:** Live Activities now work from iOS 16.2. Run
+  `create_widget` again: it lowers the deployment target of an existing
+  `LiveUpdatesWidget` target to 16.2 (with `--no-xcode`, lower it in Xcode).
+  Until then, `isSupported()` stays `false` on iOS 16, so the app does not
+  start activities that no widget can show.
 - **What stays after `end` has no buttons or running timers** on either
   platform (the final content, or the content shown last).
 - **iOS `startOrUpdate` replaces an ended activity** with the key that is

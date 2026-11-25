@@ -235,9 +235,10 @@ differently.
   ongoing notifications; `LiveUpdates.canPostPromotedNotifications()` tells
   you which. To send users to the setting, open the
   `Settings.ACTION_APP_NOTIFICATION_PROMOTION_SETTINGS` intent with
-  `Settings.EXTRA_APP_PACKAGE`; some devices have no matching screen, so
-  handle that case. ([source][android-live-update],
-  [source][android-promotion-settings])
+  `Settings.EXTRA_APP_PACKAGE` (the Live Update guide names it
+  `ACTION_MANAGE_APP_PROMOTED_NOTIFICATIONS`, which is not in the SDK); some
+  devices have no matching screen, so handle that case.
+  ([source][android-live-update], [source][android-promotion-settings])
 - **Status bar chip:** the chip is at most 96 dp wide. `shortCriticalText`
   is shown in full only if it is shorter than 7 characters; longer text is
   cut, or only the icon is shown when less than half of it fits. Without

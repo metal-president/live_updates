@@ -37,6 +37,16 @@ live_updates works without it.
      <true/>
      ```
 
+   This setting applies to the whole app: Firebase then stops issuing
+   registration tokens, and `getToken()` / `deleteToken()` fail on both
+   platforms
+   ([Android](https://firebase.google.com/docs/reference/android/com/google/firebase/messaging/FirebaseMessaging),
+   [iOS](https://firebase.google.com/docs/reference/swift/firebasemessaging/api/reference/Classes/Messaging)).
+   If another SDK in your app registers for push with FCM registration
+   tokens, check that it supports installation IDs first, or keep them off
+   and use `tokens(includeRegistrationToken: true)` (see
+   [Registering tokens with your server](#registering-tokens-with-your-server)).
+
 4. Add the package:
 
    ```bash
@@ -93,11 +103,10 @@ message also needs a target: the installation ID (`message.fid`), or
 `message.token` if you use the legacy registration token instead, as in
 [docs/server-fcm.md](https://github.com/metal-president/live_updates/blob/main/docs/server-fcm.md#ios-envelope).
 
-`fcmRegistrationToken` is only for apps that cannot use installation IDs
-yet. Firebase does not issue registration tokens while installation IDs are
-turned on (step 3 of [Getting started](#getting-started)), so
-`tokens(includeRegistrationToken: true)` reports an error instead of a token
-in that setup. Use one of the two, not both.
+`fcmRegistrationToken` is only for apps that keep installation IDs off.
+While they are on (step 3 of [Getting started](#getting-started)),
+`tokens(includeRegistrationToken: true)` reports an error instead of a token.
+Use one of the two, not both.
 
 ```dart
 LiveUpdatesFcm.tokens().listen(

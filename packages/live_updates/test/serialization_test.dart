@@ -204,6 +204,23 @@ void main() {
     expect(json['alert'], {'title': 'a', 'body': 'b'});
   });
 
+  test('removeAtCountdownEnd is sent only when turned off', () {
+    expect(
+      const LiveUpdateContent(
+        title: 't',
+        android: AndroidLiveUpdateOptions(),
+      ).toJson().containsKey('removeAtCountdownEnd'),
+      isFalse,
+    );
+    expect(
+      const LiveUpdateContent(
+        title: 't',
+        android: AndroidLiveUpdateOptions(removeAtCountdownEnd: false),
+      ).toJson()['removeAtCountdownEnd'],
+      isFalse,
+    );
+  });
+
   test('a shared alert maps to both platforms', () {
     final json = const LiveUpdateContent(
       title: 'Order',

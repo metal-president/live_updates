@@ -112,6 +112,51 @@ public class LiveUpdatesEndTest {
   }
 
   @Test
+  public void aCountdownRemovesTheUpdateWhenItEnds() throws Exception {
+    long eta = System.currentTimeMillis() + 20 * MINUTE;
+    LiveUpdatesBridge.startOrUpdate("order", "{\"title\":\"Order\",\"timerEnd\":" + seconds(eta) + "}");
+    Notification n = shown("order");
+    assertAbout(20 * MINUTE, n.getTimeoutAfter());
+    assertTrue(n.extras.getBoolean(Notification.EXTRA_SHOW_CHRONOMETER));
+    // An earlier limit still wins.
+    LiveUpdatesBridge.startOrUpdate(
+        "short",
+        "{\"title\":\"A\",\"timerEnd\":" + seconds(eta) + ",\"maxDurationMillis\":" + MINUTE + "}");
+    assertAbout(MINUTE, shown("short").getTimeoutAfter());
+  }
+
+  @Test
+  public void endedContentAtTheCountdownEndWinsOverTheRemoval() throws Exception {
+    long eta = System.currentTimeMillis() + 20 * MINUTE;
+    LiveUpdatesBridge.startOrUpdate(
+        "order",
+        "{\"title\":\"Order\",\"timerEnd\":" + seconds(eta) + ",\"endAt\":" + seconds(eta)
+            + ",\"endedContent\":{\"title\":\"Delivered\"}}");
+    assertAbout(8 * HOUR, shown("order").getTimeoutAfter());
+    fireEndAlarm();
+    assertEquals("Delivered", shown("order").extras.getString(Notification.EXTRA_TITLE));
+  }
+
+  @Test
+  public void removeAtCountdownEndFalseKeepsTheUpdate() throws Exception {
+    long eta = System.currentTimeMillis() + 20 * MINUTE;
+    LiveUpdatesBridge.startOrUpdate(
+        "order",
+        "{\"title\":\"Order\",\"timerEnd\":" + seconds(eta) + ",\"removeAtCountdownEnd\":false}");
+    assertAbout(8 * HOUR, shown("order").getTimeoutAfter());
+  }
+
+  @Test
+  public void aCountdownThatIsOverIsNotShown() throws Exception {
+    long past = System.currentTimeMillis() - MINUTE;
+    LiveUpdatesBridge.startOrUpdate("order", "{\"title\":\"Order\",\"timerEnd\":" + seconds(past) + "}");
+    Notification n = shown("order");
+    assertFalse(n.extras.getBoolean(Notification.EXTRA_SHOW_CHRONOMETER));
+    // Not removed at once: only the timer is left out.
+    assertAbout(8 * HOUR, n.getTimeoutAfter());
+  }
+
+  @Test
   public void maxDurationZeroMeansNoLimit() throws Exception {
     LiveUpdatesBridge.startOrUpdate("order", "{\"title\":\"Order\",\"maxDurationMillis\":0}");
     assertEquals(0, shown("order").getTimeoutAfter());

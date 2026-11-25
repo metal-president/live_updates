@@ -45,8 +45,12 @@
   the content has one.
 - Docs: `stale` is reported on both platforms (since 0.3.0), and `ended`
   also after Android's `maxDuration` and `removeAtEnd`.
-- Docs: how to keep an Android countdown from running below zero (`endAt`
-  at its end with `removeAtEnd: true`).
+- **Breaking (Android):** a notification with a countdown
+  (`LiveUpdateTimer.countdown`) is removed when the countdown ends, exactly
+  and even if the app is not running, instead of counting below zero (iOS
+  stops at zero); the update reports `ended`. A countdown that is already
+  over is not shown. `AndroidLiveUpdateOptions.removeAtCountdownEnd: false`
+  (remote: `"removeAtCountdownEnd": false`) keeps the notification.
 
 ## 0.3.0
 

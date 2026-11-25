@@ -1285,6 +1285,18 @@ public final class LiveUpdatesBridge {
     long timeout = content.optLong("timeoutAfterMillis", 0);
     if (timeout > 0) timeout = Math.max(timeout, MIN_TIMEOUT_MS);
     if (removeAt > 0 && (timeout <= 0 || removeAt - now < timeout)) timeout = removeAt - now;
+    // A notification's countdown cannot stop at zero and would run below it
+    // (iOS stops at zero): the update is removed when it ends, unless
+    // removeAtCountdownEnd is false, or endedContent replaces it by then
+    // (without the timer).
+    double countdownEnd = content.optDouble("timerEnd", Double.NaN);
+    if (!stale && isTime(countdownEnd) && content.optBoolean("removeAtCountdownEnd", true)) {
+      long end = (long) (countdownEnd * 1000);
+      boolean replacedFirst = staleAtEnd && endedContent != null && endAt <= end;
+      if (!replacedFirst && end > now && (timeout <= 0 || end - now < timeout)) {
+        timeout = end - now;
+      }
+    }
     long deadline = 0;
     if (timeout > 0 && Build.VERSION.SDK_INT >= 26) {
       b.setTimeoutAfter(timeout);
@@ -1518,7 +1530,9 @@ public final class LiveUpdatesBridge {
     double timerEnd = content.optDouble("timerEnd", Double.NaN);
     double timerStart = content.optDouble("timerStart", Double.NaN);
     boolean countdown = isTime(timerEnd);
-    if (countdown || isTime(timerStart)) {
+    // A countdown that is over would show below zero: no timer then.
+    boolean over = countdown && timerEnd * 1000 <= System.currentTimeMillis();
+    if (!over && (countdown || isTime(timerStart))) {
       b.setWhen((long) ((countdown ? timerEnd : timerStart) * 1000))
           .setShowWhen(true)
           .setUsesChronometer(true)

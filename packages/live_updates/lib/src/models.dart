@@ -372,9 +372,9 @@ final class LiveUpdatePublicContent {
 /// A timer counted by the system (see [LiveUpdateContent.timer]).
 @immutable
 final class LiveUpdateTimer {
-  /// Counts down to [end]. iOS stops at zero; Android keeps counting below
-  /// zero, so remove the update at [end] there (see
-  /// [AndroidLiveUpdateOptions.removeAtEnd]) or update it.
+  /// Counts down to [end]. iOS stops at zero; Android cannot stop a
+  /// notification's countdown, so it removes the notification at [end] (see
+  /// [AndroidLiveUpdateOptions.removeAtCountdownEnd]).
   const LiveUpdateTimer.countdown(DateTime this.end) : start = null;
 
   /// Counts up from [start].
@@ -1009,6 +1009,7 @@ final class AndroidLiveUpdateOptions {
     this.lockScreenVisibility = AndroidLockScreenVisibility.private,
     this.maxDuration = const Duration(hours: 8),
     this.removeAtEnd = false,
+    this.removeAtCountdownEnd = true,
   });
 
   /// Notification channel id. The channel is created on first use.
@@ -1116,6 +1117,17 @@ final class AndroidLiveUpdateOptions {
   /// [LiveUpdateContent.endedContent]. Android 8+.
   final bool removeAtEnd;
 
+  /// Removes the notification when the countdown of [LiveUpdateContent.timer]
+  /// ends (exactly, even if the app is not running), because an Android
+  /// notification's countdown cannot stop at zero and would count below it.
+  /// iOS stops the countdown at zero and keeps showing the activity. The
+  /// update then reports [LiveUpdateState.ended]. A countdown that is already
+  /// over is not shown. Not when [LiveUpdateContent.endedContent] replaces
+  /// the content at an [LiveUpdateContent.endAt] up to that time. Pass
+  /// `false` to keep the notification, for example when your server updates
+  /// it at that time. Android 8+.
+  final bool removeAtCountdownEnd;
+
   @override
   bool operator ==(Object other) =>
       other is AndroidLiveUpdateOptions &&
@@ -1136,7 +1148,8 @@ final class AndroidLiveUpdateOptions {
       other.alert == alert &&
       other.lockScreenVisibility == lockScreenVisibility &&
       other.maxDuration == maxDuration &&
-      other.removeAtEnd == removeAtEnd;
+      other.removeAtEnd == removeAtEnd &&
+      other.removeAtCountdownEnd == removeAtCountdownEnd;
 
   @override
   int get hashCode => Object.hash(
@@ -1158,6 +1171,7 @@ final class AndroidLiveUpdateOptions {
     lockScreenVisibility,
     maxDuration,
     removeAtEnd,
+    removeAtCountdownEnd,
   );
 }
 

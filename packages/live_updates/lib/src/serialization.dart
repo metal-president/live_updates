@@ -134,6 +134,7 @@ extension LiveUpdateContentJson on LiveUpdateContent {
           final d => d.inMilliseconds < 1 ? 1 : d.inMilliseconds,
         },
       if (a.removeAtEnd) 'removeAtEnd': true,
+      if (!a.removeAtCountdownEnd) 'removeAtCountdownEnd': false,
     },
   };
 }

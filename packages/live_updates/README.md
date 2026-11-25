@@ -606,25 +606,20 @@ LiveUpdateContent(
 );
 ```
 
-On iOS a countdown stops at zero. Android has no way to stop a notification's
-countdown, so it keeps counting below zero. To avoid that, remove the
-notification when the time is up: set `endAt` to the countdown's end and
-`removeAtEnd: true` for Android. Android then removes it exactly at that time,
-even if the app is not running, with no extra permission
-([source][android-timeout-after]):
+When a countdown ends, iOS stops it at zero and keeps showing the activity.
+An Android notification's countdown cannot stop and would count below zero,
+so from 0.4.0 Android removes the notification when the countdown ends:
+exactly, even if the app is not running, with no extra permission
+([source][android-timeout-after]). The update then reports `ended`. A
+countdown that is already over is not shown. With `endedContent` at an
+`endAt` up to the countdown's end (see [Ending at a time](#ending-at-a-time)),
+the ended content replaces it instead.
 
-```dart
-LiveUpdateContent(
-  title: 'Order #1234',
-  timer: LiveUpdateTimer.countdown(eta),
-  endAt: eta,
-  android: const AndroidLiveUpdateOptions(removeAtEnd: true),
-);
-```
-
-Or update the content from your server at that time, for example to "Arrived".
-Switching to `endedContent` at `endAt` instead also works, but without exact
-alarms it can come up to 10 minutes late (see [Ending at a time](#ending-at-a-time)).
+To show something else at that time on both platforms, update the content
+from your server, for example to "Arrived", before the countdown ends. To
+keep the Android notification after the countdown, pass
+`AndroidLiveUpdateOptions(removeAtCountdownEnd: false)` (it then counts below
+zero until you update it).
 
 ### Layouts
 
@@ -1218,6 +1213,10 @@ apply them again:
   its channel, as on iOS (`schedule` and `reschedule` too, for a time that
   has passed). Before, they returned as if the update were
   shown. Check `isSupported()` first, or catch the exception.
+- **Android removes a notification when its countdown ends** (a
+  notification's countdown cannot stop at zero), and leaves out a countdown
+  that is already over. Pass
+  `AndroidLiveUpdateOptions(removeAtCountdownEnd: false)` to keep it.
 - **What stays after `end` has no buttons or running timers** on either
   platform (the final content, or the content shown last).
 - **iOS `startOrUpdate` replaces an ended activity** with the key that is

@@ -1126,7 +1126,8 @@ final class AndroidLiveUpdateOptions {
   /// [LiveUpdateContent.endedContent] replaces the content at an
   /// [LiveUpdateContent.endAt] up to that time, it does so instead, if the
   /// app may set exact alarms (else the removal wins, as the replacement
-  /// could come late). Only [LiveUpdateTimer.countdown] is covered, not
+  /// could come late; and should the alarm not come, the notification is
+  /// removed 10 minutes after the countdown). Only [LiveUpdateTimer.countdown] is covered, not
   /// timer metrics. Pass `false` to keep the notification, for example when
   /// your server updates it at that time. Android 8+.
   final bool removeAtCountdownEnd;

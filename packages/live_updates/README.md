@@ -619,8 +619,10 @@ exactly, even if the app is not running, with no extra permission
 whose countdown is already over is still shown, without the timer. With
 `endedContent` at an `endAt` up to the countdown's end (see
 [Ending at a time](#ending-at-a-time)), the ended content replaces it instead
-when the app may set exact alarms; otherwise the removal wins, as the
-replacement could come up to 10 minutes late. Timer metrics
+when the app may set exact alarms (should that alarm not come, for example
+because the user revoked the permission, the notification is removed 10
+minutes later); otherwise the removal wins, as the replacement could come up
+to 10 minutes late. Timer metrics
 (`LiveUpdateMetric.timer`) are not covered.
 
 To show something else at that time on both platforms, update the content

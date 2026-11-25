@@ -264,12 +264,16 @@ public final class LiveUpdatesBridge {
    * notifications are turned off for the app or for the channel of {@code json}.
    */
   private static void requireShowable(Context c, String json) {
-    if (!manager(c).areNotificationsEnabled()) {
-      throw new IllegalStateException("Notifications are turned off for this app");
-    }
-    if (channelBlocked(c, json)) {
-      throw new IllegalStateException("The notification channel of this live update is turned off");
-    }
+    String reason = notShowableReason(c, json);
+    if (reason != null) throw new IllegalStateException(reason);
+  }
+
+  /** Why nothing posted with {@code json} could be shown, or {@code null}. */
+  @Nullable
+  private static String notShowableReason(Context c, String json) {
+    if (!manager(c).areNotificationsEnabled()) return "Notifications are turned off for this app";
+    if (channelBlocked(c, json)) return "The notification channel of this live update is turned off";
+    return null;
   }
 
   /** Posts a new live update and returns its id. */
@@ -304,10 +308,12 @@ public final class LiveUpdatesBridge {
     // posts nothing then, so no update is reported started.
     if (strict) {
       requireShowable(c, json);
-    } else if (!isShown(key)
-        && (!manager(c).areNotificationsEnabled() || channelBlocked(c, json))) {
-      Log.w(LOG_TAG, "A scheduled live update was not shown: notifications are turned off");
-      return key;
+    } else if (!isShown(key)) {
+      String reason = notShowableReason(c, json);
+      if (reason != null) {
+        Log.w(LOG_TAG, "A scheduled live update was not shown: " + reason);
+        return key;
+      }
     }
     post(key, new JSONObject(json), false, true);
     return key;
@@ -970,9 +976,19 @@ public final class LiveUpdatesBridge {
     switch (event) {
       case "start":
         if (content == null) return false;
-        clearDismissed(requireContext(), id);
-        post(id, warnIfUntitled(new JSONObject(content)), true);
-        return true;
+        {
+          Context c = requireContext();
+          clearDismissed(c, id);
+          // Nothing could be shown: post nothing, so nothing is reported
+          // started (as for local starts and schedules).
+          String reason = notShowableReason(c, content);
+          if (reason != null) {
+            Log.w(LOG_TAG, "A remote live update was not shown: " + reason);
+            return true;
+          }
+          post(id, warnIfUntitled(new JSONObject(content)), true);
+          return true;
+        }
       case "update":
         if (content == null) return false;
         // Do not bring back an update that ended or that the user dismissed.
@@ -1302,10 +1318,13 @@ public final class LiveUpdatesBridge {
               && endedContent != null
               && endAt <= end
               && LiveUpdatesScheduler.canScheduleExactly(c);
-      long left = end - now;
+      // When the ended content should replace it first, a later removal
+      // still covers an alarm that never comes (the user can revoke exact
+      // alarms, which cancels them); the replacement resets it.
+      long left = (replacedFirst ? end + ENDED_CONTENT_GRACE_MS : end) - now;
       // A payload cannot make an update vanish at once (as timeoutAfter).
       if (remote) left = Math.max(left, MIN_TIMEOUT_MS);
-      if (!replacedFirst && end > now && (timeout <= 0 || left < timeout)) timeout = left;
+      if (end > now && (timeout <= 0 || left < timeout)) timeout = left;
     }
     long deadline = 0;
     if (timeout > 0 && Build.VERSION.SDK_INT >= 26) {
@@ -1809,6 +1828,9 @@ public final class LiveUpdatesBridge {
   }
 
   private static final long MIN_TIMEOUT_MS = 60_000;
+
+  /** Longest window Android gives an inexact alarm: the ended content comes by then. */
+  private static final long ENDED_CONTENT_GRACE_MS = 10 * 60_000;
 
   /** Limits for remote payloads; the system draws far fewer anyway. */
   private static final int MAX_PROGRESS_PARTS = 20;

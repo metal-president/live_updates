@@ -132,7 +132,8 @@ public class LiveUpdatesEndTest {
         "order",
         "{\"title\":\"Order\",\"timerEnd\":" + seconds(eta) + ",\"endAt\":" + seconds(eta)
             + ",\"endedContent\":{\"title\":\"Delivered\"}}");
-    assertAbout(8 * HOUR, shown("order").getTimeoutAfter());
+    // Removed 10 minutes after the countdown should the alarm never come.
+    assertAbout(30 * MINUTE, shown("order").getTimeoutAfter());
     fireEndAlarm();
     assertEquals("Delivered", shown("order").extras.getString(Notification.EXTRA_TITLE));
   }

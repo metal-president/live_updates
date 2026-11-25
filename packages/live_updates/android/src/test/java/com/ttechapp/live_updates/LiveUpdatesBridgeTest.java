@@ -701,6 +701,18 @@ public class LiveUpdatesBridgeTest {
   }
 
   @Test
+  public void aRemoteStartWhileNotificationsAreOffReportsNothing() throws Exception {
+    List<String> events = new ArrayList<>();
+    LiveUpdatesBridge.observeEvents(events::add, 1);
+    shadowOf(manager).setNotificationsEnabled(false);
+    assertTrue(remote("start", "r-off", "{\"title\":\"A\"}"));
+    shadowOf(manager).setNotificationsEnabled(true);
+    assertEquals(null, shown("r-off"));
+    assertTrue(events.isEmpty());
+    assertFalse(Arrays.asList(LiveUpdatesBridge.activeIds()).contains("r-off"));
+  }
+
+  @Test
   public void startFailsOnABlockedChannel() throws Exception {
     manager.createNotificationChannel(
         new android.app.NotificationChannel(

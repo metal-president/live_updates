@@ -4,6 +4,9 @@ iOS **Live Activities** and Android **Live Update** notifications with one Dart 
 
 - **One API for both platforms:** start, update and end with a title, body,
   progress, a system-counted timer, an image, buttons and a tap route.
+- **Scheduling and ending at a time:** show a live update later, even if
+  the app is not running then (iOS 26+ and Android), and switch it to ended
+  content such as "Delivered" at a set time.
 - **iOS 17.2+:** Lock Screen and Dynamic Island, with five built-in layouts
   (standard, timer, metrics, stepper, journey) and a SwiftUI widget you
   generate with one command and can customize.
@@ -23,7 +26,7 @@ iOS **Live Activities** and Android **Live Update** notifications with one Dart 
 In this README, a *live update* is either a Live Activity (iOS) or a Live
 Update notification (Android).
 
-> **Status:** 0.2.x. Breaking changes come with a new minor version (0.3.0); pin the version you test with.
+> **Status:** 0.3.x. Breaking changes come with a new minor version (0.4.0); pin the version you test with.
 
 | iOS Lock Screen | iOS Dynamic Island |
 | --- | --- |
@@ -62,6 +65,8 @@ Activities need iOS 17.2: on iOS 15.0 to 17.1 every call does nothing and
 | Buttons (`actions`) | ✓ | ✓ | ✓ | |
 | Image | ✓ | large icon (not with Android 17 metrics) | large icon | |
 | Tap route (`onTap`) | ✓ | ✓ | ✓ | |
+| Scheduled start (`schedule`) | iOS 26+ | alarm | alarm | |
+| Ended content at a time (`endAt`) | stale date | alarm | alarm | |
 | Lifecycle events (`states`, `onStarted`) | ✓ | ✓ | ✓ | |
 | Live Activity push tokens | ✓ | – (FCM via `live_updates_fcm`) | – (FCM via `live_updates_fcm`) | |
 | Remote updates | push to the system (APNs, or FCM), no app code | data message → `handleRemotePayload` | data message → `handleRemotePayload` | |
@@ -254,8 +259,9 @@ differently.
   started by default, like on iOS (`AndroidLiveUpdateOptions.maxDuration`;
   `null` for no limit).
 - **Exact alarms:** scheduled updates and `endedContent` are on time only
-  while the app may set exact alarms (`SCHEDULE_EXACT_ALARM`, denied by
-  default from Android 14 for most newly installed apps). If the user takes
+  while the app may set exact alarms (`SCHEDULE_EXACT_ALARM`, from Android
+  14 denied by default for most newly installed apps that target Android 13
+  or higher). If the user takes
   the permission away, Android cancels the exact alarms without telling the
   app; the plugin sets them again (inexact) the next time the app starts.
   Otherwise Android delivers alarms within a window of at least 10 minutes.
@@ -392,7 +398,7 @@ final pending = await LiveUpdates.scheduled();
 - **Android:** an alarm posts the notification. It is on time only with
   exact alarms: add `SCHEDULE_EXACT_ALARM` to your app's manifest (this
   package does not declare it). From Android 14 it is denied by default for
-  most newly installed apps, so ask the user with
+  most newly installed apps that target Android 13 or higher, so ask the user with
   `LiveUpdates.openExactAlarmSettings()` and check
   `LiveUpdates.canScheduleExactly()`
   ([source][android-alarms], [source][android-14-exact-alarms]). Without it
@@ -449,9 +455,9 @@ await LiveUpdates.startOrUpdate(
   regular notification (title, body, icon, image, color and tap route; no
   progress, timer or buttons) that is no longer ongoing or promoted, so the
   user can swipe it away (reported as `dismissed`). Like scheduling, the
-  switch is on time only with exact alarms, otherwise within 10 minutes. `AndroidLiveUpdateOptions(removeAtEnd: true)` removes
-  the notification at `endAt` instead, exactly
-  ([source][android-timeout-after]).
+  switch is on time only with exact alarms, otherwise within 10 minutes.
+  `AndroidLiveUpdateOptions(removeAtEnd: true)` removes the notification at
+  `endAt` instead, exactly ([source][android-timeout-after]).
 - **Android time limit:** `AndroidLiveUpdateOptions.maxDuration` removes the
   notification that long after the update started (later updates do not
   reset it), even if the app is not running. It defaults to 8 hours, like

@@ -41,6 +41,9 @@
 - `onStarted` reports scheduled updates when they start, not when they are
   scheduled, and reports each activity once.
 - Images of scheduled content are kept until it is shown.
+- Docs: the README lists scheduling and `endAt` in the feature list and the
+  platform table, and says the exact alarm default applies to apps that
+  target Android 13 or higher.
 
 ## 0.2.2
 

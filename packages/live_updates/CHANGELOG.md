@@ -15,6 +15,9 @@
   on the Lock Screen now starts a new activity (and removes the ended one),
   as on Android. Before, it did nothing for up to four hours after `end`.
   Only an activity the user dismissed still keeps the key from starting.
+  Like `start`, it can then throw when iOS refuses a new activity (for
+  example while the app is in the background). A scheduled activity that
+  starts also removes an ended one with its key.
 
 ## 0.3.0
 

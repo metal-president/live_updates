@@ -101,7 +101,7 @@ extension LiveUpdatesBridge {
     Task { @MainActor in
       for activity in Activity<LiveUpdatesAttributes>.activities where isPending(activity) {
         scheduleTasks.removeValue(forKey: activity.id)?.cancel()
-        await activity.end(nil, dismissalPolicy: .immediate)
+        await endNow(activity)
         storedSchedules.removeValue(forKey: activity.id)
       }
       completion()
@@ -160,7 +160,7 @@ extension LiveUpdatesBridge {
     for activity in Activity<LiveUpdatesAttributes>.activities
     where activity.attributes.key == key && isPending(activity) && activity.id != kept {
       scheduleTasks.removeValue(forKey: activity.id)?.cancel()
-      await activity.end(nil, dismissalPolicy: .immediate)
+      await endNow(activity)
       storedSchedules.removeValue(forKey: activity.id)
     }
   }
@@ -186,16 +186,18 @@ extension LiveUpdatesBridge {
   }
 
   /// The scheduled activity `id` started: like `startOrUpdate`, it replaces
-  /// a running activity with the same key, so the older ones are ended.
+  /// a running or ended activity with the same key, so the older ones are
+  /// ended and removed.
   @available(iOS 26.0, *)
   @MainActor
   private static func scheduleStarted(_ id: String, key: String) async {
     storedSchedules.removeValue(forKey: id)
     for activity in Activity<LiveUpdatesAttributes>.activities
     where activity.id != id && activity.attributes.key == key
-      && (activity.activityState == .active || activity.activityState == .stale)
+      && (activity.activityState == .active || activity.activityState == .stale
+        || activity.activityState == .ended)
     {
-      await activity.end(nil, dismissalPolicy: .immediate)
+      await endNow(activity)
     }
   }
 

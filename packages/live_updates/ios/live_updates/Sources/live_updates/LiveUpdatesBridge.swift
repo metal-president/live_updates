@@ -142,15 +142,44 @@ public final class LiveUpdatesBridge: NSObject {
       return activity.id
     }
     // One the user dismissed is not brought back while the system lists it.
-    if let dismissed = withKey.first(where: { $0.activityState == .dismissed }) {
+    // Dismissed also covers activities this app ended with an immediate
+    // dismissal (or whose dismissal time passed): those do not count.
+    if let dismissed = withKey.first(where: {
+      $0.activityState == .dismissed && !endedByApp($0.id)
+    }) {
       return dismissed.id
     }
     // One that ended (and may still be on the Lock Screen) is replaced, as on
-    // Android: removed first, so the key shows only the new activity.
+    // Android. The new one is requested first, so a refused request keeps
+    // the ended one; then the ended ones are removed.
     let ended = withKey.filter { $0.activityState == .ended }
     let activity = try request(payload, key: key)
-    for old in ended { await old.end(nil, dismissalPolicy: .immediate) }
+    for old in ended { await endNow(old) }
     return activity.id
+  }
+
+  /// Ids of activities this app ended (guarded by `endedLock`), so a later
+  /// `dismissed` state is not mistaken for the user's dismissal.
+  private static var endedIds: Set<String> = []
+  private static let endedLock = NSLock()
+
+  static func noteEndedByApp(_ id: String) {
+    endedLock.lock()
+    defer { endedLock.unlock() }
+    endedIds.insert(id)
+  }
+
+  static func endedByApp(_ id: String) -> Bool {
+    endedLock.lock()
+    defer { endedLock.unlock() }
+    return endedIds.contains(id)
+  }
+
+  /// Ends `activity` and removes it from the screen at once.
+  @available(iOS 17.2, *)
+  static func endNow(_ activity: Activity<LiveUpdatesAttributes>) async {
+    noteEndedByApp(activity.id)
+    await activity.end(nil, dismissalPolicy: .immediate)
   }
 
   /// Whether `activity` is scheduled and has not started yet (iOS 26+).
@@ -250,6 +279,7 @@ public final class LiveUpdatesBridge: NSObject {
           dismissAfter < 0
           ? .default
           : dismissAfter == 0 ? .immediate : .after(Date().addingTimeInterval(dismissAfter))
+        noteEndedByApp(activity.id)
         await activity.end(content, dismissalPolicy: policy)
         await MainActor.run { tokenTasks.removeValue(forKey: id)?.cancel() }
         completion(nil)
@@ -307,7 +337,7 @@ public final class LiveUpdatesBridge: NSObject {
     guard #available(iOS 17.2, *) else { return completion() }
     Task {
       for activity in Activity<LiveUpdatesAttributes>.activities where !isPending(activity) {
-        await activity.end(nil, dismissalPolicy: .immediate)
+        await endNow(activity)
       }
       completion()
     }

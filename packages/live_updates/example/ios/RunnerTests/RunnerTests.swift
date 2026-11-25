@@ -106,8 +106,11 @@ struct ContentStateDecodingTests {
   @Test func extraImagesDecode() throws {
     let state = try decode(#"{"title":"T","extraImages":{"map":"lu_1.png"}}"#)
     #expect(state.extraImages == ["map": "lu_1.png"])
-    // Malformed: left out, not the whole state.
+    // Malformed: left out, not the whole state, and one bad entry alone.
     #expect(try decode(#"{"title":"T","extraImages":3}"#).extraImages.isEmpty)
+    #expect(
+      try decode(#"{"title":"T","extraImages":{"map":"lu_1.png","bad":3}}"#).extraImages
+        == ["map": "lu_1.png"])
     #expect(try decode(#"{"title":"T"}"#).extraImages.isEmpty)
   }
 

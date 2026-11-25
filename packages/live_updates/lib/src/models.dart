@@ -749,8 +749,9 @@ final class IosLiveUpdateOptions {
   /// saved in the App Group, reused when identical and cleaned up when
   /// unused for a day). The widget reads one as
   /// `LiveUpdatesImages.url(context.state.extraImages["map"])`. Keep them
-  /// few and small: the widget extension has little memory. A push cannot
-  /// add pictures: only ones the app stored can be named by a push.
+  /// few and small: the widget extension has little memory. A picture that
+  /// cannot be stored (such as a missing asset) is left out with a warning.
+  /// A push replaces the content state and cannot add pictures.
   final Map<String, LiveUpdateImage> extraImages;
 
   /// What the generated widget shows on the leading side of the compact

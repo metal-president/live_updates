@@ -99,6 +99,8 @@ void main() {
               'example/assets/parcel.png',
               maxDimension: 64,
             ),
+            // Cannot be stored: left out, not the whole content.
+            'missing': LiveUpdateImage.file('example/assets/none.png'),
           },
         ),
       );

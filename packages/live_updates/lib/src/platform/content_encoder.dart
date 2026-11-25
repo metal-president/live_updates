@@ -53,12 +53,20 @@ mixin ContentEncoder {
     }
     // iOS custom layouts: more pictures, by name (the widget reads them from
     // the same directory).
+    // A picture that cannot be stored is left out (with a warning), not the
+    // whole content.
     if (storesIconAssets && (content.ios?.extraImages.isNotEmpty ?? false)) {
       final store = _store ??= ImageStore(_directory);
-      json['extraImages'] = {
-        for (final MapEntry(:key, :value) in content.ios!.extraImages.entries)
-          key: await store.store(value, keepUntil: showAt),
-      };
+      final names = <String, String>{};
+      for (final MapEntry(:key, :value) in content.ios!.extraImages.entries) {
+        try {
+          names[key] = await store.store(value, keepUntil: showAt);
+        } on Exception catch (e) {
+          // Such as a missing file or asset, or a failed download.
+          debugPrint('live_updates: extra image "$key" left out: $e');
+        }
+      }
+      if (names.isNotEmpty) json['extraImages'] = names;
     }
     if (content.endedContent?.image case final image?) {
       final store = _store ??= ImageStore(_directory);

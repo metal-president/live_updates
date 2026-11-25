@@ -117,9 +117,11 @@ public struct LiveUpdatesAttributes: ActivityAttributes {
       image = try c.decodeIfPresent(String.self, forKey: .image)
       actions = try c.decodeIfPresent([LiveUpdatesAction].self, forKey: .actions) ?? []
       extra = try c.decodeIfPresent([String: String].self, forKey: .extra) ?? [:]
-      // Image names that do not decode are left out, not the whole state.
-      let images = try? c.decodeIfPresent([String: String].self, forKey: .extraImages)
-      extraImages = (images ?? nil) ?? [:]
+      // An image name that does not decode is left out, not the others.
+      let images =
+        (try? c.decodeIfPresent([String: LiveUpdatesLossy<String>].self, forKey: .extraImages))
+        ?? nil
+      extraImages = images?.compactMapValues(\.value) ?? [:]
       timerStart = try c.decodeIfPresent(Double.self, forKey: .timerStart)
       timerEnd = try c.decodeIfPresent(Double.self, forKey: .timerEnd)
       compactTrailing = try c.decodeIfPresent(String.self, forKey: .compactTrailing)

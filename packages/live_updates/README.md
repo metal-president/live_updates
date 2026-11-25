@@ -1113,7 +1113,7 @@ with `LiveUpdatesImages.url(context.state.extraImages["map"])`:
 ```dart
 ios: IosLiveUpdateOptions(
   layout: IosLiveUpdateLayout.custom('courier'),
-  extra: {'driver': 'Alex'},
+  extra: {'gate': 'B12'},
   extraImages: {
     'map': LiveUpdateImage.asset('assets/map.png', maxDimension: 160),
     'driver': LiveUpdateImage.asset('assets/driver.png'),

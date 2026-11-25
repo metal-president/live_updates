@@ -21,9 +21,10 @@
 - iOS: what stays on the Lock Screen after `LiveUpdate.end` (the final
   content, or the content shown last) has no buttons, timer or timer and
   stopwatch metrics, as on Android, so buttons of an ended activity no
-  longer run actions and stopwatches stop counting. A coming `endAt` no
-  longer applies to it (an `endedContent` already shown stays), as on
-  Android.
+  longer run actions and stopwatches stop counting. An `endedContent` that
+  `endAt` has not shown yet no longer appears on it (one already shown
+  stays), as on Android. An activity that already ended, for example by a
+  push, keeps what it shows.
 
 ## 0.3.0
 

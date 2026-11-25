@@ -280,12 +280,21 @@ public final class LiveUpdatesBridge: NSObject {
     guard #available(iOS 17.2, *) else { return completion(nil) }
     Task {
       do {
-        let content = try json.map { try Payload.decode($0).content }
+        let finalContent = try json.map { try Payload.decode($0).content }
         guard let activity = find(id) else { return completion(nil) }
         let policy: ActivityUIDismissalPolicy =
           dismissAfter < 0
           ? .default
           : dismissAfter == 0 ? .immediate : .after(Date().addingTimeInterval(dismissAfter))
+        // What stays on the Lock Screen has no buttons or running timers, as
+        // on Android: the final content, else the content shown last.
+        let running = activity.activityState == .active || activity.activityState == .stale
+        let shown = finalContent ?? (running ? activity.content : nil)
+        let content = shown.map {
+          ActivityContent(
+            state: $0.state.liveUpdatesEnded, staleDate: $0.staleDate,
+            relevanceScore: $0.relevanceScore)
+        }
         noteEndedByApp(activity.id)
         await activity.end(content, dismissalPolicy: policy)
         await MainActor.run { tokenTasks.removeValue(forKey: id)?.cancel() }
@@ -775,5 +784,19 @@ extension LiveUpdatesBridge {
     else { return true }
     if tapHandlers.isEmpty { pendingRoutes.append(route) } else { tapHandlers.values.forEach { $0(route) } }
     return true
+  }
+}
+
+@available(iOS 16.1, *)
+extension LiveUpdatesAttributes.ContentState {
+  /// This content as an ended activity shows it: without buttons, the timer
+  /// and timer or stopwatch metrics, which would keep running.
+  var liveUpdatesEnded: Self {
+    var state = self
+    state.actions = []
+    state.timerStart = nil
+    state.timerEnd = nil
+    state.metrics = metrics.filter { $0.type != "timer" && $0.type != "stopwatch" }
+    return state
   }
 }

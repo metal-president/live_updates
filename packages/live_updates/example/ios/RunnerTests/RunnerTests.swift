@@ -42,6 +42,24 @@ struct ContentStateDecodingTests {
     #expect(state.journey == nil)
   }
 
+  @Test func theEndedStateHasNoButtonsOrRunningTimers() throws {
+    let state = try decode(
+      #"{"title":"Order","progress":0.5,"timerEnd":1893456000,"timerStart":1,"#
+        + #""actions":[{"id":"call","title":"Call"}],"#
+        + #""metrics":[{"label":"Stops","type":"integer","value":3},"#
+        + #"{"label":"ETA","type":"timer","value":1893456000000},"#
+        + #"{"label":"Wait","type":"stopwatch","value":1},"#
+        + #"{"label":"Left","type":"pausedTimer","value":60000}]}"#)
+    #expect(!state.actions.isEmpty)
+    let ended = state.liveUpdatesEnded
+    #expect(ended.title == "Order")
+    #expect(ended.progress == 0.5)
+    #expect(ended.actions.isEmpty)
+    #expect(ended.timerStart == nil)
+    #expect(ended.timerEnd == nil)
+    #expect(ended.metrics.map(\.label) == ["Stops", "Left"])
+  }
+
   @Test func endedContentDecodes() throws {
     let state = try decode(#"{"title":"T","endedContent":{"title":"Done","body":"Enjoy"}}"#)
     #expect(state.endedContent == LiveUpdatesEndedContent(title: "Done", body: "Enjoy"))

@@ -18,6 +18,10 @@
   Like `start`, it can then throw when iOS refuses a new activity (for
   example while the app is in the background). A scheduled activity that
   starts also removes an ended one with its key.
+- iOS: what stays on the Lock Screen after `LiveUpdate.end` (the final
+  content, or the content shown last) has no buttons, timer or timer and
+  stopwatch metrics, as on Android, so buttons of an ended activity no
+  longer run actions and stopwatches stop counting.
 
 ## 0.3.0
 

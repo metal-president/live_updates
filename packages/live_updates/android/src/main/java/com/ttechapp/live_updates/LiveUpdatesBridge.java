@@ -1189,7 +1189,7 @@ public final class LiveUpdatesBridge {
    */
   private static JSONObject warnIfUntitled(JSONObject content) {
     if ("liveUpdate".equals(androidMode(content))
-        && content.optString("title").trim().isEmpty()) {
+        && content.optString("title").isEmpty()) {
       Log.w(
           LOG_TAG,
           "title is empty; Android only promotes a notification to a Live Update when it has"

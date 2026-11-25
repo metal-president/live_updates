@@ -17,7 +17,8 @@ void main() {
       'title is empty; Android only promotes a notification to a Live Update '
       'when it has a title.',
     );
-    expect(titleWarning(const LiveUpdateContent(title: ' \n ')), isNotNull);
+    // Android promotes a title of only spaces.
+    expect(titleWarning(const LiveUpdateContent(title: '   ')), isNull);
     expect(
       titleWarning(
         const LiveUpdateContent(title: '', android: AndroidLiveUpdateOptions()),
@@ -53,7 +54,7 @@ void main() {
     final encoder = _Encoder();
     encoder.warnIfUntitled(const LiveUpdateContent(title: 'Order'));
     expect(printed, isEmpty);
-    encoder.warnIfUntitled(const LiveUpdateContent(title: '  '));
+    encoder.warnIfUntitled(const LiveUpdateContent(title: ''));
     expect(printed, [
       'live_updates: title is empty; Android only promotes a notification '
           'to a Live Update when it has a title.',

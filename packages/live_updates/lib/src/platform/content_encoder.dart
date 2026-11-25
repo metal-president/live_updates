@@ -126,7 +126,8 @@ mixin ContentEncoder {
 String? titleWarning(LiveUpdateContent content) {
   final mode = content.android?.mode ?? AndroidLiveUpdateMode.liveUpdate;
   if (mode != AndroidLiveUpdateMode.liveUpdate) return null;
-  if (content.title.trim().isNotEmpty) return null;
+  // Android promotes a title of only spaces too, so only an empty one counts.
+  if (content.title.isNotEmpty) return null;
   return 'title is empty; Android only promotes a notification to a Live '
       'Update when it has a title.';
 }

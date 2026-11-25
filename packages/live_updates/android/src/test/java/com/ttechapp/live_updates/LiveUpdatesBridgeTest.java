@@ -843,7 +843,9 @@ public class LiveUpdatesBridgeTest {
   @Test
   public void remotePayloadsWithoutTitleAreWarnedAbout() throws Exception {
     org.robolectric.shadows.ShadowLog.clear();
-    assertTrue(remote("start", "untitled", "{\"title\":\"  \"}"));
+    assertTrue(remote("start", "untitled", "{}"));
+    // Android promotes a title of only spaces.
+    assertTrue(remote("start", "spaces", "{\"title\":\"  \"}"));
     assertTrue(remote("start", "titled", "{\"title\":\"Order\"}"));
     assertTrue(remote("start", "plain", "{\"title\":\"\",\"androidMode\":\"ongoing\"}"));
     long warnings =

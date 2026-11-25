@@ -123,9 +123,12 @@ JSON encoded once more.
 
 - `live_updates_event`: `start`, `update` or `end`. `live_updates_id` is the key.
 - `end` may carry final content and `live_updates_dismiss_after` (seconds,
-  as a string like every FCM data value). Without it the final content stays
-  until the user dismisses it. Final content is shown only for an update that
-  is still shown; an `end` for one the user dismissed just ends it.
+  as a string like every FCM data value). The final content, or without it
+  the content shown last, stays as a regular notification for that long: at
+  most and by default 4 hours, like on iOS; `"0"` removes it at once. Final
+  content is shown only for an update that is still shown; an `end` for one
+  the user dismissed just ends it, and a repeated `end` leaves the ended
+  notification as it is.
 - An `update` for an update that is not shown (ended, or dismissed by the
   user) is ignored; send `start` to show it again.
 

@@ -306,7 +306,8 @@ abstract final class LiveUpdates {
     }
   }
 
-  /// Ends every live update started by this app and, unless
+  /// Ends and removes every live update started by this app, also ended
+  /// ones that are still visible ([LiveUpdate.end]), and, unless
   /// [includeScheduled] is `false`, cancels every scheduled one that has not
   /// been shown yet ([cancelAllScheduled]), for example when the user logs
   /// out or switches accounts.

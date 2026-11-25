@@ -561,6 +561,7 @@ public final class LiveUpdatesBridge {
 
   /** Records that the user swiped the update away (see DismissReceiver). */
   static void markDismissed(Context c, String id) {
+    forgetLastPosted(id);
     LiveUpdatesScheduler.cancelEnd(c, id);
     forgetStartTime(c, id);
     synchronized (staleIds) {
@@ -646,7 +647,10 @@ public final class LiveUpdatesBridge {
     return java.util.Arrays.asList(activeIds()).contains(id);
   }
 
-  /** Removes the live update {@code id}, optionally showing final content for a while. */
+  /**
+   * Ends the live update {@code id}. Unless {@code dismissAfterSeconds} is 0, the final content
+   * (else the content shown last) stays as a regular notification for at most four hours.
+   */
   public static void end(@NonNull String id, @Nullable String json, double dismissAfterSeconds)
       throws JSONException {
     // Never bring back an update the user dismissed (it already reported
@@ -659,10 +663,18 @@ public final class LiveUpdatesBridge {
       String id, @Nullable String json, double dismissAfterSeconds, boolean remote, boolean emit)
       throws JSONException {
     Context c = requireContext();
-    // What is shown now, kept when there is no final content (never for an
-    // update the user dismissed: emit is false then).
-    Notification shown =
-        json == null && emit && dismissAfterSeconds != 0 ? activeNotification(c, id) : null;
+    Object[] last;
+    synchronized (lastPosted) {
+      last = lastPosted.remove(id);
+    }
+    // Whether it is running: posted a moment ago (the system lists a new
+    // notification only after a moment) or listed as running.
+    boolean recent;
+    synchronized (recentlyPosted) {
+      recent = recentlyPosted.containsKey(id) && !recentlyEnded.containsKey(id);
+    }
+    Notification shown = recent ? null : activeNotification(c, id);
+    boolean running = recent || shown != null;
     synchronized (recentlyPosted) {
       recentlyPosted.remove(id);
       recentlyEnded.put(id, SystemClock.uptimeMillis());
@@ -680,21 +692,65 @@ public final class LiveUpdatesBridge {
     // As on iOS, the ended update stays as a regular notification (the final
     // content, else what was shown) and is removed after at most four hours.
     // Below Android 8 nothing can remove it later, so only final content
-    // stays there (until the user dismisses it).
+    // stays there (until the user dismisses it). Never for an update the
+    // user dismissed (emit is false then).
     Notification.Builder builder = null;
-    if (json != null && dismissAfterSeconds != 0) {
+    boolean keep = dismissAfterSeconds != 0;
+    if (json != null && keep) {
       builder = builder(c, new JSONObject(json), remote, true);
-    } else if (shown != null && Build.VERSION.SDK_INT >= 26) {
-      builder = endedLook(c, shown);
+    } else if (keep && emit && running && Build.VERSION.SDK_INT >= 26) {
+      if (last != null) {
+        // The content posted last, also when the system does not list it yet.
+        builder = builder(c, endedContent((JSONObject) last[0]), (Boolean) last[1], true);
+      } else if (shown != null) {
+        // After a process restart: rebuilt from the shown notification.
+        builder = endedLook(c, shown);
+      }
     }
     if (builder != null) {
       if (Build.VERSION.SDK_INT >= 26) {
         builder.setTimeoutAfter(keepEndedMillis(dismissAfterSeconds));
       }
       manager(c).notify(TAG_PREFIX + id, NOTIFICATION_ID, builder.build());
+    } else if (json == null && keep && !running) {
+      // Ended before (for example a repeated remote end): an ended
+      // notification stays as it is.
     } else {
       manager(c).cancel(TAG_PREFIX + id, NOTIFICATION_ID);
     }
+  }
+
+  /** Content and remote flag of the latest post of each running update, in this process. */
+  private static final Map<String, Object[]> lastPosted = new HashMap<>();
+
+  private static void forgetLastPosted(String id) {
+    synchronized (lastPosted) {
+      lastPosted.remove(id);
+    }
+  }
+
+  /** Tests: forgets what this process posted for {@code id}, as after a restart. */
+  static void forgetPostsInProcess(String id) {
+    forgetLastPosted(id);
+    synchronized (recentlyPosted) {
+      recentlyPosted.remove(id);
+    }
+  }
+
+  /** Keys of the content that an ended update does not keep. */
+  private static final String[] RUNNING_ONLY_KEYS = {
+    "timerStart", "timerEnd", "showChronometer", "actions", "endAt", "endedContent",
+    "removeAtEnd", "maxDurationMillis", "timeoutAfterMillis", "androidAlert",
+  };
+
+  /**
+   * {@code content} as an ended update shows it: without the timer (a countdown would run past
+   * zero), buttons and running-only options.
+   */
+  static JSONObject endedContent(JSONObject content) throws JSONException {
+    JSONObject out = new JSONObject(content.toString());
+    for (String key : RUNNING_ONLY_KEYS) out.remove(key);
+    return out;
   }
 
   /** How long an ended update stays at most, as on iOS (four hours). */
@@ -726,8 +782,8 @@ public final class LiveUpdatesBridge {
 
   /**
    * {@code shown} as an ended update: the same content, but no longer ongoing
-   * or promoted, without buttons, removed by a tap and not reported as
-   * dismissed when swiped away.
+   * or promoted, without buttons or running chronometer, removed by a tap and
+   * not reported as dismissed when swiped away.
    */
   @RequiresApi(26)
   private static Notification.Builder endedLook(Context c, Notification shown) {
@@ -736,6 +792,7 @@ public final class LiveUpdatesBridge {
     // a copy.
     Notification copy = shown.clone();
     copy.actions = null;
+    if (Build.VERSION.SDK_INT >= 36) copy.flags &= ~Notification.FLAG_PROMOTED_ONGOING;
     copy.extras.remove(EXTRA_STALE);
     copy.extras.remove(EXTRA_KEYED);
     Notification.Builder b =
@@ -744,6 +801,8 @@ public final class LiveUpdatesBridge {
             .setAutoCancel(true)
             .setOnlyAlertOnce(true)
             .setDeleteIntent(null)
+            .setUsesChronometer(false)
+            .setChronometerCountDown(false)
             .setActions();
     requestPromotedOngoing(b, false);
     android.os.Bundle extras = b.getExtras();
@@ -822,8 +881,8 @@ public final class LiveUpdatesBridge {
       case "end":
         {
           // Final content only for an update that is shown: never bring back
-          // one the user dismissed. Without a dismiss time it stays, as with
-          // LiveUpdate.end(finalContent:).
+          // one the user dismissed. Without a dismiss time it stays for four
+          // hours, as with LiveUpdate.end().
           Context c = requireContext();
           boolean visible = isShown(id) && !isDismissed(c, id);
           end(
@@ -855,6 +914,7 @@ public final class LiveUpdatesBridge {
 
   /** Called by the dismiss receiver when a timeout removed the update. */
   static void timedOut(Context c, String id) {
+    forgetLastPosted(id);
     LiveUpdatesScheduler.cancelEnd(c, id);
     forgetStartTime(c, id);
     synchronized (staleIds) {
@@ -924,9 +984,16 @@ public final class LiveUpdatesBridge {
     LiveUpdatesScheduler.cancel(requireContext(), key);
   }
 
-  /** Removes every live update of this app (not the scheduled ones). */
+  /** Removes every live update of this app, also ended ones (not the scheduled ones). */
   public static void endAll() throws JSONException {
     for (String id : activeIds()) end(id, null, 0);
+    Context c = requireContext();
+    for (StatusBarNotification n : manager(c).getActiveNotifications()) {
+      String tag = n.getTag();
+      if (n.getId() == NOTIFICATION_ID && tag != null && tag.startsWith(TAG_PREFIX)) {
+        manager(c).cancel(tag, NOTIFICATION_ID);
+      }
+    }
   }
 
   static void emit(String event, String id) {
@@ -1112,6 +1179,9 @@ public final class LiveUpdatesBridge {
     if (stale) extras.putBoolean(EXTRA_STALE, true);
     if (!extras.isEmpty()) b.addExtras(extras);
     if (!stale) addActions(c, b, id, content);
+    synchronized (lastPosted) {
+      lastPosted.put(id, new Object[] {content, remote});
+    }
     manager(c).notify(TAG_PREFIX + id, NOTIFICATION_ID, b.build());
     if (staleNow) markStale(id);
     if (activeAgain) emit("active", id);

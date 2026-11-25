@@ -260,11 +260,60 @@ public class LiveUpdatesBridgeTest {
   }
 
   @Test
-  public void endingAnEndedUpdateAgainRemovesIt() throws Exception {
+  public void endingAnEndedUpdateAgainLeavesItAsItIs() throws Exception {
     String a = LiveUpdatesBridge.start("{\"title\":\"A\"}");
     LiveUpdatesBridge.end(a, null, 60);
     LiveUpdatesBridge.end(a, null, -1);
+    assertEquals(60_000, shown(a).getTimeoutAfter());
+    remote("start", "r10", "{\"title\":\"R\"}");
+    remote("end", "r10", null);
+    remote("end", "r10", null);
+    assertEndedLook(shown("r10"), "R");
+    // Zero still removes it.
+    LiveUpdatesBridge.end(a, null, 0);
     assertEquals(null, shown(a));
+  }
+
+  @Test
+  public void theEndedLookDropsTimersAndButtonsButKeepsProgress() throws Exception {
+    String id =
+        LiveUpdatesBridge.start(
+            "{\"title\":\"Order\",\"progress\":0.5,\"timerEnd\":1893456000,"
+                + "\"actions\":[{\"id\":\"call\",\"title\":\"Call\"}]}");
+    LiveUpdatesBridge.end(id, null, -1);
+    Notification n = shown(id);
+    assertEndedLook(n, "Order");
+    assertFalse(n.extras.getBoolean(Notification.EXTRA_SHOW_CHRONOMETER));
+    assertEquals(null, n.actions);
+  }
+
+  @Test
+  public void afterARestartTheShownNotificationIsKept() throws Exception {
+    String id =
+        LiveUpdatesBridge.start(
+            "{\"title\":\"Order\",\"body\":\"On the way\",\"timerEnd\":1893456000,"
+                + "\"actions\":[{\"id\":\"call\",\"title\":\"Call\"}],"
+                + "\"publicContent\":{\"title\":\"Delivery\"}}");
+    LiveUpdatesBridge.forgetPostsInProcess(id);
+    LiveUpdatesBridge.end(id, null, -1);
+    Notification n = shown(id);
+    assertEndedLook(n, "Order");
+    assertEquals("On the way", n.extras.getCharSequence(Notification.EXTRA_TEXT).toString());
+    assertFalse(n.extras.getBoolean(Notification.EXTRA_SHOW_CHRONOMETER));
+    assertEquals(null, n.actions);
+    assertEquals(4 * HOUR, n.getTimeoutAfter());
+    assertEndedLook(n.publicVersion, "Delivery");
+    assertEquals(null, LiveUpdatesBridge.keyForId(id));
+  }
+
+  @Test
+  public void endAllAlsoRemovesEndedUpdates() throws Exception {
+    String a = LiveUpdatesBridge.start("{\"title\":\"A\"}");
+    String b = LiveUpdatesBridge.start("{\"title\":\"B\"}");
+    LiveUpdatesBridge.end(a, null, -1);
+    LiveUpdatesBridge.endAll();
+    assertEquals(null, shown(a));
+    assertEquals(null, shown(b));
   }
 
   @Test

@@ -300,8 +300,15 @@ public final class LiveUpdatesBridge {
     Context c = requireContext();
     // A key the user dismissed stays hidden until the app ends it.
     if (isDismissed(c, key)) return key;
-    // Nothing can be shown: fail, as start() and update() do.
-    if (strict) requireShowable(c, json);
+    // Nothing can be shown: fail, as start() and update() do. A schedule
+    // posts nothing then, so no update is reported started.
+    if (strict) {
+      requireShowable(c, json);
+    } else if (!isShown(key)
+        && (!manager(c).areNotificationsEnabled() || channelBlocked(c, json))) {
+      Log.w(LOG_TAG, "A scheduled live update was not shown: notifications are turned off");
+      return key;
+    }
     post(key, new JSONObject(json), false, true);
     return key;
   }
@@ -1055,8 +1062,9 @@ public final class LiveUpdatesBridge {
    */
   public static void reschedule(@NonNull String key, @Nullable String json, long atMillis)
       throws JSONException {
-    requireShowableNow(
-        key, json != null ? json : LiveUpdatesScheduler.storedJson(requireContext(), key), atMillis);
+    // Not for a key without a schedule: the scheduler reports that.
+    String stored = LiveUpdatesScheduler.storedJson(requireContext(), key);
+    if (stored != null) requireShowableNow(key, json != null ? json : stored, atMillis);
     LiveUpdatesScheduler.reschedule(requireContext(), key, json, atMillis);
   }
 

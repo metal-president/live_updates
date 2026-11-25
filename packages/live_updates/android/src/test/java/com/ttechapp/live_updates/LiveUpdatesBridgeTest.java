@@ -624,6 +624,15 @@ public class LiveUpdatesBridgeTest {
       // Same.
     }
     LiveUpdatesBridge.cancelScheduled("off-key");
+    // A schedule whose time comes now posts nothing and reports nothing.
+    assertEquals("off-key", LiveUpdatesBridge.startOrUpdate("off-key", "{\"title\":\"A\"}", false));
+    // Rescheduling a key without a schedule reports that, not the setting.
+    try {
+      LiveUpdatesBridge.reschedule("no-schedule", "{\"title\":\"A\"}", 0);
+      org.junit.Assert.fail("reschedule without a schedule must fail");
+    } catch (IllegalStateException expected) {
+      assertTrue(expected.getMessage().contains("No live update is scheduled"));
+    }
     assertTrue(events.isEmpty());
     assertFalse(Arrays.asList(LiveUpdatesBridge.activeIds()).contains("off-key"));
     shadowOf(manager).setNotificationsEnabled(true);

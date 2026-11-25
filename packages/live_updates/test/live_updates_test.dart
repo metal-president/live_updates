@@ -43,11 +43,11 @@ class FakePlatform extends NoopLiveUpdatesPlatform {
 
   @override
   Future<String?> stateForId(String id) async =>
-      {'a1': 'stale', 'a2': 'ended', 'a3': 'pending'}[id];
+      {'a1': 'stale', 'a2': 'ended'}[id];
 
   @override
   Future<String?> stateForKey(String key) async =>
-      key == 'order-1' ? 'dismissed' : null;
+      {'order-1': 'dismissed', 'later': 'pending'}[key];
 }
 
 void main() {
@@ -68,6 +68,8 @@ void main() {
     expect(await a1.state(), LiveUpdateState.stale);
     expect(await a2.state(), LiveUpdateState.ended);
     expect(await LiveUpdates.stateOf('order-1'), LiveUpdateState.dismissed);
+    // A state the API does not know (such as a scheduled one) is null.
+    expect(await LiveUpdates.stateOf('later'), isNull);
     expect(await LiveUpdates.stateOf('order-2'), isNull);
   });
 

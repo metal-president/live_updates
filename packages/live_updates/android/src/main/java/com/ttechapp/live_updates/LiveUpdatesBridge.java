@@ -364,25 +364,46 @@ public final class LiveUpdatesBridge {
   public static String stateOf(@NonNull String id) {
     Context c = context;
     if (c == null) return null;
+    boolean stale;
+    synchronized (staleIds) {
+      stale = staleIds.contains(id);
+    }
+    // Posted or ended a moment ago: the system list catches up only after a
+    // moment, so this process's own record comes first.
+    long now = SystemClock.uptimeMillis();
+    boolean endedJustNow;
+    boolean postedJustNow;
+    synchronized (recentlyPosted) {
+      Long ended = recentlyEnded.get(id);
+      Long posted = recentlyPosted.get(id);
+      endedJustNow = ended != null && now - ended <= RECENT_MS;
+      postedJustNow = !endedJustNow && posted != null && now - posted <= RECENT_MS;
+    }
+    if (endedJustNow) {
+      boolean kept;
+      synchronized (keptEnded) {
+        kept = keptEnded.contains(id);
+      }
+      if (kept) return "ended";
+      return isDismissed(c, id) ? "dismissed" : null;
+    }
+    if (postedJustNow) return stale ? "stale" : "active";
+    boolean knownHere;
+    synchronized (lastPosted) {
+      knownHere = lastPosted.containsKey(id);
+    }
     for (StatusBarNotification n : manager(c).getActiveNotifications()) {
       if (n.getId() != NOTIFICATION_ID || !(TAG_PREFIX + id).equals(n.getTag())) continue;
       Notification notification = n.getNotification();
       boolean ongoing = (notification.flags & Notification.FLAG_ONGOING_EVENT) != 0;
       if (notification.extras.getBoolean(EXTRA_STALE, false)) return "stale";
       if (!ongoing) return "ended";
+      // After a process restart the stale state is not known here: past the
+      // endAt on the notification, it is stale (states reports it when the
+      // end alarm runs).
       long endAt = notification.extras.getLong(EXTRA_END_AT, 0);
-      boolean stale;
-      synchronized (staleIds) {
-        stale = staleIds.contains(id);
-      }
-      return stale || (endAt > 0 && System.currentTimeMillis() >= endAt) ? "stale" : "active";
-    }
-    // Posted a moment ago: the system lists it only after a moment.
-    long now = SystemClock.uptimeMillis();
-    synchronized (recentlyPosted) {
-      Long posted = recentlyPosted.get(id);
-      Long ended = recentlyEnded.get(id);
-      if (posted != null && now - posted <= RECENT_MS && ended == null) return "active";
+      boolean pastEndAt = !knownHere && endAt > 0 && System.currentTimeMillis() >= endAt;
+      return stale || pastEndAt ? "stale" : "active";
     }
     return isDismissed(c, id) ? "dismissed" : null;
   }
@@ -932,6 +953,7 @@ public final class LiveUpdatesBridge {
     if (Build.VERSION.SDK_INT >= 36) copy.flags &= ~Notification.FLAG_PROMOTED_ONGOING;
     copy.extras.remove(EXTRA_STALE);
     copy.extras.remove(EXTRA_KEYED);
+    copy.extras.remove(EXTRA_END_AT);
     Notification.Builder b =
         Notification.Builder.recoverBuilder(c, copy)
             .setOngoing(false)
@@ -952,6 +974,7 @@ public final class LiveUpdatesBridge {
     android.os.Bundle extras = b.getExtras();
     extras.remove(EXTRA_STALE);
     extras.remove(EXTRA_KEYED);
+    extras.remove(EXTRA_END_AT);
     if (copy.publicVersion != null) b.setPublicVersion(endedLook(c, copy.publicVersion).build());
     return b;
   }

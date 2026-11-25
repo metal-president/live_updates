@@ -131,8 +131,12 @@ public class LiveUpdatesFallbackTest {
   }
 
   @Test
-  public void promotionIsNeverAvailable() {
+  public void promotionIsNeverAvailable() throws Exception {
     assertFalse(LiveUpdatesBridge.canPostPromotedNotifications());
+    String id = LiveUpdatesBridge.start("{\"title\":\"Order\"}");
+    // Notification.FLAG_PROMOTED_ONGOING, which older versions never set.
+    shown(id).flags |= 0x00040000;
+    assertFalse(LiveUpdatesBridge.isPromoted(id));
   }
 
   @Test

@@ -1,3 +1,13 @@
+## 0.2.2
+
+- `LiveUpdate.isPromoted()`: whether Android promoted the shown update to a
+  Live Update (`Notification.FLAG_PROMOTED_ONGOING`), the system's actual
+  decision. `false` below Android 16 and on other platforms.
+- Android: a debug warning when content that asks for promotion
+  (`AndroidLiveUpdateMode.liveUpdate`) has an empty title, which Android
+  requires to promote a notification. Remote payloads log the same warning
+  natively. Nothing else changes: the notification is still posted.
+
 ## 0.2.1
 
 - `LiveUpdateContent.publicContent` (`LiveUpdatePublicContent`): content shown

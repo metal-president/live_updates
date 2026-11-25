@@ -803,6 +803,47 @@ extension type LiveUpdatesBridge._(jni$_.JObject _$this)
     ).boolean;
   }
 
+  static final _id_isPromoted = _class.staticMethodId(
+    r'isPromoted',
+    r'(Ljava/lang/String;)Z',
+  );
+
+  static final _isPromoted =
+      jni$_.ProtectedJniExtensions.lookup<
+            jni$_.NativeFunction<
+              jni$_.JniResult Function(
+                jni$_.Pointer<jni$_.Void>,
+                jni$_.JMethodIDPtr,
+                jni$_.VarArgs<(jni$_.Pointer<jni$_.Void>,)>,
+              )
+            >
+          >('globalEnv_CallStaticBooleanMethod')
+          .asFunction<
+            jni$_.JniResult Function(
+              jni$_.Pointer<jni$_.Void>,
+              jni$_.JMethodIDPtr,
+              jni$_.Pointer<jni$_.Void>,
+            )
+          >();
+
+  /// from: `static public boolean isPromoted(java.lang.String id)`
+  ///
+  /// Whether the system promoted the shown live update {@code id} to a Live
+  /// Update ({@code Notification.FLAG_PROMOTED_ONGOING}). This is the system's
+  /// actual decision, which also depends on the promotion requirements, the
+  /// user's settings and device maker criteria, unlike {@code
+  /// canPostPromotedNotifications()}. {@code false} below Android 16, when not
+  /// attached, or when {@code id} is not shown.
+  static core$_.bool isPromoted(jni$_.JString id) {
+    final _$$classRef = _class.reference;
+    final _$id = id.reference;
+    return _isPromoted(
+      _$$classRef.pointer,
+      _id_isPromoted.pointer,
+      _$id.pointer,
+    ).boolean;
+  }
+
   static final _id_requestPermission = _class.staticMethodId(
     r'requestPermission',
     r'(Lcom/ttechapp/live_updates/LiveUpdatesBridge$ResultListener;)V',

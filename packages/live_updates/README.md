@@ -207,6 +207,9 @@ differently.
   channel whose importance is above "min". If you pass your own
   `channelId`, do not create that channel with `IMPORTANCE_MIN`. Device
   makers can apply additional criteria. ([source][android-live-update])
+  `LiveUpdate.isPromoted()` tells you whether a shown update was promoted:
+  unlike `LiveUpdates.canPostPromotedNotifications()`, which only reports
+  the permission, it reflects the system's decision for that notification.
 - **User settings:** users can demote or dismiss a Live Update and turn off
   Live Updates for your app in Settings. Updates then appear as regular
   ongoing notifications; `LiveUpdates.canPostPromotedNotifications()` tells

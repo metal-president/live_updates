@@ -33,6 +33,16 @@ final class LiveUpdate {
   Future<void> end({LiveUpdateContent? finalContent, Duration? dismissAfter}) =>
       _platform.end(id, finalContent: finalContent, dismissAfter: dismissAfter);
 
+  /// Whether Android promoted this update to a Live Update (status bar chip,
+  /// top of the shade and Lock Screen) as it is shown now.
+  ///
+  /// This is the system's actual decision: besides the permission reported by
+  /// [LiveUpdates.canPostPromotedNotifications], it depends on the promotion
+  /// requirements (such as [AndroidLiveUpdateMode.liveUpdate] and a title),
+  /// the user's settings and device maker criteria. `false` when the update
+  /// is not shown, below Android 16 and on other platforms.
+  Future<bool> isPromoted() => _platform.isPromoted(id);
+
   /// Lifecycle changes of this live update, such as the user dismissing it
   /// (Android) or the system marking it stale (iOS).
   Stream<LiveUpdateState> get states => _platform.events

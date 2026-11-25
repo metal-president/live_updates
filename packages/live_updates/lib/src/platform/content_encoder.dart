@@ -60,6 +60,18 @@ mixin ContentEncoder {
     return jsonEncode(json);
   }
 
+  /// Warns in debug builds when [content] asks Android for promotion
+  /// ([AndroidLiveUpdateMode.liveUpdate]) without a title, which Android
+  /// requires to promote a notification. The notification is still posted.
+  /// Called for content that is shown as a live update (start and update),
+  /// not for final content, which is never promoted.
+  void warnIfUntitled(LiveUpdateContent content) {
+    assert(() {
+      if (titleWarning(content) case final w?) debugPrint('live_updates: $w');
+      return true;
+    }());
+  }
+
   /// Copies [assets] for the widget extension (see [storesIconAssets]). A
   /// name ending in `/` stands for every image asset under that folder.
   /// Assets that cannot be loaded are reported with a warning; the widget
@@ -106,6 +118,17 @@ mixin ContentEncoder {
     }
     return result;
   }
+}
+
+/// Why Android will not promote [content] for lack of a title, or `null`.
+/// Only content that asks for promotion ([AndroidLiveUpdateMode.liveUpdate],
+/// the default) is checked.
+String? titleWarning(LiveUpdateContent content) {
+  final mode = content.android?.mode ?? AndroidLiveUpdateMode.liveUpdate;
+  if (mode != AndroidLiveUpdateMode.liveUpdate) return null;
+  if (content.title.trim().isNotEmpty) return null;
+  return 'title is empty; Android only promotes a notification to a Live '
+      'Update when it has a title.';
 }
 
 final _imageExtension = RegExp(

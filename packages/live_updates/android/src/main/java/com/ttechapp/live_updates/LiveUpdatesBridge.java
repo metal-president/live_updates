@@ -1548,11 +1548,7 @@ public final class LiveUpdatesBridge {
           .setUsesChronometer(true)
           .setChronometerCountDown(countdown);
     }
-    long timeout = content.optLong("timeoutAfterMillis", 0);
-    if (timeout > 0 && Build.VERSION.SDK_INT >= 26) {
-      // Not shorter than a minute, so a payload cannot make an update vanish at once.
-      b.setTimeoutAfter(Math.max(timeout, MIN_TIMEOUT_MS));
-    }
+    // timeoutAfterMillis is applied by post(), with the other time limits.
 
     String route = optString(content, "route");
     PendingIntent tap = tapIntent(c, route);

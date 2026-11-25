@@ -73,6 +73,27 @@ void main() {
     await sub.cancel();
   });
 
+  test('a token that changes back is reported again', () async {
+    final fids = StreamController<String>.broadcast();
+    final got = <String>[];
+    final sub = mergeTokens(installationIds: fids.stream)
+        .listen((t) => got.add(t.value));
+    await pump();
+    fids
+      ..add('A')
+      ..add('B')
+      ..add('A')
+      ..add('A');
+    await pump();
+    p.tokensOf('a1')
+      ..add(const LiveUpdatePushToken('x'))
+      ..add(const LiveUpdatePushToken('y'))
+      ..add(const LiveUpdatePushToken('x'));
+    await pump();
+    expect(got, ['A', 'B', 'A', 'x', 'y', 'x']);
+    await sub.cancel();
+  });
+
   test('registration token only when requested', () async {
     final got = <LiveUpdatesToken>[];
     final refresh = StreamController<String>.broadcast();

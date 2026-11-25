@@ -258,7 +258,7 @@ extension LiveUpdatesBridge {
 
   /// Request JSON for an activity's current content (the content-state keys
   /// plus its stale date and relevance).
-  @available(iOS 17.2, *)
+  @available(iOS 16.2, *)
   private static func encode(_ content: ActivityContent<LiveUpdatesAttributes.ContentState>)
     throws -> String
   {

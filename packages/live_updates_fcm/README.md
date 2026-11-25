@@ -96,7 +96,7 @@ started with `pushUpdates: true` (to update or end it).
 | `fcmInstallationId` | Android, iOS | `message.fid` |
 | `fcmRegistrationToken` (opt-in, legacy) | Android, iOS | `message.token` |
 | `pushToStart` | iOS 17.2+ | `message.apns.live_activity_token`, `"event": "start"`, together with `message.fid` |
-| `activity` (with `updateId` and `key`) | iOS 17.2+ | `message.apns.live_activity_token`, `"event": "update"` / `"end"`, together with `message.fid` |
+| `activity` (with `updateId` and `key`) | iOS 16.2+ | `message.apns.live_activity_token`, `"event": "update"` / `"end"`, together with `message.fid` |
 
 The Live Activity tokens do not address the device on their own. An iOS
 message also needs a target: the installation ID (`message.fid`), or

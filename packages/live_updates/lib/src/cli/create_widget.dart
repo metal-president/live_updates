@@ -163,7 +163,7 @@ Future<int> createWidget(List<String> args, {Directory? templates}) async {
           '\nCould not edit the Xcode project automatically (needs the '
           '"xcodeproj" Ruby gem, bundled with CocoaPods).\n'
           'Add the extension manually: Xcode > File > New > Target > Widget '
-          'Extension named "$name" (deployment target 17.2), then replace its '
+          'Extension named "$name" (deployment target 16.2), then replace its '
           'files with the ones in ${out.path}.',
         );
       return 1;

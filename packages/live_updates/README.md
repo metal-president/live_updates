@@ -7,7 +7,7 @@ iOS **Live Activities** and Android **Live Update** notifications with one Dart 
 - **Scheduling and ending at a time:** show a live update later, even if
   the app is not running then (iOS 26+ and Android), and switch it to ended
   content such as "Delivered" at a set time.
-- **iOS 17.2+:** Lock Screen and Dynamic Island, with five built-in layouts
+- **iOS 16.2+:** Lock Screen and Dynamic Island, with five built-in layouts
   (standard, timer, metrics, stepper, journey) and a SwiftUI widget you
   generate with one command and can customize.
 - **Android:** `ProgressStyle` notifications on Android 16+, promoted to a
@@ -51,10 +51,12 @@ Screenshots of the example app in this repository.
 ## Platform support
 
 **Requirements:** Flutter 3.50+, iOS 15.0+, Android 7.0 (API 24)+. Live
-Activities need iOS 17.2: on iOS 15.0 to 17.1 every call does nothing and
-`isSupported()` returns `false`.
+Activities need iOS 16.2: on iOS 15.0 to 16.1 every call does nothing and
+`isSupported()` returns `false`. Some features need a newer iOS: buttons
+that run without opening the app need iOS 17.0 (before that only `opensApp`
+buttons are shown), and push-to-start needs iOS 17.2.
 
-| | iOS 17.2+ | Android 16+ | Android 7–15 | iOS 15.0–17.1, other |
+| | iOS 16.2+ | Android 16+ | Android 7–15 | iOS 15.0–16.1, other |
 | --- | --- | --- | --- | --- |
 | Start / update / end | Live Activity | Live Update (when promoted) | Ongoing notification | no-op |
 | Progress | ✓ | `ProgressStyle` (segments, points) | progress bar | |
@@ -62,13 +64,13 @@ Activities need iOS 17.2: on iOS 15.0 to 17.1 every call does nothing and
 | Metrics | `metrics` layout | Android 17 `MetricStyle`, else text | text | |
 | Steps, journey | `stepper`, `journey` layouts | progress segments and points, text | progress bar, text | |
 | Semantic colors | – | Android 17+ | – | |
-| Buttons (`actions`) | ✓ | ✓ | ✓ | |
+| Buttons (`actions`) | iOS 17+ (`opensApp` buttons from 16.2) | ✓ | ✓ | |
 | Image | ✓ | large icon (not with Android 17 metrics) | large icon | |
 | Tap route (`onTap`) | ✓ | ✓ | ✓ | |
 | Scheduled start (`schedule`) | iOS 26+ | alarm | alarm | |
 | Ended content at a time (`endAt`) | stale date | alarm | alarm | |
 | Lifecycle events (`states`, `onStarted`) | ✓ | ✓ | ✓ | |
-| Live Activity push tokens | ✓ | – (FCM via `live_updates_fcm`) | – (FCM via `live_updates_fcm`) | |
+| Live Activity push tokens | ✓ (push-to-start iOS 17.2+) | – (FCM via `live_updates_fcm`) | – (FCM via `live_updates_fcm`) | |
 | Remote updates | push to the system (APNs, or FCM), no app code | data message → `handleRemotePayload` | data message → `handleRemotePayload` | |
 | One push to many devices | broadcast channels (iOS 18+) | FCM topics | FCM topics | |
 
@@ -91,13 +93,13 @@ flutter pub add live_updates
    ```
 
    This writes `ios/LiveUpdatesWidget/`, adds a *LiveUpdatesWidget* extension
-   target (iOS 17.2) to `Runner.xcodeproj`, sets `NSSupportsLiveActivities`,
+   target (iOS 16.2) to `Runner.xcodeproj`, sets `NSSupportsLiveActivities`,
    and sets up the URL scheme for taps (`liveupdates-<bundle id>`) and the App
    Group for [images](#images). It needs Ruby with the `xcodeproj` gem
    (included with CocoaPods) and offers to run
    `gem install --user-install xcodeproj` if it is missing.
 
-   - **Deployment target:** only the widget extension needs iOS 17.2; the
+   - **Deployment target:** only the widget extension needs iOS 16.2; the
      app can target iOS 15.0 or later.
    - **Flavors:** every build configuration (for example `Debug-dev`,
      `Release-prod`) gets a widget bundle id and an App Group derived from
@@ -118,7 +120,7 @@ With `--no-xcode` only the widget sources are written. Then, in Xcode:
 
 1. File > New > Target > Widget Extension named `LiveUpdatesWidget`
    (no Live Activity or configuration intent templates), deployment target
-   17.2, and replace its generated Swift files with the files from
+   16.2, and replace its generated Swift files with the files from
    `ios/LiveUpdatesWidget/`.
 2. Add `LiveUpdatesActionIntent.swift` to both the Runner and the widget
    target (Target Membership).
@@ -304,6 +306,7 @@ differently.
   ([source][android-alarms], [source][android-14-exact-alarms])
 
 [ios-activitykit]: https://developer.apple.com/documentation/activitykit/displaying-live-data-with-live-activities
+[ios-button-intent]: https://developer.apple.com/documentation/swiftui/button/init(intent:label:)
 [ios-request-start]: https://developer.apple.com/documentation/activitykit/activity/request(attributes:content:pushtype:style:alertconfiguration:start:)
 [ios-stale-date]: https://developer.apple.com/documentation/activitykit/activitycontent/staledate
 [android-alarms]: https://developer.android.com/develop/background-work/services/alarms
@@ -584,6 +587,9 @@ Where a press is delivered:
   `requiresUnlock: true` on buttons with consequences, such as cancelling an
   order: iOS asks for Face ID or the passcode first, and Android 12+ asks the
   user to unlock.
+- On iOS 16.2 to 16.x only `opensApp` buttons are shown: buttons that run
+  without opening the app use App Intents in Live Activities, which need
+  iOS 17 ([source][ios-button-intent]).
 - Android shows up to three actions. On iOS keep labels short: the whole
   content must stay under ActivityKit's 4 KB limit.
 
@@ -1139,7 +1145,7 @@ update on both platforms.
 ### iOS (APNs)
 
 ```dart
-// Start activities from your server (iOS 17.2+).
+// Start activities from your server (push-to-start, iOS 17.2+).
 LiveUpdates.pushToStartTokens.listen((token) => api.registerPushToStart(token.hex));
 
 // Update a running activity from your server.
@@ -1262,6 +1268,10 @@ apply them again:
   notification's countdown cannot stop at zero), and leaves out the timer of
   a countdown that is already over. Pass
   `AndroidLiveUpdateOptions(removeAtCountdownEnd: false)` to keep it.
+- **iOS 16.2 and later:** Live Activities now work from iOS 16.2. To use
+  them there, run `create_widget` again and lower the deployment target of
+  the `LiveUpdatesWidget` target to 16.2 in Xcode (an existing target keeps
+  17.2).
 - **What stays after `end` has no buttons or running timers** on either
   platform (the final content, or the content shown last).
 - **iOS `startOrUpdate` replaces an ended activity** with the key that is

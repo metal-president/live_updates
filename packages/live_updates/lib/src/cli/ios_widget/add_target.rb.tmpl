@@ -127,7 +127,7 @@ if (existing = project.targets.find { |t| t.name == name })
   exit 0
 end
 
-target = project.new_target(:app_extension, name, :ios, '17.2', nil, :swift)
+target = project.new_target(:app_extension, name, :ios, '16.2', nil, :swift)
 group = project.main_group.find_subpath(name, true)
 group.set_source_tree('<group>')
 group.set_path(name)
@@ -152,7 +152,7 @@ target.build_configurations.each do |config|
   s['INFOPLIST_KEY_CFBundleDisplayName'] = name
   s['MARKETING_VERSION'] = '$(FLUTTER_BUILD_NAME)'
   s['CURRENT_PROJECT_VERSION'] = '$(FLUTTER_BUILD_NUMBER)'
-  s['IPHONEOS_DEPLOYMENT_TARGET'] = '17.2'
+  s['IPHONEOS_DEPLOYMENT_TARGET'] = '16.2'
   s['SWIFT_VERSION'] = '5.0'
   s['TARGETED_DEVICE_FAMILY'] = '1,2'
   s['SKIP_INSTALL'] = 'YES'

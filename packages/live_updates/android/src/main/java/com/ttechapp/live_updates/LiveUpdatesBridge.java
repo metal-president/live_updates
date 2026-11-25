@@ -236,7 +236,15 @@ public final class LiveUpdatesBridge {
       // Reported by post().
     }
     NotificationChannel channel = manager(c).getNotificationChannel(channelId);
-    return channel != null && channel.getImportance() == NotificationManager.IMPORTANCE_NONE;
+    if (channel == null) return false;
+    if (channel.getImportance() == NotificationManager.IMPORTANCE_NONE) return true;
+    // The user can also turn off the channel's group (Android 9+).
+    if (Build.VERSION.SDK_INT >= 28 && channel.getGroup() != null) {
+      android.app.NotificationChannelGroup group =
+          manager(c).getNotificationChannelGroup(channel.getGroup());
+      return group != null && group.isBlocked();
+    }
+    return false;
   }
 
   /** Completes waiting permission requests with the current state. */
@@ -251,9 +259,27 @@ public final class LiveUpdatesBridge {
     permissionResult(granted);
   }
 
+  /**
+   * Fails, as iOS does when Live Activities are turned off, when nothing could be shown:
+   * notifications are turned off for the app or for the channel of {@code json}.
+   */
+  private static void requireShowable(Context c, String json) {
+    String reason = notShowableReason(c, json);
+    if (reason != null) throw new IllegalStateException(reason);
+  }
+
+  /** Why nothing posted with {@code json} could be shown, or {@code null}. */
+  @Nullable
+  private static String notShowableReason(Context c, String json) {
+    if (!manager(c).areNotificationsEnabled()) return "Notifications are turned off for this app";
+    if (channelBlocked(c, json)) return "The notification channel of this live update is turned off";
+    return null;
+  }
+
   /** Posts a new live update and returns its id. */
   @NonNull
   public static String start(@NonNull String json) throws JSONException {
+    requireShowable(requireContext(), json);
     String id = UUID.randomUUID().toString();
     post(id, new JSONObject(json), false, false);
     return id;
@@ -266,8 +292,30 @@ public final class LiveUpdatesBridge {
   @NonNull
   public static String startOrUpdate(@NonNull String key, @NonNull String json)
       throws JSONException {
+    return startOrUpdate(key, json, true);
+  }
+
+  /**
+   * {@code strict}: fail when nothing could be shown (calls from Dart), also for a key that is
+   * already shown; a schedule whose time comes while notifications are off posts nothing, as
+   * before.
+   */
+  static String startOrUpdate(String key, String json, boolean strict) throws JSONException {
+    Context c = requireContext();
     // A key the user dismissed stays hidden until the app ends it.
-    if (!isDismissed(requireContext(), key)) post(key, new JSONObject(json), false, true);
+    if (isDismissed(c, key)) return key;
+    // Nothing can be shown: fail, as start() and update() do. A schedule
+    // posts nothing then, so no update is reported started.
+    if (strict) {
+      requireShowable(c, json);
+    } else if (!isShown(key)) {
+      String reason = notShowableReason(c, json);
+      if (reason != null) {
+        Log.w(LOG_TAG, "A scheduled live update was not shown: " + reason);
+        return key;
+      }
+    }
+    post(key, new JSONObject(json), false, true);
     return key;
   }
 
@@ -305,6 +353,63 @@ public final class LiveUpdatesBridge {
   public static String idForKey(@NonNull String key) {
     return isShown(key) ? key : null;
   }
+
+  /**
+   * State of the live update {@code id} as the system shows it: {@code active}, {@code stale}
+   * (past its endAt), {@code ended} (the notification kept after the end) or, when it is not
+   * shown, {@code dismissed} if the user swiped it away (remembered until the app ends it); else
+   * {@code null}. The id of a keyed update is its key.
+   */
+  @Nullable
+  public static String stateOf(@NonNull String id) {
+    Context c = context;
+    if (c == null) return null;
+    boolean stale;
+    synchronized (staleIds) {
+      stale = staleIds.contains(id);
+    }
+    // Posted or ended a moment ago: the system list catches up only after a
+    // moment, so this process's own record comes first.
+    long now = SystemClock.uptimeMillis();
+    boolean endedJustNow;
+    boolean postedJustNow;
+    synchronized (recentlyPosted) {
+      Long ended = recentlyEnded.get(id);
+      Long posted = recentlyPosted.get(id);
+      endedJustNow = ended != null && now - ended <= RECENT_MS;
+      postedJustNow = !endedJustNow && posted != null && now - posted <= RECENT_MS;
+    }
+    if (endedJustNow) {
+      boolean kept;
+      synchronized (keptEnded) {
+        kept = keptEnded.contains(id);
+      }
+      if (kept) return "ended";
+      return isDismissed(c, id) ? "dismissed" : null;
+    }
+    if (postedJustNow) return stale ? "stale" : "active";
+    boolean knownHere;
+    synchronized (lastPosted) {
+      knownHere = lastPosted.containsKey(id);
+    }
+    for (StatusBarNotification n : manager(c).getActiveNotifications()) {
+      if (n.getId() != NOTIFICATION_ID || !(TAG_PREFIX + id).equals(n.getTag())) continue;
+      Notification notification = n.getNotification();
+      boolean ongoing = (notification.flags & Notification.FLAG_ONGOING_EVENT) != 0;
+      if (notification.extras.getBoolean(EXTRA_STALE, false)) return "stale";
+      if (!ongoing) return "ended";
+      // After a process restart the stale state is not known here: past the
+      // endAt on the notification, it is stale (states reports it when the
+      // end alarm runs).
+      long endAt = notification.extras.getLong(EXTRA_END_AT, 0);
+      boolean pastEndAt = !knownHere && endAt > 0 && System.currentTimeMillis() >= endAt;
+      return stale || pastEndAt ? "stale" : "active";
+    }
+    return isDismissed(c, id) ? "dismissed" : null;
+  }
+
+  /** Notification extra with the endAt time (epoch ms) of an update that becomes stale then. */
+  private static final String EXTRA_END_AT = "com.ttechapp.live_updates.END_AT";
 
   /**
    * Calls {@code listener} with presses of {@code updateIds} ({@code null}:
@@ -635,11 +740,9 @@ public final class LiveUpdatesBridge {
     if (isDismissed(c, id)) {
       throw new IllegalStateException("Live update " + id + " was dismissed by the user");
     }
-    // When notifications are blocked nothing is ever shown; posting is a
-    // harmless no-op then, matching start().
-    if (!isShown(id) && manager(c).areNotificationsEnabled() && !channelBlocked(c, json)) {
-      throw new IllegalStateException("Unknown live update " + id);
-    }
+    // Nothing can be shown (the system also stops listing the update).
+    requireShowable(c, json);
+    if (!isShown(id)) throw new IllegalStateException("Unknown live update " + id);
     post(id, new JSONObject(json));
   }
 
@@ -741,6 +844,10 @@ public final class LiveUpdatesBridge {
       // Ended before (for example a repeated remote end): an ended
       // notification stays as it is.
     } else {
+      // Removed: a later end with final content must not bring it back.
+      synchronized (keptEnded) {
+        keptEnded.remove(id);
+      }
       manager(c).cancel(TAG_PREFIX + id, NOTIFICATION_ID);
     }
   }
@@ -776,7 +883,8 @@ public final class LiveUpdatesBridge {
   /** Keys of the content that an ended update does not keep. */
   private static final String[] RUNNING_ONLY_KEYS = {
     "timerStart", "timerEnd", "showChronometer", "actions", "endAt", "endedContent",
-    "removeAtEnd", "maxDurationMillis", "timeoutAfterMillis", "androidAlert",
+    "removeAtEnd", "maxDurationMillis", "timeoutAfterMillis", "androidAlert", "alert",
+    "removeAtCountdownEnd",
   };
 
   /**
@@ -845,6 +953,7 @@ public final class LiveUpdatesBridge {
     if (Build.VERSION.SDK_INT >= 36) copy.flags &= ~Notification.FLAG_PROMOTED_ONGOING;
     copy.extras.remove(EXTRA_STALE);
     copy.extras.remove(EXTRA_KEYED);
+    copy.extras.remove(EXTRA_END_AT);
     Notification.Builder b =
         Notification.Builder.recoverBuilder(c, copy)
             .setOngoing(false)
@@ -865,6 +974,7 @@ public final class LiveUpdatesBridge {
     android.os.Bundle extras = b.getExtras();
     extras.remove(EXTRA_STALE);
     extras.remove(EXTRA_KEYED);
+    extras.remove(EXTRA_END_AT);
     if (copy.publicVersion != null) b.setPublicVersion(endedLook(c, copy.publicVersion).build());
     return b;
   }
@@ -925,9 +1035,19 @@ public final class LiveUpdatesBridge {
     switch (event) {
       case "start":
         if (content == null) return false;
-        clearDismissed(requireContext(), id);
-        post(id, warnIfUntitled(new JSONObject(content)), true);
-        return true;
+        {
+          Context c = requireContext();
+          clearDismissed(c, id);
+          // Nothing could be shown: post nothing, so nothing is reported
+          // started (as for local starts and schedules).
+          String reason = notShowableReason(c, content);
+          if (reason != null) {
+            Log.w(LOG_TAG, "A remote live update was not shown: " + reason);
+            return true;
+          }
+          post(id, warnIfUntitled(new JSONObject(content)), true);
+          return true;
+        }
       case "update":
         if (content == null) return false;
         // Do not bring back an update that ended or that the user dismissed.
@@ -1012,6 +1132,7 @@ public final class LiveUpdatesBridge {
   public static void schedule(
       @NonNull String key, @NonNull String json, long atMillis, boolean exact, long windowMillis)
       throws JSONException {
+    requireShowableNow(key, json, atMillis);
     LiveUpdatesScheduler.schedule(requireContext(), key, json, atMillis, exact, windowMillis);
   }
 
@@ -1021,7 +1142,20 @@ public final class LiveUpdatesBridge {
    */
   public static void reschedule(@NonNull String key, @Nullable String json, long atMillis)
       throws JSONException {
+    // Not for a key without a schedule: the scheduler reports that.
+    String stored = LiveUpdatesScheduler.storedJson(requireContext(), key);
+    if (stored != null) requireShowableNow(key, json != null ? json : stored, atMillis);
     LiveUpdatesScheduler.reschedule(requireContext(), key, json, atMillis);
+  }
+
+  /**
+   * A schedule for a time that has passed shows its update now: it fails as startOrUpdate does
+   * (not for a key the user dismissed, which startOrUpdate leaves alone).
+   */
+  private static void requireShowableNow(String key, @Nullable String json, long atMillis) {
+    Context c = requireContext();
+    if (json == null || atMillis > System.currentTimeMillis() || isDismissed(c, key)) return;
+    requireShowable(c, json);
   }
 
   /** Scheduled live updates as a JSON array of {@code {"key", "at"}} (epoch seconds). */
@@ -1225,12 +1359,32 @@ public final class LiveUpdatesBridge {
     // but not cancelled by a tap, as the update keeps running.
     Notification.Builder b =
         stale ? builder(c, content, remote, true).setAutoCancel(false) : builder(c, content, remote);
-    if (content.optBoolean("androidAlert", false) && !mayAlert(id)) b.setOnlyAlertOnce(true);
+    if (wantsAlert(content, remote) && !mayAlert(id)) b.setOnlyAlertOnce(true);
     // The system sends the delete intent for timeouts too; the deadline lets
     // the receiver tell them from a swipe.
     long timeout = content.optLong("timeoutAfterMillis", 0);
     if (timeout > 0) timeout = Math.max(timeout, MIN_TIMEOUT_MS);
     if (removeAt > 0 && (timeout <= 0 || removeAt - now < timeout)) timeout = removeAt - now;
+    // A notification's countdown cannot stop at zero and would run below it
+    // (iOS stops at zero): the update is removed when it ends, unless
+    // removeAtCountdownEnd is false, or endedContent replaces it by then
+    // (without the timer) on time, which needs exact alarms.
+    double countdownEnd = content.optDouble("timerEnd", Double.NaN);
+    if (!stale && isTime(countdownEnd) && content.optBoolean("removeAtCountdownEnd", true)) {
+      long end = (long) (countdownEnd * 1000);
+      boolean replacedFirst =
+          staleAtEnd
+              && endedContent != null
+              && endAt <= end
+              && LiveUpdatesScheduler.canScheduleExactly(c);
+      // When the ended content should replace it first, a later removal
+      // still covers an alarm that never comes (the user can revoke exact
+      // alarms, which cancels them); the replacement resets it.
+      long left = (replacedFirst ? end + ENDED_CONTENT_GRACE_MS : end) - now;
+      // A payload cannot make an update vanish at once (as timeoutAfter).
+      if (remote) left = Math.max(left, MIN_TIMEOUT_MS);
+      if (end > now && (timeout <= 0 || left < timeout)) timeout = left;
+    }
     long deadline = 0;
     if (timeout > 0 && Build.VERSION.SDK_INT >= 26) {
       b.setTimeoutAfter(timeout);
@@ -1241,6 +1395,8 @@ public final class LiveUpdatesBridge {
     android.os.Bundle extras = new android.os.Bundle();
     if (keyed || keyForId(id) != null) extras.putBoolean(EXTRA_KEYED, true);
     if (stale) extras.putBoolean(EXTRA_STALE, true);
+    // Lets stateOf() tell a stale update after a process restart.
+    if (staleAtEnd) extras.putLong(EXTRA_END_AT, endAt);
     if (!extras.isEmpty()) b.addExtras(extras);
     if (!stale) addActions(c, b, id, content);
     synchronized (lastPosted) {
@@ -1441,7 +1597,7 @@ public final class LiveUpdatesBridge {
     b.setContentTitle(content.optString("title"))
         .setOngoing(true)
         // Only the first post alerts, unless this post asks to.
-        .setOnlyAlertOnce(!content.optBoolean("androidAlert", false))
+        .setOnlyAlertOnce(!wantsAlert(content, remote))
         .setSmallIcon(smallIcon(c, content));
     String body = optString(content, "body");
     if (body != null) {
@@ -1464,17 +1620,15 @@ public final class LiveUpdatesBridge {
     double timerEnd = content.optDouble("timerEnd", Double.NaN);
     double timerStart = content.optDouble("timerStart", Double.NaN);
     boolean countdown = isTime(timerEnd);
-    if (countdown || isTime(timerStart)) {
+    // A countdown that is over would show below zero: no timer then.
+    boolean over = countdown && timerEnd * 1000 <= System.currentTimeMillis();
+    if (!over && (countdown || isTime(timerStart))) {
       b.setWhen((long) ((countdown ? timerEnd : timerStart) * 1000))
           .setShowWhen(true)
           .setUsesChronometer(true)
           .setChronometerCountDown(countdown);
     }
-    long timeout = content.optLong("timeoutAfterMillis", 0);
-    if (timeout > 0 && Build.VERSION.SDK_INT >= 26) {
-      // Not shorter than a minute, so a payload cannot make an update vanish at once.
-      b.setTimeoutAfter(Math.max(timeout, MIN_TIMEOUT_MS));
-    }
+    // timeoutAfterMillis is applied by post(), with the other time limits.
 
     String route = optString(content, "route");
     PendingIntent tap = tapIntent(c, route);
@@ -1709,6 +1863,15 @@ public final class LiveUpdatesBridge {
   /** At most one requested alert per update in this interval (remote payloads included). */
   private static final long MIN_ALERT_INTERVAL_MS = 10_000;
 
+  /**
+   * Whether this post should alert: {@code androidAlert} when given, else in a remote payload the
+   * iOS {@code alert} object, so one content alerts on both platforms.
+   */
+  static boolean wantsAlert(JSONObject content, boolean remote) {
+    if (content.has("androidAlert")) return content.optBoolean("androidAlert", false);
+    return remote && content.optJSONObject("alert") != null;
+  }
+
   private static final Map<String, Long> lastAlert = new HashMap<>();
 
   private static boolean mayAlert(String id) {
@@ -1726,6 +1889,9 @@ public final class LiveUpdatesBridge {
   }
 
   private static final long MIN_TIMEOUT_MS = 60_000;
+
+  /** Longest window Android gives an inexact alarm: the ended content comes by then. */
+  private static final long ENDED_CONTENT_GRACE_MS = 10 * 60_000;
 
   /** Limits for remote payloads; the system draws far fewer anyway. */
   private static final int MAX_PROGRESS_PARTS = 20;

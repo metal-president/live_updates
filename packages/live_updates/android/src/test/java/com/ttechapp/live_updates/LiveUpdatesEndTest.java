@@ -112,6 +112,112 @@ public class LiveUpdatesEndTest {
   }
 
   @Test
+  public void aCountdownRemovesTheUpdateWhenItEnds() throws Exception {
+    long eta = System.currentTimeMillis() + 20 * MINUTE;
+    LiveUpdatesBridge.startOrUpdate("order", "{\"title\":\"Order\",\"timerEnd\":" + seconds(eta) + "}");
+    Notification n = shown("order");
+    assertAbout(20 * MINUTE, n.getTimeoutAfter());
+    assertTrue(n.extras.getBoolean(Notification.EXTRA_SHOW_CHRONOMETER));
+    // An earlier limit still wins.
+    LiveUpdatesBridge.startOrUpdate(
+        "short",
+        "{\"title\":\"A\",\"timerEnd\":" + seconds(eta) + ",\"maxDurationMillis\":" + MINUTE + "}");
+    assertAbout(MINUTE, shown("short").getTimeoutAfter());
+  }
+
+  @Test
+  public void endedContentAtTheCountdownEndWinsOverTheRemoval() throws Exception {
+    long eta = System.currentTimeMillis() + 20 * MINUTE;
+    LiveUpdatesBridge.startOrUpdate(
+        "order",
+        "{\"title\":\"Order\",\"timerEnd\":" + seconds(eta) + ",\"endAt\":" + seconds(eta)
+            + ",\"endedContent\":{\"title\":\"Delivered\"}}");
+    // Removed 10 minutes after the countdown should the alarm never come.
+    assertAbout(30 * MINUTE, shown("order").getTimeoutAfter());
+    fireEndAlarm();
+    assertEquals("Delivered", shown("order").extras.getString(Notification.EXTRA_TITLE));
+  }
+
+  @Test
+  public void withoutExactAlarmsTheCountdownRemovalWins() throws Exception {
+    ShadowAlarmManager.setCanScheduleExactAlarms(false);
+    long eta = System.currentTimeMillis() + 20 * MINUTE;
+    LiveUpdatesBridge.startOrUpdate(
+        "order",
+        "{\"title\":\"Order\",\"timerEnd\":" + seconds(eta) + ",\"endAt\":" + seconds(eta)
+            + ",\"endedContent\":{\"title\":\"Delivered\"}}");
+    // The ended content could come up to 10 minutes late.
+    assertAbout(20 * MINUTE, shown("order").getTimeoutAfter());
+  }
+
+  @Test
+  public void aRemoteCountdownCannotRemoveTheUpdateAtOnce() throws Exception {
+    JSONObject data =
+        new JSONObject()
+            .put("live_updates_event", "start")
+            .put("live_updates_id", "r")
+            .put(
+                "live_updates_content",
+                "{\"title\":\"R\",\"timerEnd\":" + seconds(System.currentTimeMillis() + 50) + "}");
+    assertTrue(LiveUpdatesBridge.handleRemotePayload(data.toString()));
+    assertAbout(MINUTE, shown("r").getTimeoutAfter());
+  }
+
+  @Test
+  public void removeAtCountdownEndFalseKeepsTheUpdate() throws Exception {
+    long eta = System.currentTimeMillis() + 20 * MINUTE;
+    LiveUpdatesBridge.startOrUpdate(
+        "order",
+        "{\"title\":\"Order\",\"timerEnd\":" + seconds(eta) + ",\"removeAtCountdownEnd\":false}");
+    assertAbout(8 * HOUR, shown("order").getTimeoutAfter());
+  }
+
+  @Test
+  public void aCountdownThatIsOverIsNotShown() throws Exception {
+    long past = System.currentTimeMillis() - MINUTE;
+    LiveUpdatesBridge.startOrUpdate("order", "{\"title\":\"Order\",\"timerEnd\":" + seconds(past) + "}");
+    Notification n = shown("order");
+    assertFalse(n.extras.getBoolean(Notification.EXTRA_SHOW_CHRONOMETER));
+    // Not removed at once: only the timer is left out.
+    assertAbout(8 * HOUR, n.getTimeoutAfter());
+  }
+
+  @Test
+  public void stateOfReportsWhatTheSystemShows() throws Exception {
+    assertNull(LiveUpdatesBridge.stateOf("st-order"));
+    long endAt = System.currentTimeMillis() + 20 * MINUTE;
+    LiveUpdatesBridge.startOrUpdate(
+        "st-order", "{\"title\":\"Order\",\"endAt\":" + seconds(endAt) + "}");
+    assertEquals("active", LiveUpdatesBridge.stateOf("st-order"));
+    fireEndAlarm();
+    assertEquals("stale", LiveUpdatesBridge.stateOf("st-order"));
+    // After a process restart: from the endAt on the shown notification.
+    LiveUpdatesBridge.forgetPostsInProcess("st-order");
+    assertEquals("stale", LiveUpdatesBridge.stateOf("st-order"));
+    LiveUpdatesBridge.end("st-order", null, -1);
+    assertEquals("ended", LiveUpdatesBridge.stateOf("st-order"));
+    LiveUpdatesBridge.end("st-order", null, 0);
+    assertNull(LiveUpdatesBridge.stateOf("st-order"));
+    // A dismissal is remembered until the app ends the update.
+    LiveUpdatesBridge.startOrUpdate("d", "{\"title\":\"D\"}");
+    manager.cancel(LiveUpdatesBridge.TAG_PREFIX + "d", LiveUpdatesBridge.NOTIFICATION_ID);
+    LiveUpdatesBridge.markDismissed(app, "d");
+    LiveUpdatesBridge.forgetPostsInProcess("d");
+    assertEquals("dismissed", LiveUpdatesBridge.stateOf("d"));
+  }
+
+  @Test
+  public void endedContentAtEndAtIsStale() throws Exception {
+    long endAt = System.currentTimeMillis() + 20 * MINUTE;
+    LiveUpdatesBridge.startOrUpdate(
+        "order",
+        "{\"title\":\"Order\",\"endAt\":" + seconds(endAt)
+            + ",\"endedContent\":{\"title\":\"Delivered\"}}");
+    fireEndAlarm();
+    assertEquals("stale", LiveUpdatesBridge.stateOf("order"));
+  }
+
+  @Test
   public void maxDurationZeroMeansNoLimit() throws Exception {
     LiveUpdatesBridge.startOrUpdate("order", "{\"title\":\"Order\",\"maxDurationMillis\":0}");
     assertEquals(0, shown("order").getTimeoutAfter());

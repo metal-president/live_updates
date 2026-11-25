@@ -62,11 +62,24 @@ extension LiveUpdateContentJson on LiveUpdateContent {
             'androidIcon': ?a.androidIcon?.toJson(),
           },
       ],
+    // The iOS alert option wins over the shared one.
+    if (ios?.alert case final a?)
+      'alert': {'title': a.title, 'body': a.body, 'sound': ?a.sound}
+    // Without its own text, the shared alert shows the public text when the
+    // content has one: it can appear on a locked device.
+    else if (alert case final a?)
+      'alert': {
+        'title': a.title ?? publicContent?.title ?? title,
+        'body':
+            a.body ??
+            (publicContent != null ? publicContent!.body : body) ??
+            '',
+      },
+    // Not 'alert': that key holds the iOS alert.
+    if ((android?.alert ?? false) || alert != null) 'androidAlert': true,
     if (ios case final ios?) ...{
       'extra': ios.extra,
       'relevanceScore': ?ios.relevanceScore,
-      if (ios.alert case final a?)
-        'alert': {'title': a.title, 'body': a.body, 'sound': ?a.sound},
       'compactLeading': ?ios.compactLeading?.value,
       'compactTrailing': ?ios.compactTrailing?.value,
       'minimal': ?ios.minimal?.value,
@@ -111,8 +124,6 @@ extension LiveUpdateContentJson on LiveUpdateContent {
         ],
       'progressTrackerIcon': ?a.progressTrackerIcon?.toJson(),
       'timeoutAfterMillis': ?a.timeoutAfter?.inMilliseconds,
-      // Not 'alert': that key holds the iOS alert.
-      if (a.alert) 'androidAlert': true,
       if (a.lockScreenVisibility != AndroidLockScreenVisibility.private)
         'androidLockScreenVisibility': a.lockScreenVisibility.name,
       // Absent means the default (8 hours); 0 means no limit.
@@ -123,6 +134,7 @@ extension LiveUpdateContentJson on LiveUpdateContent {
           final d => d.inMilliseconds < 1 ? 1 : d.inMilliseconds,
         },
       if (a.removeAtEnd) 'removeAtEnd': true,
+      if (!a.removeAtCountdownEnd) 'removeAtCountdownEnd': false,
     },
   };
 }

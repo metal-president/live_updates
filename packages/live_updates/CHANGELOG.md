@@ -25,6 +25,38 @@
   `endAt` has not shown yet no longer appears on it (one already shown
   stays), as on Android. An activity that already ended, for example by a
   push, keeps what it shows.
+- **Breaking (Android):** `start`, `startOrUpdate` and `update` throw a
+  `LiveUpdateException` while notifications are turned off for the app or
+  for its channel (or its channel group), as iOS does with Live Activities
+  turned off. Before, they returned as if the update were shown (`start`
+  even reported `started`). `schedule` and `reschedule` throw too for a time
+  that has passed (they show the update now). Scheduled updates whose time
+  comes while notifications are off are still dropped without an error.
+- **Breaking (Android remote payloads):** an `alert` object in
+  `live_updates_content` now alerts (sound and vibration), so one content
+  alerts on both platforms. Send `"androidAlert": false` to keep such an
+  update silent.
+- `LiveUpdateContent.alert` (`LiveUpdateAlert`): one alert for both
+  platforms, mapped to the iOS alert (the content's title and body, or its
+  public text, unless set) and to Android's alert. The platform options
+  still work and the iOS one takes precedence. `copyWith` does not carry it
+  over.
+- iOS: the default alert of a scheduled start uses the public text when
+  the content has one.
+- Docs: `stale` is reported on both platforms (since 0.3.0), and `ended`
+  also after Android's `maxDuration` and `removeAtEnd`.
+- **Breaking (Android):** a notification with a countdown
+  (`LiveUpdateTimer.countdown`) is removed when the countdown ends, exactly
+  and even if the app is not running, instead of counting below zero (iOS
+  stops at zero); the update reports `ended`. The timer of a countdown that
+  is already over is left out. `AndroidLiveUpdateOptions.removeAtCountdownEnd: false`
+  (remote: `"removeAtCountdownEnd": false`) keeps the notification.
+- `LiveUpdate.state()` and `LiveUpdates.stateOf(key)`: the current state
+  (`active`, `stale`, `ended` while still shown, `dismissed`) without
+  waiting for `states`, for example to set up the UI after a restart.
+  `stateOf` also reports updates that have ended. Android keeps reporting
+  `dismissed` until the app ends the update; iOS while it lists the
+  activity.
 
 ## 0.3.0
 

@@ -408,6 +408,15 @@ public class LiveUpdatesBridgeTest {
   }
 
   @Test
+  public void finalContentDoesNotBringBackAnUpdateRemovedAMomentAgo() throws Exception {
+    String id = LiveUpdatesBridge.start("{\"title\":\"Order\"}");
+    LiveUpdatesBridge.end(id, null, -1);
+    LiveUpdatesBridge.end(id, null, 0);
+    LiveUpdatesBridge.end(id, "{\"title\":\"Delivered\"}", -1);
+    assertEquals(null, shown(id));
+  }
+
+  @Test
   public void endAllAlsoRemovesEndedUpdates() throws Exception {
     String a = LiveUpdatesBridge.start("{\"title\":\"A\"}");
     String b = LiveUpdatesBridge.start("{\"title\":\"B\"}");
@@ -573,12 +582,147 @@ public class LiveUpdatesBridgeTest {
   }
 
   @Test
-  public void updateToABlockedChannelDoesNotThrow() throws Exception {
-    // The user turned the channel off: the system never lists the posts.
+  public void theIosAlertOfARemotePayloadAlertsOnAndroidToo() throws Exception {
+    JSONObject withAlert = new JSONObject("{\"title\":\"A\",\"alert\":{\"title\":\"t\",\"body\":\"b\"}}");
+    assertTrue(LiveUpdatesBridge.wantsAlert(withAlert, true));
+    // Local content says androidAlert itself (the iOS option alone does not alert).
+    assertFalse(LiveUpdatesBridge.wantsAlert(withAlert, false));
+    assertTrue(LiveUpdatesBridge.wantsAlert(new JSONObject("{\"androidAlert\":true}"), false));
+    assertFalse(LiveUpdatesBridge.wantsAlert(new JSONObject("{\"alert\":true}"), true));
+    // An explicit androidAlert wins.
+    withAlert.put("androidAlert", false);
+    assertFalse(LiveUpdatesBridge.wantsAlert(withAlert, true));
+    // What stays after the end does not alert.
+    assertFalse(LiveUpdatesBridge.endedContent(withAlert).has("alert"));
+  }
+
+  @Test
+  public void startFailsWhenNotificationsAreOff() throws Exception {
+    List<String> events = new ArrayList<>();
+    LiveUpdatesBridge.observeEvents(events::add, 1);
+    shadowOf(manager).setNotificationsEnabled(false);
+    try {
+      LiveUpdatesBridge.start("{\"title\":\"A\"}");
+      org.junit.Assert.fail("start must fail");
+    } catch (IllegalStateException expected) {
+      // As iOS with Live Activities turned off.
+    }
+    try {
+      LiveUpdatesBridge.startOrUpdate("off-key", "{\"title\":\"A\"}");
+      org.junit.Assert.fail("startOrUpdate must fail");
+    } catch (IllegalStateException expected) {
+      // Same.
+    }
+    try {
+      // A time that has passed shows it now, as startOrUpdate.
+      LiveUpdatesBridge.schedule("off-key", "{\"title\":\"A\"}", 0, true, 0);
+      org.junit.Assert.fail("schedule for now must fail");
+    } catch (IllegalStateException expected) {
+      // Same.
+    }
+    // Rescheduling to now as well; a later time is kept for later.
+    shadowOf(manager).setNotificationsEnabled(true);
+    long later = System.currentTimeMillis() + 3_600_000;
+    LiveUpdatesBridge.schedule("off-key", "{\"title\":\"A\"}", later, true, 0);
+    shadowOf(manager).setNotificationsEnabled(false);
+    LiveUpdatesBridge.reschedule("off-key", null, later + 60_000);
+    try {
+      LiveUpdatesBridge.reschedule("off-key", null, 0);
+      org.junit.Assert.fail("reschedule to now must fail");
+    } catch (IllegalStateException expected) {
+      // Same.
+    }
+    LiveUpdatesBridge.cancelScheduled("off-key");
+    // A schedule whose time comes now posts nothing and reports nothing.
+    assertEquals("off-key", LiveUpdatesBridge.startOrUpdate("off-key", "{\"title\":\"A\"}", false));
+    // Rescheduling a key without a schedule reports that, not the setting.
+    try {
+      LiveUpdatesBridge.reschedule("no-schedule", "{\"title\":\"A\"}", 0);
+      org.junit.Assert.fail("reschedule without a schedule must fail");
+    } catch (IllegalStateException expected) {
+      assertTrue(expected.getMessage().contains("No live update is scheduled"));
+    }
+    assertTrue(events.isEmpty());
+    assertFalse(Arrays.asList(LiveUpdatesBridge.activeIds()).contains("off-key"));
+    shadowOf(manager).setNotificationsEnabled(true);
+  }
+
+  @Test
+  public void updatesFailOnceTheChannelIsTurnedOff() throws Exception {
+    LiveUpdatesBridge.startOrUpdate("shown-key", "{\"title\":\"A\",\"channelId\":\"later-off\"}");
+    manager.getNotificationChannel("later-off").setImportance(NotificationManager.IMPORTANCE_NONE);
+    for (Runnable call :
+        new Runnable[] {
+          () -> {
+            try {
+              LiveUpdatesBridge.startOrUpdate(
+                  "shown-key", "{\"title\":\"B\",\"channelId\":\"later-off\"}");
+            } catch (org.json.JSONException e) {
+              throw new AssertionError(e);
+            }
+          },
+          () -> {
+            try {
+              LiveUpdatesBridge.update("shown-key", "{\"title\":\"B\",\"channelId\":\"later-off\"}");
+            } catch (org.json.JSONException e) {
+              throw new AssertionError(e);
+            }
+          },
+        }) {
+      try {
+        call.run();
+        org.junit.Assert.fail("must fail while nothing can be shown");
+      } catch (IllegalStateException expected) {
+        // As start().
+      }
+    }
+  }
+
+  @Test
+  @Config(sdk = 36)
+  public void startFailsWhenTheChannelGroupIsOff() throws Exception {
+    android.app.NotificationChannelGroup group =
+        new android.app.NotificationChannelGroup("g", "Group");
+    // setBlocked is hidden from the SDK stubs.
+    android.app.NotificationChannelGroup.class
+        .getMethod("setBlocked", boolean.class)
+        .invoke(group, true);
+    manager.createNotificationChannelGroup(group);
+    android.app.NotificationChannel channel =
+        new android.app.NotificationChannel("grouped", "Grouped", NotificationManager.IMPORTANCE_DEFAULT);
+    channel.setGroup("g");
+    manager.createNotificationChannel(channel);
+    try {
+      LiveUpdatesBridge.start("{\"title\":\"A\",\"channelId\":\"grouped\"}");
+      org.junit.Assert.fail("start must fail");
+    } catch (IllegalStateException expected) {
+      // The user turned that channel's group off.
+    }
+  }
+
+  @Test
+  public void aRemoteStartWhileNotificationsAreOffReportsNothing() throws Exception {
+    List<String> events = new ArrayList<>();
+    LiveUpdatesBridge.observeEvents(events::add, 1);
+    shadowOf(manager).setNotificationsEnabled(false);
+    assertTrue(remote("start", "r-off", "{\"title\":\"A\"}"));
+    shadowOf(manager).setNotificationsEnabled(true);
+    assertEquals(null, shown("r-off"));
+    assertTrue(events.isEmpty());
+    assertFalse(Arrays.asList(LiveUpdatesBridge.activeIds()).contains("r-off"));
+  }
+
+  @Test
+  public void startFailsOnABlockedChannel() throws Exception {
     manager.createNotificationChannel(
         new android.app.NotificationChannel(
             "off", "Off", NotificationManager.IMPORTANCE_NONE));
-    LiveUpdatesBridge.update("never-listed", "{\"title\":\"A\",\"channelId\":\"off\"}");
+    try {
+      LiveUpdatesBridge.start("{\"title\":\"A\",\"channelId\":\"off\"}");
+      org.junit.Assert.fail("start must fail");
+    } catch (IllegalStateException expected) {
+      // The user turned that channel off.
+    }
   }
 
   @Test

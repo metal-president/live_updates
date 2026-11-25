@@ -1,3 +1,9 @@
+## 0.4.0
+
+- Requires live_updates 0.4.0.
+- `tokens()` reports a token again when it changes back to an earlier value
+  (A, B, A): before, the second A was dropped and the server kept B.
+
 ## 0.3.0
 
 - Requires live_updates 0.3.0 (scheduled live updates, `endAt` and

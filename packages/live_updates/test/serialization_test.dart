@@ -204,6 +204,59 @@ void main() {
     expect(json['alert'], {'title': 'a', 'body': 'b'});
   });
 
+  test('removeAtCountdownEnd is sent only when turned off', () {
+    expect(
+      const LiveUpdateContent(
+        title: 't',
+        android: AndroidLiveUpdateOptions(),
+      ).toJson().containsKey('removeAtCountdownEnd'),
+      isFalse,
+    );
+    expect(
+      const LiveUpdateContent(
+        title: 't',
+        android: AndroidLiveUpdateOptions(removeAtCountdownEnd: false),
+      ).toJson()['removeAtCountdownEnd'],
+      isFalse,
+    );
+  });
+
+  test('a shared alert maps to both platforms', () {
+    final json = const LiveUpdateContent(
+      title: 'Order',
+      body: 'Here',
+      alert: LiveUpdateAlert(),
+    ).toJson();
+    expect(json['alert'], {'title': 'Order', 'body': 'Here'});
+    expect(json['androidAlert'], isTrue);
+    final custom = const LiveUpdateContent(
+      title: 'Order',
+      alert: LiveUpdateAlert(title: 'Arrived', body: 'At the door'),
+    ).toJson();
+    expect(custom['alert'], {'title': 'Arrived', 'body': 'At the door'});
+    // The iOS option wins on iOS; Android still alerts.
+    final both = const LiveUpdateContent(
+      title: 'Order',
+      alert: LiveUpdateAlert(),
+      ios: IosLiveUpdateOptions(
+        alert: IosAlert(title: 'i', body: 'b', sound: 's.caf'),
+      ),
+    ).toJson();
+    expect(both['alert'], {'title': 'i', 'body': 'b', 'sound': 's.caf'});
+    expect(both['androidAlert'], isTrue);
+    // Without its own text, the public text (it can show when locked).
+    final private = const LiveUpdateContent(
+      title: 'Prescription for J. Doe',
+      body: 'Ready',
+      publicContent: LiveUpdatePublicContent(title: 'Order ready'),
+      alert: LiveUpdateAlert(),
+    ).toJson();
+    expect(private['alert'], {'title': 'Order ready', 'body': ''});
+    final none = const LiveUpdateContent(title: 'Order').toJson();
+    expect(none.containsKey('alert'), isFalse);
+    expect(none.containsKey('androidAlert'), isFalse);
+  });
+
   test('dynamic island choices', () {
     final json = const LiveUpdateContent(
       title: 't',

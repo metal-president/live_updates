@@ -72,7 +72,8 @@ final class LiveUpdatesToken {
 /// push-to-start tokens and the push tokens of every live update that is
 /// running or starts later. Token sources replay their current value to new
 /// listeners, so subscribing late or again still yields the current tokens.
-/// Each distinct token is emitted once per listener.
+/// A token is emitted when it differs from the previous one of its kind (and
+/// live update), so a token that changes back is reported again.
 @internal
 Stream<LiveUpdatesToken> mergeTokens({
   required Stream<String> installationIds,
@@ -82,10 +83,16 @@ Stream<LiveUpdatesToken> mergeTokens({
   var active = true;
   final subscriptions = <StreamSubscription<Object?>>[];
   final perUpdate = <String, List<StreamSubscription<Object?>>>{};
-  final seen = <LiveUpdatesToken>{};
+  // The latest token of each kind (and live update): a token that changes
+  // back (A, B, A) must reach the server again.
+  final latest = <(LiveUpdatesTokenType, String?), String>{};
 
   void emit(LiveUpdatesToken token) {
-    if (active && seen.add(token)) listener.add(token);
+    if (!active) return;
+    final kind = (token.type, token.updateId);
+    if (latest[kind] == token.value) return;
+    latest[kind] = token.value;
+    listener.add(token);
   }
 
   void error(Object e, StackTrace s) {

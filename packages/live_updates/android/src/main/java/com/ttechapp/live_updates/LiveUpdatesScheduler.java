@@ -111,6 +111,15 @@ final class LiveUpdatesScheduler {
     arm(c, key, entry);
   }
 
+  /** Stored content of the schedule with {@code key}, or {@code null}. */
+  @Nullable
+  static String storedJson(Context c, String key) {
+    synchronized (lock) {
+      JSONObject entry = read(c).optJSONObject(key);
+      return entry == null ? null : entry.optString("json", null);
+    }
+  }
+
   /**
    * Moves the schedule with {@code key} to {@code atMillis}, with {@code json} as its content
    * when given. Throws when nothing is scheduled with {@code key}.
@@ -335,7 +344,7 @@ final class LiveUpdatesScheduler {
     // context yet.
     if (LiveUpdatesBridge.context == null) LiveUpdatesBridge.context = c.getApplicationContext();
     try {
-      LiveUpdatesBridge.startOrUpdate(key, entry.getString("json"));
+      LiveUpdatesBridge.startOrUpdate(key, entry.getString("json"), false);
     } catch (JSONException | RuntimeException e) {
       // Only the type: messages of JSON errors can quote the content.
       Log.e(LOG_TAG, "Could not show a scheduled live update: " + e.getClass().getName());

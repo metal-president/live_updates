@@ -40,6 +40,14 @@ class FakePlatform extends NoopLiveUpdatesPlatform {
 
   @override
   Stream<String> get taps => taps$.stream;
+
+  @override
+  Future<String?> stateForId(String id) async =>
+      {'a1': 'stale', 'a2': 'ended'}[id];
+
+  @override
+  Future<String?> stateForKey(String key) async =>
+      {'order-1': 'dismissed', 'later': 'pending'}[key];
 }
 
 void main() {
@@ -53,6 +61,16 @@ void main() {
     await u.update(const LiveUpdateContent(title: 'Pizza', progress: .5));
     await u.end(dismissAfter: const Duration(seconds: 3));
     expect(fake.calls, ['start:Pizza', 'update:a1:0.5', 'end:a1:3']);
+  });
+
+  test('state and stateOf report the current state', () async {
+    final [a1, a2] = await LiveUpdates.active();
+    expect(await a1.state(), LiveUpdateState.stale);
+    expect(await a2.state(), LiveUpdateState.ended);
+    expect(await LiveUpdates.stateOf('order-1'), LiveUpdateState.dismissed);
+    // A state the API does not know (such as a scheduled one) is null.
+    expect(await LiveUpdates.stateOf('later'), isNull);
+    expect(await LiveUpdates.stateOf('order-2'), isNull);
   });
 
   test('isPromoted asks the platform for that update', () async {

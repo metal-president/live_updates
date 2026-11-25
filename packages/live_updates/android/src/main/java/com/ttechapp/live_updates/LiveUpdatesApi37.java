@@ -207,12 +207,16 @@ final class LiveUpdatesApi37 {
     return text.substring(0, end);
   }
 
-  private static boolean warned;
+  /** Messages already logged. */
+  private static final java.util.Set<String> warned =
+      java.util.Collections.synchronizedSet(new java.util.HashSet<>());
 
-  /** Logs the first failure only, so a missing API does not log on every post. */
+  /**
+   * Logs the first failure of each kind ({@code message}) only, so a missing API does not log on
+   * every post and a failure of another API is still logged.
+   */
   private static void warn(String message, Throwable e) {
-    if (warned) return;
-    warned = true;
+    if (!warned.add(message)) return;
     Log.w(TAG, message, e);
   }
 }

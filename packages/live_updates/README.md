@@ -26,7 +26,7 @@ iOS **Live Activities** and Android **Live Update** notifications with one Dart 
 In this README, a *live update* is either a Live Activity (iOS) or a Live
 Update notification (Android).
 
-> **Status:** 0.3.x. Breaking changes come with a new minor version (0.4.0); pin the version you test with.
+> **Status:** 0.4.x. Breaking changes come with a new minor version (0.5.0); pin the version you test with.
 
 | iOS Lock Screen | iOS Dynamic Island |
 | --- | --- |
@@ -58,7 +58,7 @@ Activities need iOS 17.2: on iOS 15.0 to 17.1 every call does nothing and
 | --- | --- | --- | --- | --- |
 | Start / update / end | Live Activity | Live Update (when promoted) | Ongoing notification | no-op |
 | Progress | ✓ | `ProgressStyle` (segments, points) | progress bar | |
-| Timer (countdown, stopwatch) | ✓ | chronometer | chronometer | |
+| Timer (countdown, stopwatch) | ✓ (a countdown stops at zero) | chronometer (removed when a countdown ends) | chronometer (removed when a countdown ends, Android 8+) | |
 | Metrics | `metrics` layout | Android 17 `MetricStyle`, else text | text | |
 | Steps, journey | `stepper`, `journey` layouts | progress segments and points, text | progress bar, text | |
 | Semantic colors | – | Android 17+ | – | |
@@ -178,7 +178,9 @@ Interface Guidelines for Live Activities and Android's
   notification.
 - Do not bring back an update the user dismissed. On Android `update` fails
   for a dismissed update, and remote `update` payloads for it are ignored.
-  `startOrUpdate` does not show a dismissed key again until you `end` it on
+  A remote `start` (or an iOS push-to-start) shows it again: send one only
+  for a new activity. `startOrUpdate` does not show a dismissed key again
+  until you `end` it on
   Android; iOS cannot always tell a dismissal from other ends (for example
   while the app is not running), so there the key can start again once the
   system no longer lists the dismissed activity. Use a new key for a new
@@ -264,13 +266,20 @@ differently.
   shown as the remaining time. ([source][android-live-update])
 - **Permissions:** on Android 13 and later nothing is shown until the user
   grants the notification permission, including updates started by a
-  remote message. ([source][android-permission])
+  remote message. ([source][android-permission]) While notifications are
+  turned off for the app or for its channel, `start`, `startOrUpdate` and
+  `update` throw a `LiveUpdateException`, as on iOS with Live Activities
+  turned off (from 0.4.0), and so do `schedule` and `reschedule` for a time
+  that has passed. A schedule whose time comes then shows nothing. `isSupported()` tells you beforehand
+  whether notifications are on for the app; a turned-off channel shows only
+  in the exception.
 - **After `end`:** from 0.4.0 the final content (or the content shown last)
   stays as a regular notification for up to 4 hours, like on iOS, and the
   user can swipe it away. Running timers (and timer or stopwatch metrics)
   are left out of it, so a countdown does not run past zero. This applies to
   `end` and remote `end` payloads; an update removed by `maxDuration`,
-  `timeoutAfter` or `removeAtEnd` is removed at once. Unlike iOS, Android
+  `timeoutAfter`, `removeAtEnd` or at the end of a countdown is removed at
+  once. Unlike iOS, Android
   does not report `dismissed` when the ended notification goes away.
   `dismissAfter` longer than 4 hours is capped at 4 hours; `Duration.zero`
   removes it at once. Below Android 8.0 the system cannot remove a
@@ -333,7 +342,7 @@ Future<void> trackOrder() async {
     const LiveUpdateContent(title: 'Order #1234', body: 'On the way', progress: 0.6),
   );
 
-  // Lifecycle: stale (iOS), ended, dismissed (e.g. swiped away on Android).
+  // Lifecycle: stale (at endAt), ended, dismissed (e.g. swiped away).
   update.states.listen((state) => print(state));
 
   // The last content stays for 5 minutes: on the iOS Lock Screen, and on
@@ -354,11 +363,45 @@ LiveUpdates.onTap.listen((route) => router.go(route));
 // Live updates still running, e.g. after an app restart.
 final running = await LiveUpdates.active();
 
+// The current state, to set up your UI after a restart (null when gone):
+// active, stale (past endAt), ended (still shown after end) or dismissed.
+final state = await LiveUpdates.stateOf('order-1234'); // or update.state()
+
 // Live updates that appear while the app runs, including remote starts.
 LiveUpdates.onStarted.listen((update) => track(update));
 
 await LiveUpdates.endAll();
 ```
+
+### When the app is closed
+
+Live updates keep showing after the user closes the app, for example by
+swiping it away in the app switcher: that is what they are for, and remote
+updates keep them current. The plugin does not end them then, because
+neither platform tells an app reliably that it is being closed. iOS calls
+`applicationWillTerminate` only when the app is not suspended
+([source][ios-will-terminate]), and Android reports a removed task only to a
+running service ([source][android-task-removed]), which the system stops in
+the background ([source][android-background-limits]).
+
+To make sure updates do not outlive their purpose, use what always works:
+
+- **At the next start**, end what the previous session left, for example
+  when your app only shows updates while it is in use:
+
+  ```dart
+  await LiveUpdates.endAll();
+  ```
+
+- **By time:** `endAt` with `endedContent`, a countdown (removed on Android
+  when it ends), `AndroidLiveUpdateOptions.timeoutAfter` and `maxDuration`
+  end or remove an update the app never ends.
+- **From your server:** send an `end` when the activity or the session is
+  over (see [Remote updates](#remote-updates)).
+
+[ios-will-terminate]: https://developer.apple.com/documentation/uikit/uiapplicationdelegate/applicationwillterminate(_:)
+[android-task-removed]: https://developer.android.com/reference/android/app/Service#onTaskRemoved(android.content.Intent)
+[android-background-limits]: https://developer.android.com/about/versions/oreo/background
 
 ### One live update per key
 
@@ -374,7 +417,11 @@ final update = await LiveUpdates.find('order-1234');
 On Android the key is the update's id and is the same as `live_updates_id`
 in remote payloads, so the app and the server address the same notification.
 On iOS the key is stored in the activity's attributes; a push-to-start can set
-it with `"attributes": {"key": "order-1234"}`.
+it with `"attributes": {"key": "order-1234"}`. Unlike a remote `start` on Android,
+which replaces the notification, a push-to-start with the key of a running
+activity adds a second one (iOS cannot replace an activity, and does not say
+which of the two is newer). Send a push-to-start only for a key that is not
+running, and update a running one with its push token instead.
 
 ### Scheduling
 
@@ -413,7 +460,8 @@ final pending = await LiveUpdates.scheduled();
   `publicContent`, see [Hiding content on the Lock Screen](#hiding-content-on-the-lock-screen)).
 - **iOS 26 and later:** the system starts the Live Activity at that time
   ([source][ios-request-start]) and presents an alert:
-  `IosLiveUpdateOptions.alert`, or else the title and body. Call `schedule`
+  `IosLiveUpdateOptions.alert`, else `LiveUpdateContent.alert`, else the
+  public text (`publicContent`) or the title and body. Call `schedule`
   and `reschedule` while the app is in the foreground; they throw a
   `LiveUpdateException` in the background and before iOS 26 (check
   `canSchedule`). ActivityKit drops content updates made before the start,
@@ -479,16 +527,20 @@ await LiveUpdates.startOrUpdate(
   `endedContent` once the activity is stale ([source][ios-stale-date]). In
   tests the system marked the activity stale about a minute after the stale
   date. The activity keeps running until the app ends it or the system
-  removes it after at most 8 hours (see [Platform limits](#ios)). The
+  removes it after at most 8 hours (see [Platform limits](#platform-limits)). The
   switch lives in your layout file: one generated before 0.3.0 needs it
   added (see [Upgrading](#upgrading)).
 - **Android:** an alarm replaces the notification with `endedContent` as a
   regular notification (title, body, icon, image, color and tap route; no
   progress, timer or buttons) that is no longer ongoing or promoted, so the
-  user can swipe it away (reported as `dismissed`). Like scheduling, the
+  user can swipe it away (reported as `dismissed`; as with any dismissal,
+  `startOrUpdate` then does not show the key again until you `end` it). Like scheduling, the
   switch is on time only with exact alarms, otherwise within 10 minutes.
   `AndroidLiveUpdateOptions(removeAtEnd: true)` removes the notification at
-  `endAt` instead, exactly ([source][android-timeout-after]).
+  `endAt` instead, exactly ([source][android-timeout-after]). With a
+  countdown that ends by `endAt` (as in the example), the notification is
+  removed at the countdown's end instead when the app may not set exact
+  alarms, so it never counts below zero (see [Timers](#timers)).
 - **Android time limit:** `AndroidLiveUpdateOptions.maxDuration` removes the
   notification that long after the update started (later updates do not
   reset it), even if the app is not running. It defaults to 8 hours, like
@@ -593,8 +645,25 @@ LiveUpdateContent(
 );
 ```
 
-On iOS a countdown stops at zero; Android keeps counting below zero, so update
-or end the live update when the time is up.
+When a countdown ends, iOS stops it at zero and keeps showing the activity.
+An Android notification's countdown cannot stop and would count below zero,
+so from 0.4.0 Android removes the notification when the countdown ends:
+exactly, even if the app is not running, with no extra permission
+([source][android-timeout-after]). The update then reports `ended`. Content
+whose countdown is already over is still shown, without the timer. With
+`endedContent` at an `endAt` up to the countdown's end (see
+[Ending at a time](#ending-at-a-time)), the ended content replaces it instead
+when the app may set exact alarms (should that alarm not come, for example
+because the user revoked the permission, the notification is removed 10
+minutes later); otherwise the removal wins, as the replacement could come up
+to 10 minutes late. Timer metrics
+(`LiveUpdateMetric.timer`) are not covered.
+
+To show something else at that time on both platforms, update the content
+from your server, for example to "Arrived", before the countdown ends. To
+keep the Android notification after the countdown, pass
+`AndroidLiveUpdateOptions(removeAtCountdownEnd: false)` (it then counts below
+zero until you update it).
 
 ### Layouts
 
@@ -624,7 +693,7 @@ LiveUpdateContent(
 | Layout | iOS Lock Screen | Data | Android |
 | --- | --- | --- | --- |
 | `standard` (default) | image, title, body, progress bar | `progress` | progress bar |
-| `timer` | a large countdown or stopwatch | `timer` | chronometer |
+| `timer` | a large countdown or stopwatch | `timer` | chronometer (removed when a countdown ends) |
 | `metrics` | up to three labeled values | `metrics` | Android 17 `MetricStyle` (not in `classic`); otherwise number and text metrics in the text |
 | `stepper` | stages as dots, the current one highlighted | `steps` | Android 16+ progress segments and points; "2/4 Preparing" in the text |
 | `journey` | from and to with the progress between them | `journey`, `progress` | "Shop → Home" in the text |
@@ -704,6 +773,40 @@ Use `liveUpdate` only for activities that fit Android's Live Update guidance,
 metrics are added to the text, and segments, points and semantic colors are
 not used).
 
+### Alerts
+
+Set `alert` on content the user must notice, such as "Your order is here".
+The device plays a sound and may light up the screen or show a banner:
+
+```dart
+await LiveUpdates.startOrUpdate(
+  'order-1234',
+  const LiveUpdateContent(
+    title: 'Order #1234',
+    body: 'At your door',
+    alert: LiveUpdateAlert(), // or LiveUpdateAlert(title: ..., body: ...)
+  ),
+);
+```
+
+- **iOS:** an update (or a scheduled start) shows the alert, with the
+  content's title and body unless the alert sets its own; the system shows
+  them on devices without the Dynamic Island and on Apple Watch (with a
+  `publicContent`, its title and body are the default). Starting
+  a Live Activity from the app is always silent. `IosLiveUpdateOptions.alert`
+  (with a custom sound) takes precedence.
+- **Android:** the post plays the sound and vibration of the notification
+  channel (`AndroidLiveUpdateOptions.alert` does the same). The first post of
+  an update alerts anyway (see [Platform limits](#platform-limits)), and Android allows
+  one requested alert per update every 10 seconds.
+- **Remote:** an `"alert": {"title": ..., "body": ...}` object in the
+  Android content alerts too (unless it says `"androidAlert": false`), so
+  one content works for both; on iOS the alert goes in `aps.alert`, next to
+  `content-state`.
+- `copyWith` does not carry `alert` over: it belongs to one post.
+- `end` never alerts (iOS ends a Live Activity silently): to announce
+  "Delivered", `update` with an alert first, then `end`.
+
 ### Android progress stages, timeout and alerts
 
 ```dart
@@ -734,7 +837,8 @@ LiveUpdateContent(
   Android 17 `metrics` replace the progress bar.
 - `timeoutAfter` counts from the latest post.
 - Requested alerts are limited to one per update every 10 seconds. The iOS
-  equivalent of `alert` is `IosLiveUpdateOptions.alert`.
+  equivalent of `alert` is `IosLiveUpdateOptions.alert`;
+  `LiveUpdateContent.alert` covers both (see [Alerts](#alerts)).
 
 ### Android 17 metrics and semantic colors
 
@@ -1148,7 +1252,23 @@ apply them again:
   `dismissAfter: null` (also a remote `end` without
   `live_updates_dismiss_after`) means 4 hours instead of "until dismissed".
   To remove it at once as before, pass `dismissAfter: Duration.zero` (remote:
-  `"live_updates_dismiss_after": 0`).
+  `"live_updates_dismiss_after": 0`). `endAll()` removes these too.
+- **Android `start`, `startOrUpdate` and `update` throw a
+  `LiveUpdateException`** while notifications are turned off for the app or
+  its channel, as on iOS (`schedule` and `reschedule` too, for a time that
+  has passed). Before, they returned as if the update were
+  shown. Check `isSupported()` first, or catch the exception.
+- **Android removes a notification when its countdown ends** (a
+  notification's countdown cannot stop at zero), and leaves out the timer of
+  a countdown that is already over. Pass
+  `AndroidLiveUpdateOptions(removeAtCountdownEnd: false)` to keep it.
+- **What stays after `end` has no buttons or running timers** on either
+  platform (the final content, or the content shown last).
+- **iOS `startOrUpdate` replaces an ended activity** with the key that is
+  still on the Lock Screen, instead of doing nothing; only an activity the
+  user dismissed still keeps the key from starting.
+- **Android remote `alert`:** an `alert` object in `live_updates_content`
+  now alerts. Send `"androidAlert": false` to keep such an update silent.
 
 ### From 0.2.x to 0.3.0
 

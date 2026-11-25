@@ -27,6 +27,7 @@ final class LiveUpdateContent {
     this.publicContent,
     this.endAt,
     this.endedContent,
+    this.alert,
     this.ios,
     this.android,
   }) : assert(progress == null || (progress >= 0 && progress <= 1)),
@@ -142,6 +143,23 @@ final class LiveUpdateContent {
   /// content.
   final LiveUpdateEndedContent? endedContent;
 
+  /// Alerts the user with this post of the content, on both platforms: the
+  /// device plays a sound and may light up the screen or show a banner.
+  /// Use it for changes the user must notice, such as "Your order is here",
+  /// not for every update.
+  ///
+  /// iOS shows it with an update (and with a scheduled start), as
+  /// [IosLiveUpdateOptions.alert] does, which takes precedence; starting a
+  /// Live Activity from the app is always silent. Android plays the sound
+  /// and vibration of the notification channel, as
+  /// [AndroidLiveUpdateOptions.alert] does; the first post of an update
+  /// alerts anyway. Android allows one alert per update every 10 seconds.
+  ///
+  /// [LiveUpdate.end] never alerts, also with this set on its final
+  /// content: [LiveUpdate.update] with the alert first. With this set,
+  /// Android alerts whatever [AndroidLiveUpdateOptions.alert] says.
+  final LiveUpdateAlert? alert;
+
   /// iOS-only options.
   final IosLiveUpdateOptions? ios;
 
@@ -150,7 +168,9 @@ final class LiveUpdateContent {
 
   /// Returns a copy with the given fields replaced. A `null` argument keeps
   /// the current value, so a field such as [publicContent] cannot be removed
-  /// with it: create a new [LiveUpdateContent] instead.
+  /// with it: create a new [LiveUpdateContent] instead. [alert] is the
+  /// exception: it belongs to one post, so the copy has it only when given
+  /// (the alerts in [ios] and [android] are kept with those options).
   LiveUpdateContent copyWith({
     String? title,
     String? body,
@@ -167,6 +187,7 @@ final class LiveUpdateContent {
     LiveUpdatePublicContent? publicContent,
     DateTime? endAt,
     LiveUpdateEndedContent? endedContent,
+    LiveUpdateAlert? alert,
     IosLiveUpdateOptions? ios,
     AndroidLiveUpdateOptions? android,
   }) => LiveUpdateContent(
@@ -185,6 +206,8 @@ final class LiveUpdateContent {
     publicContent: publicContent ?? this.publicContent,
     endAt: endAt ?? this.endAt,
     endedContent: endedContent ?? this.endedContent,
+    // One post's alert: not carried over to the next update.
+    alert: alert,
     ios: ios ?? this.ios,
     android: android ?? this.android,
   );
@@ -207,6 +230,7 @@ final class LiveUpdateContent {
       other.publicContent == publicContent &&
       other.endAt == endAt &&
       other.endedContent == endedContent &&
+      other.alert == alert &&
       other.ios == ios &&
       other.android == android;
 
@@ -227,6 +251,7 @@ final class LiveUpdateContent {
     publicContent,
     endAt,
     endedContent,
+    alert,
     ios,
     android,
   );
@@ -347,7 +372,9 @@ final class LiveUpdatePublicContent {
 /// A timer counted by the system (see [LiveUpdateContent.timer]).
 @immutable
 final class LiveUpdateTimer {
-  /// Counts down to [end] and stops at zero.
+  /// Counts down to [end]. iOS stops at zero; Android cannot stop a
+  /// notification's countdown, so it removes the notification at [end] (see
+  /// [AndroidLiveUpdateOptions.removeAtCountdownEnd]).
   const LiveUpdateTimer.countdown(DateTime this.end) : start = null;
 
   /// Counts up from [start].
@@ -906,6 +933,33 @@ final class IosIslandContent {
   String toString() => 'IosIslandContent($value)';
 }
 
+/// An alert with a post of a live update ([LiveUpdateContent.alert]).
+@immutable
+final class LiveUpdateAlert {
+  /// Creates an alert. Without [title] or [body], the content's title and
+  /// body are used, or those of its [LiveUpdateContent.publicContent] when it
+  /// has one, as the alert can show on a locked device.
+  const LiveUpdateAlert({this.title, this.body});
+
+  /// Title of the alert on iOS, where the system shows it on devices without
+  /// the Dynamic Island and on Apple Watch. Android alerts with the
+  /// notification itself, so it is not used there.
+  final String? title;
+
+  /// Body of the alert on iOS (see [title]).
+  final String? body;
+
+  @override
+  bool operator ==(Object other) =>
+      other is LiveUpdateAlert && other.title == title && other.body == body;
+
+  @override
+  int get hashCode => Object.hash(title, body);
+
+  @override
+  String toString() => 'LiveUpdateAlert(title: $title, body: $body)';
+}
+
 /// An alert presented with an iOS Live Activity update.
 @immutable
 final class IosAlert {
@@ -955,6 +1009,7 @@ final class AndroidLiveUpdateOptions {
     this.lockScreenVisibility = AndroidLockScreenVisibility.private,
     this.maxDuration = const Duration(hours: 8),
     this.removeAtEnd = false,
+    this.removeAtCountdownEnd = true,
   });
 
   /// Notification channel id. The channel is created on first use.
@@ -1062,6 +1117,21 @@ final class AndroidLiveUpdateOptions {
   /// [LiveUpdateContent.endedContent]. Android 8+.
   final bool removeAtEnd;
 
+  /// Removes the notification when the countdown of [LiveUpdateContent.timer]
+  /// ends (exactly, even if the app is not running), because an Android
+  /// notification's countdown cannot stop at zero and would count below it.
+  /// iOS stops the countdown at zero and keeps showing the activity. The
+  /// update then reports [LiveUpdateState.ended]. Content whose countdown is
+  /// already over is still shown, without the timer. When
+  /// [LiveUpdateContent.endedContent] replaces the content at an
+  /// [LiveUpdateContent.endAt] up to that time, it does so instead, if the
+  /// app may set exact alarms (else the removal wins, as the replacement
+  /// could come late; and should the alarm not come, the notification is
+  /// removed 10 minutes after the countdown). Only [LiveUpdateTimer.countdown] is covered, not
+  /// timer metrics. Pass `false` to keep the notification, for example when
+  /// your server updates it at that time. Android 8+.
+  final bool removeAtCountdownEnd;
+
   @override
   bool operator ==(Object other) =>
       other is AndroidLiveUpdateOptions &&
@@ -1082,7 +1152,8 @@ final class AndroidLiveUpdateOptions {
       other.alert == alert &&
       other.lockScreenVisibility == lockScreenVisibility &&
       other.maxDuration == maxDuration &&
-      other.removeAtEnd == removeAtEnd;
+      other.removeAtEnd == removeAtEnd &&
+      other.removeAtCountdownEnd == removeAtCountdownEnd;
 
   @override
   int get hashCode => Object.hash(
@@ -1104,6 +1175,7 @@ final class AndroidLiveUpdateOptions {
     lockScreenVisibility,
     maxDuration,
     removeAtEnd,
+    removeAtCountdownEnd,
   );
 }
 
@@ -1365,11 +1437,14 @@ enum LiveUpdateState {
   /// Visible and updatable.
   active,
 
-  /// iOS: past its stale date; update it or end it.
+  /// Past [LiveUpdateContent.endAt] (on iOS also an
+  /// [IosLiveUpdateOptions.staleDate]); update it or end it.
   stale,
 
   /// Ended by the app or a remote update (on Android also removed by
-  /// [AndroidLiveUpdateOptions.timeoutAfter]); may still be visible until
+  /// [AndroidLiveUpdateOptions.timeoutAfter], [AndroidLiveUpdateOptions.maxDuration],
+  /// [AndroidLiveUpdateOptions.removeAtEnd] or at the end of a countdown); may
+  /// still be visible until
   /// its dismissal time (see [LiveUpdate.end]).
   ended,
 

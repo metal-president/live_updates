@@ -20,7 +20,9 @@ final class LiveUpdate {
 
   LiveUpdatesPlatform get _platform => LiveUpdatesPlatform.instance;
 
-  /// Replaces the shown content.
+  /// Replaces the shown content. Throws a [LiveUpdateException] when the
+  /// update has ended, and on Android also when the user dismissed it or
+  /// while notifications are turned off for the app or for its channel.
   Future<void> update(LiveUpdateContent content) =>
       _platform.update(id, content);
 
@@ -52,8 +54,24 @@ final class LiveUpdate {
   /// [LiveUpdates.start] or [update].
   Future<bool> isPromoted() => _platform.isPromoted(id);
 
-  /// Lifecycle changes of this live update, such as the user dismissing it
-  /// (Android) or the system marking it stale (iOS).
+  /// The current state of this live update, or `null` when the platform no
+  /// longer knows it (it ended and is no longer shown, or was never shown).
+  /// Use it to set up your UI, for example after an app restart, and [states]
+  /// for later changes.
+  ///
+  /// [LiveUpdateState.ended] means it ended and is still shown (see
+  /// [end]). [LiveUpdateState.dismissed] is reported on iOS while the system
+  /// still lists the dismissed activity; on Android until the app ends the
+  /// update (the plugin remembers the dismissal, see
+  /// [LiveUpdates.startOrUpdate]).
+  Future<LiveUpdateState?> state() async =>
+      switch (await _platform.stateForId(id)) {
+        final name? => _stateFromName(name),
+        null => null,
+      };
+
+  /// Lifecycle changes of this live update, such as the user dismissing it or
+  /// the update becoming stale at [LiveUpdateContent.endAt].
   Stream<LiveUpdateState> get states => _platform.events
       .where((e) => e.$1 == id)
       .map((e) => _stateFromName(e.$2))
@@ -166,6 +184,13 @@ abstract final class LiveUpdates {
 
   /// Starts a live update.
   ///
+  /// Throws a [LiveUpdateException] when it cannot be shown: on iOS when Live
+  /// Activities are turned off for the app, the system limit of running
+  /// activities is reached or the app is in the background; on Android when
+  /// notifications are turned off for the app or for its channel. Check
+  /// [isSupported] before you offer to track something on the Lock Screen
+  /// (it does not cover a turned-off Android channel).
+  ///
   /// [pushUpdates] requests a per-activity APNs token on iOS (see
   /// [LiveUpdate.pushTokens]); it needs the Push Notifications capability.
   /// It has no effect on Android, where remote updates arrive as payloads
@@ -221,6 +246,11 @@ abstract final class LiveUpdates {
   /// [LiveUpdate.end] for that key, on iOS once the system no longer lists
   /// the dismissed activity. Use a new key for a new activity.
   ///
+  /// Throws a [LiveUpdateException] when a new live update cannot be shown,
+  /// as [start] does; on Android also when updating a running one while
+  /// notifications are turned off for the app or for its channel (as
+  /// [LiveUpdate.update]).
+  ///
   /// [pushUpdates] and [iosChannelId] only apply when a new activity is
   /// started: an existing activity keeps the push setting it was started
   /// with.
@@ -241,6 +271,16 @@ abstract final class LiveUpdates {
       key,
     );
   }
+
+  /// The current state of the live update with [key], as [LiveUpdate.state]:
+  /// a running one if there is one, else one that ended and is still shown,
+  /// else one the user dismissed. Unlike [find], it also reports updates that
+  /// have ended.
+  static Future<LiveUpdateState?> stateOf(String key) async =>
+      switch (await _platform.stateForKey(key)) {
+        final name? => _stateFromName(name),
+        null => null,
+      };
 
   /// The running live update identified by [key], if any.
   static Future<LiveUpdate?> find(String key) async =>
@@ -339,7 +379,9 @@ abstract final class LiveUpdates {
   /// do.
   ///
   /// iOS (26 and later): the system starts the Live Activity and presents
-  /// an alert, [IosLiveUpdateOptions.alert] or else the title and body.
+  /// an alert: [IosLiveUpdateOptions.alert], else [LiveUpdateContent.alert],
+  /// else the public text ([LiveUpdateContent.publicContent]) or the title
+  /// and body.
   /// Call this while the app is in the foreground; it throws
   /// [LiveUpdateException] in the background and before iOS 26 (check
   /// [canSchedule]). [pushUpdates] requests a per-activity APNs token, which

@@ -187,6 +187,7 @@ public final class LiveUpdatesBridge: NSObject {
   static func endNow(_ activity: Activity<LiveUpdatesAttributes>) async {
     noteEndedByApp(activity.id)
     await activity.end(nil, dismissalPolicy: .immediate)
+    await MainActor.run { tokenTasks.removeValue(forKey: activity.id)?.cancel() }
   }
 
   /// Whether `activity` is scheduled and has not started yet (iOS 26+).
@@ -234,6 +235,31 @@ public final class LiveUpdatesBridge: NSObject {
   @objc public static func idForKey(_ key: String) -> String? {
     guard #available(iOS 17.2, *) else { return nil }
     return findByKey(key)?.id
+  }
+
+  /// State of the activity with `id` as ActivityKit reports it ("active",
+  /// "stale", "ended" or "dismissed"), or `nil` when the system no longer
+  /// lists it or it is scheduled and has not started.
+  @objc public static func stateForId(_ id: String) -> String? {
+    guard #available(iOS 17.2, *) else { return nil }
+    return Activity<LiveUpdatesAttributes>.activities.first { $0.id == id }.flatMap(stateName)
+  }
+
+  /// State of the activity whose key is `key`: a running one first, else an
+  /// ended one, else a dismissed one; `nil` when the system lists none.
+  @objc public static func stateForKey(_ key: String) -> String? {
+    guard #available(iOS 17.2, *) else { return nil }
+    let names = Activity<LiveUpdatesAttributes>.activities
+      .filter { $0.attributes.key == key }
+      .compactMap(stateName)
+    return ["active", "stale", "ended", "dismissed"].first(where: names.contains)
+  }
+
+  @available(iOS 17.2, *)
+  private static func stateName(_ activity: Activity<LiveUpdatesAttributes>) -> String? {
+    if isPending(activity) { return nil }
+    let state = name(of: activity.activityState)
+    return state == "unknown" ? nil : state
   }
 
   /// Key of the activity with `id` (from `startOrUpdate` or the push-to-start
@@ -423,6 +449,11 @@ public final class LiveUpdatesBridge: NSObject {
               emitStarted(activity.id)
             }
             emit("\(name(of: state)):\(activity.id)")
+            // Ended by a push, the system or the user: its push token is of
+            // no more use, so stop watching for new ones (end() does too).
+            if state == .ended || state == .dismissed {
+              await MainActor.run { tokenTasks.removeValue(forKey: activity.id)?.cancel() }
+            }
             // An ended activity stays listed until it is dismissed.
             if state == .dismissed { break }
           }
@@ -745,12 +776,14 @@ struct Payload: Decodable {
     )
   }
 
-  /// Alert for a scheduled activity's start when the content has none.
+  /// Alert for a scheduled activity's start when the content has none: the
+  /// public text when there is one, as the alert can show on a locked device.
   @available(iOS 17.2, *)
   var defaultAlertConfiguration: AlertConfiguration {
     AlertConfiguration(
-      title: LocalizedStringResource(stringLiteral: title),
-      body: LocalizedStringResource(stringLiteral: body ?? ""),
+      title: LocalizedStringResource(stringLiteral: publicContent?.title ?? title),
+      body: LocalizedStringResource(
+        stringLiteral: (publicContent != nil ? publicContent?.body : body) ?? ""),
       sound: .default)
   }
 

@@ -1039,6 +1039,46 @@ extension type LiveUpdatesBridge._(jni$_.JObject _$this)
     ).object<jni$_.JString?>();
   }
 
+  static final _id_stateOf = _class.staticMethodId(
+    r'stateOf',
+    r'(Ljava/lang/String;)Ljava/lang/String;',
+  );
+
+  static final _stateOf =
+      jni$_.ProtectedJniExtensions.lookup<
+            jni$_.NativeFunction<
+              jni$_.JniResult Function(
+                jni$_.Pointer<jni$_.Void>,
+                jni$_.JMethodIDPtr,
+                jni$_.VarArgs<(jni$_.Pointer<jni$_.Void>,)>,
+              )
+            >
+          >('globalEnv_CallStaticObjectMethod')
+          .asFunction<
+            jni$_.JniResult Function(
+              jni$_.Pointer<jni$_.Void>,
+              jni$_.JMethodIDPtr,
+              jni$_.Pointer<jni$_.Void>,
+            )
+          >();
+
+  /// from: `static public java.lang.String stateOf(java.lang.String id)`
+  /// The returned object must be released after use, by calling the [release] method.
+  ///
+  /// State of the live update {@code id} as the system shows it: {@code active}, {@code stale}
+  /// (past its endAt), {@code ended} (the notification kept after the end) or, when it is not
+  /// shown, {@code dismissed} if the user swiped it away (remembered until the app ends it); else
+  /// {@code null}. The id of a keyed update is its key.
+  static jni$_.JString? stateOf(jni$_.JString id) {
+    final _$$classRef = _class.reference;
+    final _$id = id.reference;
+    return _stateOf(
+      _$$classRef.pointer,
+      _id_stateOf.pointer,
+      _$id.pointer,
+    ).object<jni$_.JString?>();
+  }
+
   static final _id_observeActions = _class.staticMethodId(
     r'observeActions',
     r'(Lcom/ttechapp/live_updates/LiveUpdatesBridge$ActionListener;J[Ljava/lang/String;)V',
@@ -1420,7 +1460,8 @@ extension type LiveUpdatesBridge._(jni$_.JObject _$this)
 
   /// from: `static public void end(java.lang.String id, java.lang.String json, double dismissAfterSeconds)`
   ///
-  /// Removes the live update {@code id}, optionally showing final content for a while.
+  /// Ends the live update {@code id}. Unless {@code dismissAfterSeconds} is 0, the final content
+  /// (else the content shown last) stays as a regular notification for at most four hours.
   static void end(
     jni$_.JString id,
     jni$_.JString? json,
@@ -1911,7 +1952,7 @@ extension type LiveUpdatesBridge._(jni$_.JObject _$this)
 
   /// from: `static public void endAll()`
   ///
-  /// Removes every live update of this app (not the scheduled ones).
+  /// Removes every live update of this app, also ended ones (not the scheduled ones).
   static void endAll() {
     final _$$classRef = _class.reference;
     _endAll(_$$classRef.pointer, _id_endAll.pointer).check();

@@ -53,7 +53,10 @@ Ending at a time: on Android, the update becomes stale at `endAt` and
 shows `endedContent` if it is set; `"removeAtEnd": true` removes it then
 instead. `maxDurationMillis` limits how long an Android live
 update is shown, counted from its start: without the key the default of
-8 hours applies, and `0` means no limit. On iOS the widget shows
+8 hours applies, and `0` means no limit. An Android update with a
+countdown (`timerEnd`) is removed when the countdown ends, as a
+notification's countdown would run below zero; `"removeAtCountdownEnd":
+false` keeps it. On iOS the widget shows
 `endedContent` once the activity is stale: send `stale-date` (the `endAt`
 time) next to `content-state`, as `endAt` inside `content-state` does not
 set it.
@@ -160,8 +163,9 @@ activity token for that key (or the push-to-start token to start one).
   older than the last one it applied.
 - `start` (with the push-to-start token) also needs
   `"attributes-type": "LiveUpdatesAttributes"`, `"attributes": {"key": "order-1234"}`
-  and an `alert` with `title` and `body`. Use a key that no running activity
-  on the device has.
+  and an `alert` with `title` and `body`. Use a key that no running
+  activity on the device has: iOS adds a second activity (Android replaces
+  the notification); update a running one with its activity token instead.
 - `end` takes `dismissal-date` (a UNIX time in seconds); `stale-date`
   (also a UNIX time), `relevance-score` and
   `alert` go next to `content-state`, not inside it. The content of an
@@ -181,6 +185,7 @@ activity token for that key (or the push-to-start token to start one).
 | Content | `data.live_updates_content` (string) | `apns.payload.aps.content-state` (object) |
 | Event | `data.live_updates_event` | `aps.event` + `aps.timestamp` |
 | Final display time | `live_updates_dismiss_after` (seconds from now) | `aps.dismissal-date` (time) |
+| Alert with an update | `"alert": {"title", "body"}` in the content | `aps.alert` |
 | Many devices at once | FCM topics | broadcast channels (iOS 18, APNs only) |
 
 `tool/send_push.dart` builds both envelopes (`fcm` and `fcm-ios` commands);

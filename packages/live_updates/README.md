@@ -369,6 +369,36 @@ LiveUpdates.onStarted.listen((update) => track(update));
 await LiveUpdates.endAll();
 ```
 
+### When the app is closed
+
+Live updates keep showing after the user closes the app, for example by
+swiping it away in the app switcher: that is what they are for, and remote
+updates keep them current. The plugin does not end them then, because
+neither platform tells an app reliably that it is being closed. iOS calls
+`applicationWillTerminate` only when the app is not suspended
+([source][ios-will-terminate]), and Android reports a removed task only to a
+running service ([source][android-task-removed]), which the system stops in
+the background ([source][android-background-limits]).
+
+To make sure updates do not outlive their purpose, use what always works:
+
+- **At the next start**, end what the previous session left, for example
+  when your app only shows updates while it is in use:
+
+  ```dart
+  await LiveUpdates.endAll();
+  ```
+
+- **By time:** `endAt` with `endedContent`, a countdown (removed on Android
+  when it ends), `AndroidLiveUpdateOptions.timeoutAfter` and `maxDuration`
+  end or remove an update the app never ends.
+- **From your server:** send an `end` when the activity or the session is
+  over (see [Remote updates](#remote-updates)).
+
+[ios-will-terminate]: https://developer.apple.com/documentation/uikit/uiapplicationdelegate/applicationwillterminate(_:)
+[android-task-removed]: https://developer.android.com/reference/android/app/Service#onTaskRemoved(android.content.Intent)
+[android-background-limits]: https://developer.android.com/about/versions/oreo/background
+
 ### One live update per key
 
 When your data already has an id, use it as the key. Calling

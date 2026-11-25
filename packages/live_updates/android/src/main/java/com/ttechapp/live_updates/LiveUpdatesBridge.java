@@ -781,6 +781,10 @@ public final class LiveUpdatesBridge {
       // Ended before (for example a repeated remote end): an ended
       // notification stays as it is.
     } else {
+      // Removed: a later end with final content must not bring it back.
+      synchronized (keptEnded) {
+        keptEnded.remove(id);
+      }
       manager(c).cancel(TAG_PREFIX + id, NOTIFICATION_ID);
     }
   }

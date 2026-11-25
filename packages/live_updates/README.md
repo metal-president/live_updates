@@ -493,7 +493,7 @@ await LiveUpdates.startOrUpdate(
   `endedContent` once the activity is stale ([source][ios-stale-date]). In
   tests the system marked the activity stale about a minute after the stale
   date. The activity keeps running until the app ends it or the system
-  removes it after at most 8 hours (see [Platform limits](#ios-1)). The
+  removes it after at most 8 hours (see [Platform limits](#platform-limits)). The
   switch lives in your layout file: one generated before 0.3.0 needs it
   added (see [Upgrading](#upgrading)).
 - **Android:** an alarm replaces the notification with `endedContent` as a
@@ -761,7 +761,7 @@ await LiveUpdates.startOrUpdate(
   (with a custom sound) takes precedence.
 - **Android:** the post plays the sound and vibration of the notification
   channel (`AndroidLiveUpdateOptions.alert` does the same). The first post of
-  an update alerts anyway (see [Platform limits](#android-1)), and Android allows
+  an update alerts anyway (see [Platform limits](#platform-limits)), and Android allows
   one requested alert per update every 10 seconds.
 - **Remote:** an `"alert": {"title": ..., "body": ...}` object in the
   Android content alerts too (unless it says `"androidAlert": false`), so

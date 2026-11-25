@@ -408,6 +408,15 @@ public class LiveUpdatesBridgeTest {
   }
 
   @Test
+  public void finalContentDoesNotBringBackAnUpdateRemovedAMomentAgo() throws Exception {
+    String id = LiveUpdatesBridge.start("{\"title\":\"Order\"}");
+    LiveUpdatesBridge.end(id, null, -1);
+    LiveUpdatesBridge.end(id, null, 0);
+    LiveUpdatesBridge.end(id, "{\"title\":\"Delivered\"}", -1);
+    assertEquals(null, shown(id));
+  }
+
+  @Test
   public void endAllAlsoRemovesEndedUpdates() throws Exception {
     String a = LiveUpdatesBridge.start("{\"title\":\"A\"}");
     String b = LiveUpdatesBridge.start("{\"title\":\"B\"}");

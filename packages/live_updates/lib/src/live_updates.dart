@@ -52,8 +52,8 @@ final class LiveUpdate {
   /// [LiveUpdates.start] or [update].
   Future<bool> isPromoted() => _platform.isPromoted(id);
 
-  /// Lifecycle changes of this live update, such as the user dismissing it
-  /// (Android) or the system marking it stale (iOS).
+  /// Lifecycle changes of this live update, such as the user dismissing it or
+  /// the update becoming stale at [LiveUpdateContent.endAt].
   Stream<LiveUpdateState> get states => _platform.events
       .where((e) => e.$1 == id)
       .map((e) => _stateFromName(e.$2))
@@ -166,6 +166,12 @@ abstract final class LiveUpdates {
 
   /// Starts a live update.
   ///
+  /// Throws a [LiveUpdateException] when it cannot be shown: on iOS when Live
+  /// Activities are turned off for the app, the system limit of running
+  /// activities is reached or the app is in the background; on Android when
+  /// notifications are turned off for the app or for its channel. Check
+  /// [isSupported] before you offer to track something on the Lock Screen.
+  ///
   /// [pushUpdates] requests a per-activity APNs token on iOS (see
   /// [LiveUpdate.pushTokens]); it needs the Push Notifications capability.
   /// It has no effect on Android, where remote updates arrive as payloads
@@ -220,6 +226,9 @@ abstract final class LiveUpdates {
   /// shown again (platform guidance); on Android it comes back only after
   /// [LiveUpdate.end] for that key, on iOS once the system no longer lists
   /// the dismissed activity. Use a new key for a new activity.
+  ///
+  /// Throws a [LiveUpdateException] when a new live update cannot be shown,
+  /// as [start] does.
   ///
   /// [pushUpdates] and [iosChannelId] only apply when a new activity is
   /// started: an existing activity keeps the push setting it was started

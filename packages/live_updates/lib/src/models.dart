@@ -27,6 +27,7 @@ final class LiveUpdateContent {
     this.publicContent,
     this.endAt,
     this.endedContent,
+    this.alert,
     this.ios,
     this.android,
   }) : assert(progress == null || (progress >= 0 && progress <= 1)),
@@ -142,6 +143,19 @@ final class LiveUpdateContent {
   /// content.
   final LiveUpdateEndedContent? endedContent;
 
+  /// Alerts the user with this post of the content, on both platforms: the
+  /// device plays a sound and may light up the screen or show a banner.
+  /// Use it for changes the user must notice, such as "Your order is here",
+  /// not for every update.
+  ///
+  /// iOS shows it with an update (and with a scheduled start), as
+  /// [IosLiveUpdateOptions.alert] does, which takes precedence; starting a
+  /// Live Activity from the app is always silent. Android plays the sound
+  /// and vibration of the notification channel, as
+  /// [AndroidLiveUpdateOptions.alert] does; the first post of an update
+  /// alerts anyway. Android allows one alert per update every 10 seconds.
+  final LiveUpdateAlert? alert;
+
   /// iOS-only options.
   final IosLiveUpdateOptions? ios;
 
@@ -167,6 +181,7 @@ final class LiveUpdateContent {
     LiveUpdatePublicContent? publicContent,
     DateTime? endAt,
     LiveUpdateEndedContent? endedContent,
+    LiveUpdateAlert? alert,
     IosLiveUpdateOptions? ios,
     AndroidLiveUpdateOptions? android,
   }) => LiveUpdateContent(
@@ -185,6 +200,7 @@ final class LiveUpdateContent {
     publicContent: publicContent ?? this.publicContent,
     endAt: endAt ?? this.endAt,
     endedContent: endedContent ?? this.endedContent,
+    alert: alert ?? this.alert,
     ios: ios ?? this.ios,
     android: android ?? this.android,
   );
@@ -207,6 +223,7 @@ final class LiveUpdateContent {
       other.publicContent == publicContent &&
       other.endAt == endAt &&
       other.endedContent == endedContent &&
+      other.alert == alert &&
       other.ios == ios &&
       other.android == android;
 
@@ -227,6 +244,7 @@ final class LiveUpdateContent {
     publicContent,
     endAt,
     endedContent,
+    alert,
     ios,
     android,
   );
@@ -906,6 +924,32 @@ final class IosIslandContent {
   String toString() => 'IosIslandContent($value)';
 }
 
+/// An alert with a post of a live update ([LiveUpdateContent.alert]).
+@immutable
+final class LiveUpdateAlert {
+  /// Creates an alert. Without [title] or [body], the content's title and
+  /// body are used.
+  const LiveUpdateAlert({this.title, this.body});
+
+  /// Title of the alert on iOS, where the system shows it on devices without
+  /// the Dynamic Island and on Apple Watch. Android alerts with the
+  /// notification itself, so it is not used there.
+  final String? title;
+
+  /// Body of the alert on iOS (see [title]).
+  final String? body;
+
+  @override
+  bool operator ==(Object other) =>
+      other is LiveUpdateAlert && other.title == title && other.body == body;
+
+  @override
+  int get hashCode => Object.hash(title, body);
+
+  @override
+  String toString() => 'LiveUpdateAlert(title: $title, body: $body)';
+}
+
 /// An alert presented with an iOS Live Activity update.
 @immutable
 final class IosAlert {
@@ -1365,11 +1409,13 @@ enum LiveUpdateState {
   /// Visible and updatable.
   active,
 
-  /// iOS: past its stale date; update it or end it.
+  /// Past [LiveUpdateContent.endAt] (on iOS also an
+  /// [IosLiveUpdateOptions.staleDate]); update it or end it.
   stale,
 
   /// Ended by the app or a remote update (on Android also removed by
-  /// [AndroidLiveUpdateOptions.timeoutAfter]); may still be visible until
+  /// [AndroidLiveUpdateOptions.timeoutAfter], [AndroidLiveUpdateOptions.maxDuration]
+  /// or [AndroidLiveUpdateOptions.removeAtEnd]); may still be visible until
   /// its dismissal time (see [LiveUpdate.end]).
   ended,
 

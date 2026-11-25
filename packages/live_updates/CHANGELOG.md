@@ -25,6 +25,20 @@
   `endAt` has not shown yet no longer appears on it (one already shown
   stays), as on Android. An activity that already ended, for example by a
   push, keeps what it shows.
+- **Breaking (Android):** `start` and `startOrUpdate` throw a
+  `LiveUpdateException` while notifications are turned off for the app or
+  for its channel, as iOS does with Live Activities turned off. Before,
+  they returned an update that was never shown (and reported `started`).
+- `LiveUpdateContent.alert` (`LiveUpdateAlert`): one alert for both
+  platforms, mapped to the iOS alert (the content's title and body unless
+  set) and to Android's alert. The platform options still work and the iOS
+  one takes precedence. In Android remote payloads, an `alert` object in the
+  content alerts too.
+- iOS: a push-to-start with the key of a running activity no longer leaves
+  two activities: when the app runs, the plugin ends the older one (the
+  plugin remembers the activities it has seen in UserDefaults).
+- Docs: `stale` is reported on both platforms (since 0.3.0), and `ended`
+  also after Android's `maxDuration` and `removeAtEnd`.
 
 ## 0.3.0
 

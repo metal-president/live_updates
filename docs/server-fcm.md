@@ -160,8 +160,9 @@ activity token for that key (or the push-to-start token to start one).
   older than the last one it applied.
 - `start` (with the push-to-start token) also needs
   `"attributes-type": "LiveUpdatesAttributes"`, `"attributes": {"key": "order-1234"}`
-  and an `alert` with `title` and `body`. Use a key that no running activity
-  on the device has.
+  and an `alert` with `title` and `body`. Prefer a key that no running
+  activity on the device has: iOS shows both until the app runs, then the
+  plugin ends the older one (Android replaces the notification at once).
 - `end` takes `dismissal-date` (a UNIX time in seconds); `stale-date`
   (also a UNIX time), `relevance-score` and
   `alert` go next to `content-state`, not inside it. The content of an
@@ -181,6 +182,7 @@ activity token for that key (or the push-to-start token to start one).
 | Content | `data.live_updates_content` (string) | `apns.payload.aps.content-state` (object) |
 | Event | `data.live_updates_event` | `aps.event` + `aps.timestamp` |
 | Final display time | `live_updates_dismiss_after` (seconds from now) | `aps.dismissal-date` (time) |
+| Alert with an update | `"alert": {"title", "body"}` in the content | `aps.alert` |
 | Many devices at once | FCM topics | broadcast channels (iOS 18, APNs only) |
 
 `tool/send_push.dart` builds both envelopes (`fcm` and `fcm-ios` commands);

@@ -251,9 +251,23 @@ public final class LiveUpdatesBridge {
     permissionResult(granted);
   }
 
+  /**
+   * Fails, as iOS does when Live Activities are turned off, when nothing could be shown:
+   * notifications are turned off for the app or for the channel of {@code json}.
+   */
+  private static void requireShowable(Context c, String json) {
+    if (!manager(c).areNotificationsEnabled()) {
+      throw new IllegalStateException("Notifications are turned off for this app");
+    }
+    if (channelBlocked(c, json)) {
+      throw new IllegalStateException("The notification channel of this live update is turned off");
+    }
+  }
+
   /** Posts a new live update and returns its id. */
   @NonNull
   public static String start(@NonNull String json) throws JSONException {
+    requireShowable(requireContext(), json);
     String id = UUID.randomUUID().toString();
     post(id, new JSONObject(json), false, false);
     return id;
@@ -266,6 +280,7 @@ public final class LiveUpdatesBridge {
   @NonNull
   public static String startOrUpdate(@NonNull String key, @NonNull String json)
       throws JSONException {
+    requireShowable(requireContext(), json);
     // A key the user dismissed stays hidden until the app ends it.
     if (!isDismissed(requireContext(), key)) post(key, new JSONObject(json), false, true);
     return key;
@@ -635,8 +650,8 @@ public final class LiveUpdatesBridge {
     if (isDismissed(c, id)) {
       throw new IllegalStateException("Live update " + id + " was dismissed by the user");
     }
-    // When notifications are blocked nothing is ever shown; posting is a
-    // harmless no-op then, matching start().
+    // When notifications were blocked after the start nothing is shown;
+    // posting is a harmless no-op then.
     if (!isShown(id) && manager(c).areNotificationsEnabled() && !channelBlocked(c, json)) {
       throw new IllegalStateException("Unknown live update " + id);
     }
@@ -776,7 +791,7 @@ public final class LiveUpdatesBridge {
   /** Keys of the content that an ended update does not keep. */
   private static final String[] RUNNING_ONLY_KEYS = {
     "timerStart", "timerEnd", "showChronometer", "actions", "endAt", "endedContent",
-    "removeAtEnd", "maxDurationMillis", "timeoutAfterMillis", "androidAlert",
+    "removeAtEnd", "maxDurationMillis", "timeoutAfterMillis", "androidAlert", "alert",
   };
 
   /**
@@ -1225,7 +1240,7 @@ public final class LiveUpdatesBridge {
     // but not cancelled by a tap, as the update keeps running.
     Notification.Builder b =
         stale ? builder(c, content, remote, true).setAutoCancel(false) : builder(c, content, remote);
-    if (content.optBoolean("androidAlert", false) && !mayAlert(id)) b.setOnlyAlertOnce(true);
+    if (wantsAlert(content, remote) && !mayAlert(id)) b.setOnlyAlertOnce(true);
     // The system sends the delete intent for timeouts too; the deadline lets
     // the receiver tell them from a swipe.
     long timeout = content.optLong("timeoutAfterMillis", 0);
@@ -1441,7 +1456,7 @@ public final class LiveUpdatesBridge {
     b.setContentTitle(content.optString("title"))
         .setOngoing(true)
         // Only the first post alerts, unless this post asks to.
-        .setOnlyAlertOnce(!content.optBoolean("androidAlert", false))
+        .setOnlyAlertOnce(!wantsAlert(content, remote))
         .setSmallIcon(smallIcon(c, content));
     String body = optString(content, "body");
     if (body != null) {
@@ -1708,6 +1723,15 @@ public final class LiveUpdatesBridge {
 
   /** At most one requested alert per update in this interval (remote payloads included). */
   private static final long MIN_ALERT_INTERVAL_MS = 10_000;
+
+  /**
+   * Whether this post should alert: {@code androidAlert}, or in a remote payload also the iOS
+   * {@code alert} object, so one content alerts on both platforms.
+   */
+  static boolean wantsAlert(JSONObject content, boolean remote) {
+    return content.optBoolean("androidAlert", false)
+        || (remote && content.optJSONObject("alert") != null);
+  }
 
   private static final Map<String, Long> lastAlert = new HashMap<>();
 

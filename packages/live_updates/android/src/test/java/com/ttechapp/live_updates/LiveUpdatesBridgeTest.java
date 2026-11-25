@@ -573,6 +573,53 @@ public class LiveUpdatesBridgeTest {
   }
 
   @Test
+  public void theIosAlertOfARemotePayloadAlertsOnAndroidToo() throws Exception {
+    JSONObject withAlert = new JSONObject("{\"title\":\"A\",\"alert\":{\"title\":\"t\",\"body\":\"b\"}}");
+    assertTrue(LiveUpdatesBridge.wantsAlert(withAlert, true));
+    // Local content says androidAlert itself (the iOS option alone does not alert).
+    assertFalse(LiveUpdatesBridge.wantsAlert(withAlert, false));
+    assertTrue(LiveUpdatesBridge.wantsAlert(new JSONObject("{\"androidAlert\":true}"), false));
+    assertFalse(LiveUpdatesBridge.wantsAlert(new JSONObject("{\"alert\":true}"), true));
+    // What stays after the end does not alert.
+    assertFalse(LiveUpdatesBridge.endedContent(withAlert).has("alert"));
+  }
+
+  @Test
+  public void startFailsWhenNotificationsAreOff() throws Exception {
+    List<String> events = new ArrayList<>();
+    LiveUpdatesBridge.observeEvents(events::add, 1);
+    shadowOf(manager).setNotificationsEnabled(false);
+    try {
+      LiveUpdatesBridge.start("{\"title\":\"A\"}");
+      org.junit.Assert.fail("start must fail");
+    } catch (IllegalStateException expected) {
+      // As iOS with Live Activities turned off.
+    }
+    try {
+      LiveUpdatesBridge.startOrUpdate("off-key", "{\"title\":\"A\"}");
+      org.junit.Assert.fail("startOrUpdate must fail");
+    } catch (IllegalStateException expected) {
+      // Same.
+    }
+    assertTrue(events.isEmpty());
+    assertFalse(Arrays.asList(LiveUpdatesBridge.activeIds()).contains("off-key"));
+    shadowOf(manager).setNotificationsEnabled(true);
+  }
+
+  @Test
+  public void startFailsOnABlockedChannel() throws Exception {
+    manager.createNotificationChannel(
+        new android.app.NotificationChannel(
+            "off", "Off", NotificationManager.IMPORTANCE_NONE));
+    try {
+      LiveUpdatesBridge.start("{\"title\":\"A\",\"channelId\":\"off\"}");
+      org.junit.Assert.fail("start must fail");
+    } catch (IllegalStateException expected) {
+      // The user turned that channel off.
+    }
+  }
+
+  @Test
   public void updateToABlockedChannelDoesNotThrow() throws Exception {
     // The user turned the channel off: the system never lists the posts.
     manager.createNotificationChannel(

@@ -327,6 +327,44 @@ public final class LiveUpdatesBridge: NSObject {
       state: state, staleDate: staleDate, relevanceScore: base.relevanceScore)
   }
 
+  /// UserDefaults key with the ids of activities the plugin has seen, so a
+  /// new activity (such as one started by a push-to-start) can be told from
+  /// older ones with its key. Pruned to the activities the system lists.
+  static let seenIdsKey = "live_updates.seenIds"
+
+  /// Watches for activities that share a key, as a push-to-start with the
+  /// key of a running activity creates: the newest one stays and the older
+  /// ones end, as `startOrUpdate` and Android keep one update per key. Runs
+  /// once now and then for every activity that appears while the app runs.
+  static func watchDuplicateKeys() {
+    guard #available(iOS 17.2, *) else { return }
+    Task { @MainActor in
+      await endDuplicateKeys()
+      for await _ in Activity<LiveUpdatesAttributes>.activityUpdates {
+        await endDuplicateKeys()
+      }
+    }
+  }
+
+  /// Ends the older activities of every key that more than one running
+  /// activity has (ended ones with that key are removed too). The newest is
+  /// one the plugin has not seen before; when it cannot tell, the last one
+  /// the system lists stays.
+  @available(iOS 17.2, *)
+  @MainActor
+  static func endDuplicateKeys() async {
+    let listed = Activity<LiveUpdatesAttributes>.activities.filter { !isPending($0) }
+    let seen = Set(UserDefaults.standard.stringArray(forKey: seenIdsKey) ?? [])
+    UserDefaults.standard.set(listed.map(\.id), forKey: seenIdsKey)
+    let keyed = listed.filter { $0.attributes.key != nil && $0.activityState != .dismissed }
+    for (_, group) in Dictionary(grouping: keyed, by: { $0.attributes.key ?? "" }) {
+      let running = group.filter { $0.activityState == .active || $0.activityState == .stale }
+      guard group.count > 1, let last = running.last else { continue }
+      let keep = running.last(where: { !seen.contains($0.id) }) ?? last
+      for other in group where other.id != keep.id { await endNow(other) }
+    }
+  }
+
   /// Directory for images shared with the widget, or `nil` when the
   /// `LiveUpdatesAppGroup` Info.plist key is missing or the App Group is not
   /// enabled for this app.

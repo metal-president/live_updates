@@ -42,6 +42,8 @@ public class LiveUpdatesPlugin: NSObject, FlutterPlugin, FlutterSceneLifeCycleDe
     // Scheduled Live Activities may have started while the app was not
     // running.
     LiveUpdatesBridge.resumeSchedules()
+    // A push-to-start may have added an activity with the key of another.
+    LiveUpdatesBridge.watchDuplicateKeys()
     // Scene-based apps get URLs through the scene delegate only; registering
     // both would deliver every tap twice.
     if Bundle.main.object(forInfoDictionaryKey: "UIApplicationSceneManifest") == nil {

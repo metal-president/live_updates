@@ -27,6 +27,16 @@ void main() {
     expect(b, isNot(a));
   });
 
+  test('the shared alert has value equality and is part of the content', () {
+    const a = LiveUpdateAlert(title: 'Arrived');
+    expect(a, const LiveUpdateAlert(title: 'Arrived'));
+    expect(a.hashCode, const LiveUpdateAlert(title: 'Arrived').hashCode);
+    expect(a, isNot(const LiveUpdateAlert()));
+    const c = LiveUpdateContent(title: 'T');
+    expect(c.copyWith(alert: a).alert, a);
+    expect(c.copyWith(alert: a), isNot(c));
+  });
+
   test('public content has value equality and is part of the content', () {
     const p = LiveUpdatePublicContent(title: 'Delivery', body: 'On the way');
     expect(

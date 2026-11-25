@@ -613,7 +613,10 @@ public class LiveUpdatesBridgeTest {
   public void startOrUpdateOfAShownKeyDoesNotFailOnABlockedChannel() throws Exception {
     LiveUpdatesBridge.startOrUpdate("shown-key", "{\"title\":\"A\",\"channelId\":\"later-off\"}");
     manager.getNotificationChannel("later-off").setImportance(NotificationManager.IMPORTANCE_NONE);
-    // As update(): the shown update is updated, not an error.
+    // The system no longer lists the notifications of a blocked channel.
+    manager.cancel(LiveUpdatesBridge.TAG_PREFIX + "shown-key", LiveUpdatesBridge.NOTIFICATION_ID);
+    LiveUpdatesBridge.forgetPostsInProcess("shown-key");
+    // As update(): the started update is updated (a no-op), not an error.
     LiveUpdatesBridge.startOrUpdate("shown-key", "{\"title\":\"B\",\"channelId\":\"later-off\"}");
   }
 

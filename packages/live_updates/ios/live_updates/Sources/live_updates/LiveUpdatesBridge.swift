@@ -787,12 +787,14 @@ struct Payload: Decodable {
     )
   }
 
-  /// Alert for a scheduled activity's start when the content has none.
+  /// Alert for a scheduled activity's start when the content has none: the
+  /// public text when there is one, as the alert can show on a locked device.
   @available(iOS 17.2, *)
   var defaultAlertConfiguration: AlertConfiguration {
     AlertConfiguration(
-      title: LocalizedStringResource(stringLiteral: title),
-      body: LocalizedStringResource(stringLiteral: body ?? ""),
+      title: LocalizedStringResource(stringLiteral: publicContent?.title ?? title),
+      body: LocalizedStringResource(
+        stringLiteral: (publicContent != nil ? publicContent?.body : body) ?? ""),
       sound: .default)
   }
 

@@ -288,11 +288,21 @@ public final class LiveUpdatesBridge {
   @NonNull
   public static String startOrUpdate(@NonNull String key, @NonNull String json)
       throws JSONException {
+    return startOrUpdate(key, json, true);
+  }
+
+  /**
+   * {@code strict}: fail when a new update could not be shown (calls from Dart); a schedule
+   * whose time comes while notifications are off posts nothing, as before.
+   */
+  static String startOrUpdate(String key, String json, boolean strict) throws JSONException {
     Context c = requireContext();
     // A key the user dismissed stays hidden until the app ends it.
     if (isDismissed(c, key)) return key;
-    // Only a new update fails; one already shown is updated, as update() does.
-    if (!isShown(key)) requireShowable(c, json);
+    // Only a new update fails. One that started and has not ended is updated
+    // (a no-op while nothing can be shown), as update() does: the system
+    // stops listing the notifications of a blocked app or channel.
+    if (strict && !isShown(key) && !hasStartTime(c, key)) requireShowable(c, json);
     post(key, new JSONObject(json), false, true);
     return key;
   }
@@ -1345,6 +1355,13 @@ public final class LiveUpdatesBridge {
       }
       prefs(c).edit().putString(PREF_START_TIMES, times.toString()).apply();
       return now;
+    }
+  }
+
+  /** Whether {@code id} started and has not ended (its start time is kept until then). */
+  private static boolean hasStartTime(Context c, String id) {
+    synchronized (actionLock) {
+      return readObject(prefs(c), PREF_START_TIMES).has(id);
     }
   }
 

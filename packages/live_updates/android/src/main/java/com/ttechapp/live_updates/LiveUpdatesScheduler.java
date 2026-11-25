@@ -335,7 +335,7 @@ final class LiveUpdatesScheduler {
     // context yet.
     if (LiveUpdatesBridge.context == null) LiveUpdatesBridge.context = c.getApplicationContext();
     try {
-      LiveUpdatesBridge.startOrUpdate(key, entry.getString("json"));
+      LiveUpdatesBridge.startOrUpdate(key, entry.getString("json"), false);
     } catch (JSONException | RuntimeException e) {
       // Only the type: messages of JSON errors can quote the content.
       Log.e(LOG_TAG, "Could not show a scheduled live update: " + e.getClass().getName());

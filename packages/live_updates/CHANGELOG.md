@@ -29,14 +29,21 @@
   `LiveUpdateException` while notifications are turned off for the app or
   for its channel, as iOS does with Live Activities turned off. Before,
   they returned an update that was never shown (and reported `started`).
+- **Breaking (Android remote payloads):** an `alert` object in
+  `live_updates_content` now alerts (sound and vibration), so one content
+  alerts on both platforms. Send `"androidAlert": false` to keep such an
+  update silent.
 - `LiveUpdateContent.alert` (`LiveUpdateAlert`): one alert for both
-  platforms, mapped to the iOS alert (the content's title and body unless
-  set) and to Android's alert. The platform options still work and the iOS
-  one takes precedence. In Android remote payloads, an `alert` object in the
-  content alerts too.
+  platforms, mapped to the iOS alert (the content's title and body, or its
+  public text, unless set) and to Android's alert. The platform options
+  still work and the iOS one takes precedence. `copyWith` does not carry it
+  over.
 - iOS: a push-to-start with the key of a running activity no longer leaves
   two activities: when the app runs, the plugin ends the older one (the
-  plugin remembers the activities it has seen in UserDefaults).
+  plugin remembers the activities it has seen in UserDefaults). A
+  `LiveUpdate` the app held for the older one then reports it ended: get the
+  current one with `LiveUpdates.find(key)`. The default alert of a scheduled
+  start uses the public text when the content has one.
 - Docs: `stale` is reported on both platforms (since 0.3.0), and `ended`
   also after Android's `maxDuration` and `removeAtEnd`.
 

@@ -384,7 +384,8 @@ On iOS the key is stored in the activity's attributes; a push-to-start can set
 it with `"attributes": {"key": "order-1234"}`. A push-to-start with the key of
 a running activity adds a second one, as iOS cannot replace it; the plugin
 ends the older one when the app runs (on Android a remote `start` replaces the
-notification at once).
+notification at once). A `LiveUpdate` the app held for the older one then
+fails to update: call `find` again after a push-to-start.
 
 ### Scheduling
 
@@ -1201,6 +1202,8 @@ apply them again:
   still on the Lock Screen, instead of doing nothing; only an activity the
   user dismissed still keeps the key from starting. A push-to-start with
   the key of a running activity ends the older one when the app runs.
+- **Android remote `alert`:** an `alert` object in `live_updates_content`
+  now alerts. Send `"androidAlert": false` to keep such an update silent.
 
 ### From 0.2.x to 0.3.0
 

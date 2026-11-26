@@ -200,7 +200,7 @@
 ## 0.2.0
 
 Breaking: icons are `LiveUpdateIcon` values. See "From 0.1.x to 0.2.0" in
-the README, and run `dart run live_updates:create_widget` again.
+[doc/upgrading.md](https://github.com/metal-president/live_updates/blob/main/packages/live_updates/doc/upgrading.md), and run `dart run live_updates:create_widget` again.
 
 - `LiveUpdateIcon`: a native resource (`.native`, an Android drawable or an
   image in the widget extension's asset catalog), a Flutter asset (`.asset`)

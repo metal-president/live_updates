@@ -51,9 +51,19 @@ Future<int> createAndroid({
   };
   for (final MapEntry(key: path, value: content) in files.entries) {
     final f = File(path);
-    if (f.existsSync() && !force) {
-      stdout.writeln('keep   $path (yours to edit; --force replaces it)');
-      continue;
+    if (f.existsSync()) {
+      if (!force) {
+        stdout.writeln('keep   $path (yours to edit; --force replaces it)');
+        continue;
+      }
+      final old = f.readAsStringSync();
+      if (old == content) {
+        stdout.writeln('same   $path');
+        continue;
+      }
+      // It may hold your changes: keep a copy.
+      File('$path.bak').writeAsStringSync(old);
+      stdout.writeln('backup $path.bak');
     }
     f
       ..createSync(recursive: true)

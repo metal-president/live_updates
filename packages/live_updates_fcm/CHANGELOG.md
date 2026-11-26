@@ -1,3 +1,9 @@
+## 0.5.0
+
+- Requires live_updates 0.5.0. No changes in this package; remote payloads
+  can now select Android custom layouts (`androidLayout`,
+  `androidExpandedLayout`) and fill them with `extra`.
+
 ## 0.4.0
 
 - Requires live_updates 0.4.0 (Live Activities from iOS 16.2, so activity

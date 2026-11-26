@@ -164,7 +164,7 @@ shows complete messages for both platforms. For Android, send a data message
 | --- | --- |
 | `live_updates_event` | `start`, `update` or `end` |
 | `live_updates_id` | Your id; later messages with the same id update the same notification |
-| `live_updates_content` | JSON string with the keys of `LiveUpdateContent` (`title`, `body`, `progress`, `timerEnd`, `actions`, `publicContent`, ...) and Android options |
+| `live_updates_content` | JSON string with the keys of `LiveUpdateContent` (`title`, `body`, `progress`, `timerEnd`, `actions`, `publicContent`, ...) and Android options (including `androidLayout` / `androidExpandedLayout` and `extra` for [custom layouts](https://pub.dev/packages/live_updates#customizing-the-android-notification)) |
 | `live_updates_dismiss_after` | Optional, seconds to keep the final content on `end` (at most and by default 4 hours, like `dismissAfter` of `LiveUpdate.end`) |
 
 High priority lets the message wake the device, but Firebase Cloud

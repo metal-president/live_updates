@@ -12,13 +12,14 @@
     live_update_title              TextView     LiveUpdateContent.title
     live_update_body               TextView     body (hidden without one)
     live_update_progress           ProgressBar  progress (hidden without one)
-    live_update_timer              Chronometer  timer (hidden without one)
+    live_update_timer              Chronometer  timer (hidden without one or when over)
     live_update_image              ImageView    image (hidden without one)
     live_update_extra_<key>        TextView     extra[key] (made visible)
     live_update_extra_image_<key>  ImageView    extraImages[key] (made visible)
 
-  Android 12 and later draw this inside the system's notification frame and
-  keep the collapsed notification to 48 dp in height. Keep the text colors of
+  Android 12 and later draw this inside the system's notification frame; for
+  apps that target Android 12 or later, the collapsed custom content is at
+  most 48 dp high. Keep the text colors of
   the notification text appearances (no background color), so the layout
   reads well in light and dark themes.
 -->

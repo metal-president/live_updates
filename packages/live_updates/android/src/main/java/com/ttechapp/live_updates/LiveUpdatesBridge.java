@@ -1622,7 +1622,7 @@ public final class LiveUpdatesBridge {
     String image = optString(content, "image");
     if (custom == null && image != null && !image.contains("/")) {
       android.graphics.Bitmap bitmap =
-          android.graphics.BitmapFactory.decodeFile(new java.io.File(imageDir(c), image).getPath());
+          LiveUpdatesCustomLayout.decode(new java.io.File(imageDir(c), image).getPath());
       if (bitmap != null) b.setLargeIcon(Icon.createWithBitmap(bitmap));
     }
     if (content.has("colorArgb")) b.setColor((int) content.optLong("colorArgb"));

@@ -63,6 +63,11 @@ void main() {
       res('layout/live_update_custom.xml').readAsStringSync(),
       contains('live_update_title'),
     );
+    // Your version is kept as a copy.
+    expect(
+      res('layout/live_update_custom.xml.bak').readAsStringSync(),
+      '<!-- mine -->',
+    );
     // The keep file may list your own layouts: never replaced.
     expect(
       res('raw/live_updates_keep.xml').readAsStringSync(),
@@ -88,6 +93,24 @@ void main() {
 
   test('needs an Android app project', () async {
     expect(await create(['android', '--android-dir', '${root.path}/none']), 66);
+  });
+
+  test('the example layouts are the generated ones', () {
+    final dir = Directory('lib/src/cli/android_layout');
+    const example = 'example/android/app/src/main/res';
+    for (final (template, file) in [
+      ('layout.xml.tmpl', 'layout/live_update_custom.xml'),
+      ('layout_expanded.xml.tmpl', 'layout/live_update_custom_expanded.xml'),
+      ('keep.xml.tmpl', 'raw/live_updates_keep.xml'),
+    ]) {
+      expect(
+        File('$example/$file').readAsStringSync(),
+        File('${dir.path}/$template')
+            .readAsStringSync()
+            .replaceAll('{{name}}', 'live_update_custom'),
+        reason: file,
+      );
+    }
   });
 
   test('the templates fit what the library binds', () {

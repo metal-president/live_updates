@@ -30,6 +30,9 @@
   payloads are unchanged; `extra` is now sent only when it has values.
 - The empty-title warning is not shown for custom layouts, which are never
   promoted.
+- iOS: `LiveUpdatesImages.url` also refuses names starting with `.`, as
+  Android does.
+- Android: the large icon is decoded at most 512 pixels in size.
 
 ## 0.4.1
 

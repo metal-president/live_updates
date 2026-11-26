@@ -1198,8 +1198,9 @@ final class AndroidLiveUpdateOptions {
   /// (use [AndroidLiveUpdateMode.ongoing] to say so); progress styles,
   /// metrics, the status bar chip and [shortCriticalText] are not used.
   /// Android 12+ draws the layout inside the system's notification frame
-  /// (with the app icon and name), and keeps the collapsed layout to 48 dp
-  /// in height. The lock screen version made from
+  /// (with the app icon and name); for apps that target Android 12+, the
+  /// custom content of the collapsed notification is at most 48 dp high.
+  /// The lock screen version made from
   /// [LiveUpdateContent.publicContent] keeps the system template. A layout
   /// that cannot be found shows the system template, with a warning in the
   /// log.

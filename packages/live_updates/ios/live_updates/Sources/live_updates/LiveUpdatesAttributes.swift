@@ -388,7 +388,8 @@ public enum LiveUpdatesImages {
 
   /// URL of the image `name` written by the app.
   public static func url(_ name: String?) -> URL? {
-    guard let name, !name.contains("/") else { return nil }
+    // A file name in the directory only, as on Android.
+    guard let name, !name.isEmpty, !name.contains("/"), !name.hasPrefix(".") else { return nil }
     return directory?.appendingPathComponent(name)
   }
 

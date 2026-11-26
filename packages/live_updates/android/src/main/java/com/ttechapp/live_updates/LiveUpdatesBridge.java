@@ -277,6 +277,12 @@ public final class LiveUpdatesBridge {
     NotShowableException(String message) {
       super(message);
     }
+
+    // The message Dart shows, as before this class existed.
+    @Override
+    public String toString() {
+      return "java.lang.IllegalStateException: " + getMessage();
+    }
   }
 
   /**
@@ -1177,7 +1183,8 @@ public final class LiveUpdatesBridge {
         c.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
       }
       return true;
-    } catch (ActivityNotFoundException | SecurityException e) {
+    } catch (RuntimeException e) {
+      // No matching screen, or an activity that is going away.
       return false;
     }
   }

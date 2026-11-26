@@ -81,7 +81,7 @@ public final class LiveUpdatesBridge: NSObject {
     case limitReached = 2
     /// The app is not in the foreground.
     case notInForeground = 3
-    /// This iOS version does not support the call.
+    /// The device or this iOS version does not support the call.
     case unsupported = 4
   }
 
@@ -109,7 +109,7 @@ public final class LiveUpdatesBridge: NSObject {
     case .denied: return .disabled
     case .globalMaximumExceeded, .targetMaximumExceeded: return .limitReached
     case .visibility: return .notInForeground
-    case .unsupported, .unsupportedTarget: return .unsupported
+    case .unsupported: return .unsupported
     default: return .other
     }
   }

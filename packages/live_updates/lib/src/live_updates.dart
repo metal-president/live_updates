@@ -390,7 +390,8 @@ abstract final class LiveUpdates {
   /// Call this while the app is in the foreground; it throws
   /// [LiveUpdateException] in the background
   /// ([LiveUpdateFailure.notInForeground]) and before iOS 26
-  /// ([LiveUpdateFailure.unsupported]; check [canSchedule]). [pushUpdates] requests a per-activity APNs token, which
+  /// ([LiveUpdateFailure.unsupported]; check [canSchedule]).
+  /// [pushUpdates] requests a per-activity APNs token, which
   /// is issued only once the activity starts ([LiveUpdate.pushTokens] of the
   /// update from [onStarted] or [find]). If a live update with [key] is
   /// running at that time, the system shows both until the app runs; the
@@ -474,13 +475,15 @@ abstract final class LiveUpdates {
       _platform.openExactAlarmSettings();
 
   /// Opens the system screen where the user turns live updates back on, and
-  /// returns whether it was opened: the app's page in Settings on iOS (with
-  /// its Live Activities switch), the app's notification settings on
-  /// Android 8.0 and later, and the app's details below Android 8.0.
-  /// Offer it when [isSupported] or [requestPermission] returns `false` or a
-  /// call fails with [LiveUpdateFailure.disabled], and check again when the
-  /// app returns to the foreground. `false` on other platforms and below
-  /// iOS 16.2.
+  /// returns whether it was opened: the app's page in Settings on iOS, the
+  /// app's notification settings on Android 8.0 and later, and the app's
+  /// details below Android 8.0.
+  /// Offer it when a call fails with [LiveUpdateFailure.disabled], or on
+  /// Android when [isSupported] or [requestPermission] returns `false`, and
+  /// check again when the app returns to the foreground. `false` on other
+  /// platforms and on iOS versions where the plugin does nothing (below
+  /// iOS 16.2, or when the widget extension does not support the running
+  /// iOS).
   static Future<bool> openSettings() => _platform.openSettings();
 
   /// Copies Flutter assets used as [LiveUpdateIcon.asset] icons into the

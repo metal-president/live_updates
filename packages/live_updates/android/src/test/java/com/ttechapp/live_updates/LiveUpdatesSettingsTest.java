@@ -74,6 +74,10 @@ public class LiveUpdatesSettingsTest {
       fail("start must fail");
     } catch (IllegalStateException e) {
       assertEquals("disabled", LiveUpdatesBridge.failureReason(e));
+      // The message Dart shows is unchanged.
+      assertEquals(
+          "java.lang.IllegalStateException: Notifications are turned off for this app",
+          e.toString());
     } finally {
       shadowOf(manager).setNotificationsEnabled(true);
     }

@@ -246,20 +246,22 @@ Future<void> trackOrder() async {
 }
 ```
 
-`start`, `startOrUpdate`, `update` and `schedule` throw a
-`LiveUpdateException` when the system refuses. Its `reason` says why, in the
-same terms on both platforms: `disabled` (the user turned live updates off),
-`limitReached` and `notInForeground` (iOS), `unsupported` (the OS version is
-too old for the call) or `other`. For `disabled`, `LiveUpdates.openSettings()`
-opens the screen where the user turns them back on:
+`LiveUpdates.start`, `startOrUpdate` and `schedule`, `LiveUpdate.update` and
+`ScheduledLiveUpdate.reschedule` throw a `LiveUpdateException` when the
+system refuses. Its `reason` says why: `disabled` (the user turned live
+updates off: Live Activities on iOS, notifications for the app or its
+channel on Android), on iOS also `limitReached`, `notInForeground` and
+`unsupported` (the device or iOS version does not support the call)
+([source][ios-authorization-error]), else `other`. For `disabled`,
+`LiveUpdates.openSettings()` opens the screen where the user turns them back
+on:
 
 ```dart
 try {
-  await LiveUpdates.start(content);
+  await LiveUpdates.start(content); // content as above
 } on LiveUpdateException catch (e) {
-  if (e.reason == LiveUpdateFailure.disabled) {
-    await LiveUpdates.openSettings(); // check again when the app resumes
-  }
+  if (e.reason != LiveUpdateFailure.disabled) rethrow;
+  await LiveUpdates.openSettings(); // check again when the app resumes
 }
 ```
 
@@ -1375,6 +1377,7 @@ differently.
   and versions.
 
 [ios-activitykit]: https://developer.apple.com/documentation/activitykit/displaying-live-data-with-live-activities
+[ios-authorization-error]: https://developer.apple.com/documentation/activitykit/activityauthorizationerror
 [ios-button-intent]: https://developer.apple.com/documentation/swiftui/button/init(intent:label:)
 [ios-request-start]: https://developer.apple.com/documentation/activitykit/activity/request(attributes:content:pushtype:style:alertconfiguration:start:)
 [ios-stale-date]: https://developer.apple.com/documentation/activitykit/activitycontent/staledate

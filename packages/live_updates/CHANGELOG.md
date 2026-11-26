@@ -4,12 +4,13 @@
   updates back on (the app's page in Settings on iOS, the app's
   notification settings on Android 8.0+, its app details below) and
   returns whether it was opened.
-- `LiveUpdateException.reason` (`LiveUpdateFailure`): why a call failed, in
-  the same terms on both platforms: `disabled` (Live Activities, or
-  notifications for the app or its channel, turned off), `limitReached` and
-  `notInForeground` (iOS), `unsupported` (the OS is too old for the call)
-  or `other`. Existing code is unaffected: the constructor keeps its
-  positional message, and the reason defaults to `other`.
+- `LiveUpdateException.reason` (`LiveUpdateFailure`): why a call failed.
+  `disabled`: Live Activities turned off on iOS, notifications for the app
+  or its channel turned off on Android. iOS also reports `limitReached`,
+  `notInForeground` and `unsupported` (the device or iOS version does not
+  support the call). Anything else is `other`. Existing code is
+  unaffected: the constructor keeps its positional message, the reason
+  defaults to `other`, and messages are unchanged.
 - `dart run live_updates:create ios` now sets `NSSupportsLiveActivities`
   to YES when the Runner `Info.plist` has it set to NO (it was left as it
   was).

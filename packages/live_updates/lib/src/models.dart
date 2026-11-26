@@ -1651,7 +1651,8 @@ final class LiveUpdatePushToken {
 enum LiveUpdateFailure {
   /// The user turned live updates off: Live Activities for the app on iOS,
   /// notifications for the app or for its channel on Android. See
-  /// [LiveUpdates.openSettings].
+  /// [LiveUpdates.openSettings]. Android reports only this reason and
+  /// [other].
   disabled,
 
   /// iOS: too many Live Activities are running, for the app or on the
@@ -1662,9 +1663,9 @@ enum LiveUpdateFailure {
   /// Activity or to schedule one.
   notInForeground,
 
-  /// This OS version does not support the call, for example Live Activities
-  /// before iOS 16.2, [LiveUpdates.schedule] before iOS 26 or a broadcast
-  /// channel before iOS 18.
+  /// iOS: the device or this iOS version does not support the call, for
+  /// example [LiveUpdates.schedule] before iOS 26 or a broadcast channel
+  /// before iOS 18.
   unsupported,
 
   /// Any other failure; see [LiveUpdateException.message].

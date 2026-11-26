@@ -246,6 +246,23 @@ Future<void> trackOrder() async {
 }
 ```
 
+`start`, `startOrUpdate`, `update` and `schedule` throw a
+`LiveUpdateException` when the system refuses. Its `reason` says why, in the
+same terms on both platforms: `disabled` (the user turned live updates off),
+`limitReached` and `notInForeground` (iOS), `unsupported` (the OS version is
+too old for the call) or `other`. For `disabled`, `LiveUpdates.openSettings()`
+opens the screen where the user turns them back on:
+
+```dart
+try {
+  await LiveUpdates.start(content);
+} on LiveUpdateException catch (e) {
+  if (e.reason == LiveUpdateFailure.disabled) {
+    await LiveUpdates.openSettings(); // check again when the app resumes
+  }
+}
+```
+
 ### Taps and running updates
 
 ```dart
@@ -1256,8 +1273,10 @@ differently.
   that is cut off. ([source][ios-hig-specs])
 - **User settings:** users can turn off Live Activities for your app in
   Settings. `LiveUpdates.isSupported()` returns `false` then, and `start`
-  throws a `LiveUpdateException`. Check it before you offer a "Track on Lock
-  Screen" option. ([source][ios-activitykit])
+  throws a `LiveUpdateException` (`LiveUpdateFailure.disabled`). Check it
+  before you offer a "Track on Lock Screen" option;
+  `LiveUpdates.openSettings()` opens the app's page in Settings.
+  ([source][ios-activitykit])
 - **Number of activities:** the system limits how many Live Activities can
   run at once (per app and per device; the exact number varies). Handle a
   `LiveUpdateException` from `start`, and prefer one activity that you update
@@ -1309,7 +1328,8 @@ differently.
   turned off. `schedule` and `reschedule` with a past time throw too, and a
   schedule that comes due meanwhile shows nothing. `isSupported()` tells
   you beforehand whether notifications are on for the app; a turned-off
-  channel shows only in the exception.
+  channel shows only in the exception (`LiveUpdateFailure.disabled`).
+  `LiveUpdates.openSettings()` opens the app's notification settings.
 - **After `end`:** the final content (or the content shown last)
   stays as a regular notification for up to 4 hours, as on iOS, and the
   user can swipe it away. Running timers (and timer or stopwatch metrics)

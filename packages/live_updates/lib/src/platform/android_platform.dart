@@ -76,7 +76,25 @@ class AndroidLiveUpdatesPlatform extends LiveUpdatesPlatform
     try {
       return call();
     } on JThrowable catch (e) {
-      throw LiveUpdateException(e.toString());
+      throw LiveUpdateException(e.toString(), reason: _reason(e));
+    }
+  }
+
+  /// The reason the Java bridge gives for [e]
+  /// (`LiveUpdatesBridge.failureReason`).
+  static LiveUpdateFailure _reason(JThrowable e) {
+    try {
+      final throwable = e.as(Throwable.type);
+      try {
+        return failureFromName(
+          LiveUpdatesBridge.failureReason(throwable)
+              .toDartString(releaseOriginal: true),
+        );
+      } finally {
+        throwable.release();
+      }
+    } on Object {
+      return LiveUpdateFailure.other;
     }
   }
 
@@ -264,6 +282,9 @@ class AndroidLiveUpdatesPlatform extends LiveUpdatesPlatform
   @override
   Future<bool> openExactAlarmSettings() async =>
       LiveUpdatesBridge.openExactAlarmSettings();
+
+  @override
+  Future<bool> openSettings() async => LiveUpdatesBridge.openSettings();
 
   @override
   Future<void> schedule(

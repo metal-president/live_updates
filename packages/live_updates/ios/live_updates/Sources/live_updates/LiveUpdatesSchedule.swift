@@ -13,8 +13,9 @@ extension LiveUpdatesBridge {
   /// UserDefaults key: activity id -> ["key", "at" (epoch seconds), "json"].
   static let schedulesKey = "live_updates.schedules"
 
-  private static let scheduleUnavailableMessage =
-    "Scheduling live updates requires iOS 26 or later."
+  private static var scheduleUnavailableError: NSError {
+    failure(.unsupported, "Scheduling live updates requires iOS 26 or later.")
+  }
 
   /// Whether live updates can be scheduled: iOS 26+ and Live Activities
   /// enabled for this app.
@@ -25,17 +26,17 @@ extension LiveUpdatesBridge {
 
   /// Schedules `json` to start with `key` at `at` (epoch seconds), replacing
   /// the schedule with that key. A time that is not in the future starts or
-  /// updates it now. `completion` receives an error message or `nil`.
+  /// updates it now. `completion` receives an error or `nil`.
   static func scheduleFromDart(
-    _ key: String, json: String, at: Double, completion: @escaping (String?) -> Void
+    _ key: String, json: String, at: Double, completion: @escaping (NSError?) -> Void
   ) {
-    guard #available(iOS 26.0, *) else { return completion(scheduleUnavailableMessage) }
+    guard #available(iOS 26.0, *) else { return completion(scheduleUnavailableError) }
     Task { @MainActor in
       do {
         try await scheduleNow(key, json: json, at: Date(timeIntervalSince1970: at))
         completion(nil)
       } catch {
-        completion(error.localizedDescription)
+        completion(bridged(error))
       }
     }
   }
@@ -43,13 +44,13 @@ extension LiveUpdatesBridge {
   /// Moves the schedule with `key` to `at`, with `json` as its content when
   /// given (the push setting of the schedule is kept).
   static func rescheduleFromDart(
-    _ key: String, json: String?, at: Double, completion: @escaping (String?) -> Void
+    _ key: String, json: String?, at: Double, completion: @escaping (NSError?) -> Void
   ) {
-    guard #available(iOS 26.0, *) else { return completion(scheduleUnavailableMessage) }
+    guard #available(iOS 26.0, *) else { return completion(scheduleUnavailableError) }
     Task { @MainActor in
       do {
         guard let activity = pendingActivity(key) else {
-          return completion("No live update is scheduled with this key.")
+          return completion(failure(.other, "No live update is scheduled with this key."))
         }
         let stored = storedSchedules[activity.id]?["json"] as? String
         let request: String
@@ -65,7 +66,7 @@ extension LiveUpdatesBridge {
         if json == nil { keepImages(of: request, until: Date(timeIntervalSince1970: at)) }
         completion(nil)
       } catch {
-        completion(error.localizedDescription)
+        completion(bridged(error))
       }
     }
   }

@@ -1,6 +1,8 @@
 import 'dart:io';
 import 'dart:isolate';
 
+import 'package:meta/meta.dart';
+
 /// `dart run live_updates:create ios`: writes the SwiftUI Live Activity
 /// widget extension to `<iosDir>/<name>` and, with [editXcode], adds it to
 /// Runner.xcodeproj. [appGroup] `'auto'` uses `group.<app bundle id>`;
@@ -98,7 +100,7 @@ Future<int> createIos({
   _markWidgetPlist(File('${out.path}/Info.plist'));
 
   if (editXcode) {
-    if (!_enableLiveActivities('${ios.path}/Runner/Info.plist')) return 1;
+    if (!enableLiveActivities('${ios.path}/Runner/Info.plist')) return 1;
     // Private temp directory (mkdtemp, 0700), removed afterwards.
     final tmp = Directory.systemTemp.createTempSync('live_updates_');
     final ProcessResult result;
@@ -245,14 +247,24 @@ void _markWidgetPlist(File plist) {
 
 /// Sets NSSupportsLiveActivities and the tap URL scheme. Returns `false`
 /// (after printing why) if Info.plist could not be updated.
-bool _enableLiveActivities(String plist) {
+@visibleForTesting
+bool enableLiveActivities(String plist) {
   if (!File(plist).existsSync()) {
     stderr.writeln('$plist not found.');
     return false;
   }
   if (!_registerTapScheme(plist)) return false;
   const key = 'NSSupportsLiveActivities';
-  if (_plistBuddy('Print :$key', plist)) return true;
+  final current = Process.runSync('/usr/libexec/PlistBuddy', [
+    '-c',
+    'Print :$key',
+    plist,
+  ]);
+  if (current.exitCode == 0) {
+    if ((current.stdout as String).trim() == 'true') return true;
+    // Set to NO (or not a Boolean): make it a Boolean set to YES.
+    _plistBuddy('Delete :$key', plist);
+  }
   if (!_plistBuddy('Add :$key bool true', plist)) {
     stderr.writeln('Could not set $key in $plist.');
     return false;

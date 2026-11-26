@@ -885,6 +885,45 @@ extension type LiveUpdatesBridge._(jni$_.JObject _$this)
     ).check();
   }
 
+  static final _id_failureReason = _class.staticMethodId(
+    r'failureReason',
+    r'(Ljava/lang/Throwable;)Ljava/lang/String;',
+  );
+
+  static final _failureReason =
+      jni$_.ProtectedJniExtensions.lookup<
+            jni$_.NativeFunction<
+              jni$_.JniResult Function(
+                jni$_.Pointer<jni$_.Void>,
+                jni$_.JMethodIDPtr,
+                jni$_.VarArgs<(jni$_.Pointer<jni$_.Void>,)>,
+              )
+            >
+          >('globalEnv_CallStaticObjectMethod')
+          .asFunction<
+            jni$_.JniResult Function(
+              jni$_.Pointer<jni$_.Void>,
+              jni$_.JMethodIDPtr,
+              jni$_.Pointer<jni$_.Void>,
+            )
+          >();
+
+  /// from: `static public java.lang.String failureReason(java.lang.Throwable t)`
+  /// The returned object must be released after use, by calling the [release] method.
+  ///
+  /// Why {@code t}, thrown by a call of this class, failed: {@code "disabled"} when notifications
+  /// are turned off for the app or for the channel, else {@code "other"}. Dart maps it to
+  /// LiveUpdateFailure.
+  static jni$_.JString failureReason(Throwable t) {
+    final _$$classRef = _class.reference;
+    final _$t = t.reference;
+    return _failureReason(
+      _$$classRef.pointer,
+      _id_failureReason.pointer,
+      _$t.pointer,
+    ).object<jni$_.JString>();
+  }
+
   static final _id_start = _class.staticMethodId(
     r'start',
     r'(Ljava/lang/String;)Ljava/lang/String;',
@@ -1720,6 +1759,36 @@ extension type LiveUpdatesBridge._(jni$_.JObject _$this)
     ).boolean;
   }
 
+  static final _id_openSettings = _class.staticMethodId(
+    r'openSettings',
+    r'()Z',
+  );
+
+  static final _openSettings =
+      jni$_.ProtectedJniExtensions.lookup<
+            jni$_.NativeFunction<
+              jni$_.JniResult Function(
+                jni$_.Pointer<jni$_.Void>,
+                jni$_.JMethodIDPtr,
+              )
+            >
+          >('globalEnv_CallStaticBooleanMethod')
+          .asFunction<
+            jni$_.JniResult Function(
+              jni$_.Pointer<jni$_.Void>,
+              jni$_.JMethodIDPtr,
+            )
+          >();
+
+  /// from: `static public boolean openSettings()`
+  ///
+  /// Opens the system screen where the user turns notifications for this app back on: the app's
+  /// notification settings (Android 8.0+), else its app details. Returns whether it was opened.
+  static core$_.bool openSettings() {
+    final _$$classRef = _class.reference;
+    return _openSettings(_$$classRef.pointer, _id_openSettings.pointer).boolean;
+  }
+
   static final _id_schedule = _class.staticMethodId(
     r'schedule',
     r'(Ljava/lang/String;Ljava/lang/String;JZJ)V',
@@ -2012,4 +2081,26 @@ final class $LiveUpdatesBridge$Type$ extends jni$_.JType<LiveUpdatesBridge> {
   @jni$_.internal
   @core$_.override
   String get className => r'com/ttechapp/live_updates/LiveUpdatesBridge';
+}
+
+/// from: `java.lang.Throwable`
+///
+/// WARNING: Throwable is a stub. To generate bindings for this class, include
+/// java.lang.Throwable in your config's classes list.
+///
+extension type Throwable._(jni$_.JObject _$this) implements jni$_.JObject {
+  static const jni$_.JType<Throwable> type = $Throwable$Type$();
+}
+
+final class $Throwable$Type$ extends jni$_.JType<Throwable> {
+  @jni$_.internal
+  const $Throwable$Type$();
+
+  @jni$_.internal
+  @core$_.override
+  String get signature => r'Ljava/lang/Throwable;';
+
+  @jni$_.internal
+  @core$_.override
+  String get className => r'java/lang/Throwable';
 }

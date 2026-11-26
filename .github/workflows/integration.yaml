@@ -14,7 +14,16 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Whether this pull request changes more than documentation. These jobs
+  # are not required checks, so docs-only pull requests skip them as a whole
+  # (see build-ios in ci.yaml for required matrix jobs).
+  changes:
+    uses: ./.github/workflows/changes.yaml
+
   integration-ios:
+    needs: changes
+    # Skipped for docs-only pull requests; runs if the check itself failed.
+    if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
     strategy:
       fail-fast: false
       matrix:
@@ -107,6 +116,9 @@ jobs:
           retention-days: 7
 
   integration-android:
+    needs: changes
+    # Skipped for docs-only pull requests; runs if the check itself failed.
+    if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
     runs-on: ubuntu-latest
     timeout-minutes: 50
     strategy:

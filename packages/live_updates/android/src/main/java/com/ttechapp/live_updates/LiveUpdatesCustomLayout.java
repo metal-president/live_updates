@@ -51,6 +51,9 @@ final class LiveUpdatesCustomLayout {
   /** Largest side of a picture in the views: notifications have a size limit. */
   private static final int MAX_IMAGE_PX = 512;
 
+  /** Extra pictures shown at most, as a notification has a size limit. */
+  static final int MAX_EXTRA_IMAGES = 4;
+
   /** Entries kept in the caches below, which payloads can fill with names. */
   private static final int MAX_CACHED = 200;
 
@@ -141,6 +144,15 @@ final class LiveUpdatesCustomLayout {
    * views a notification cannot show, which would make the system reject it.
    */
   private static int layout(Context c, String name, boolean remote) {
+    // Names that are not resource names are not logged as given (they may
+    // come from a payload).
+    if (!NAME.matcher(name).matches()) {
+      warnOnce(
+          "Custom layout name is not a resource name ("
+              + name.length()
+              + " characters): showing the system template.");
+      return 0;
+    }
     if (remote && !name.startsWith(REMOTE_PREFIX)) {
       warnOnce(
           "Custom layout \""
@@ -150,10 +162,7 @@ final class LiveUpdatesCustomLayout {
               + "; showing the system template.");
       return 0;
     }
-    int res =
-        NAME.matcher(name).matches()
-            ? c.getResources().getIdentifier(name, "layout", c.getPackageName())
-            : 0;
+    int res = c.getResources().getIdentifier(name, "layout", c.getPackageName());
     if (res == 0) {
       warnOnce(
           "Custom layout \""
@@ -225,7 +234,7 @@ final class LiveUpdatesCustomLayout {
       Object value = extra.opt(key);
       if (!(value instanceof String)) continue;
       if (!KEY.matcher(key).matches()) {
-        warnOnce("extra \"" + key + "\": only a-z, 0-9 and _ can name a view; not shown.");
+        warnOnce("An extra key is not a-z, 0-9 and _ only (" + key.length() + " characters): not shown.");
         continue;
       }
       // live_update_extra_image_<key> is the ImageView of extraImages: text
@@ -241,11 +250,15 @@ final class LiveUpdatesCustomLayout {
     }
 
     JSONObject extraImages = content.optJSONObject("extraImages");
+    int pictures = 0;
     for (Iterator<String> it = extraImages == null ? null : extraImages.keys();
-        it != null && it.hasNext(); ) {
+        it != null && it.hasNext() && pictures < MAX_EXTRA_IMAGES; ) {
       String key = it.next();
       if (!KEY.matcher(key).matches()) {
-        warnOnce("extraImages \"" + key + "\": only a-z, 0-9 and _ can name a view; not shown.");
+        warnOnce(
+            "An extraImages key is not a-z, 0-9 and _ only ("
+                + key.length()
+                + " characters): not shown.");
         continue;
       }
       int id = id(c, ID_EXTRA_IMAGE_PREFIX + key);
@@ -254,6 +267,7 @@ final class LiveUpdatesCustomLayout {
       if (bitmap == null) continue;
       v.setImageViewBitmap(id, bitmap);
       v.setViewVisibility(id, View.VISIBLE);
+      pictures++;
     }
   }
 
@@ -309,7 +323,7 @@ final class LiveUpdatesCustomLayout {
 
   /** The picture at {@code path}, scaled down to at most {@link #MAX_IMAGE_PX}, or null. */
   @Nullable
-  private static Bitmap decode(String path) {
+  static Bitmap decode(String path) {
     BitmapFactory.Options bounds = new BitmapFactory.Options();
     bounds.inJustDecodeBounds = true;
     BitmapFactory.decodeFile(path, bounds);

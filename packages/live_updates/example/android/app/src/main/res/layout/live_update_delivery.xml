@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The example app's custom layout, collapsed (at most 48 dp high on
-     Android 12+): title, countdown, status and a thin progress bar. -->
+<!-- The example app's custom layout, collapsed (custom content at most
+     48 dp high for apps that target Android 12+): title, countdown, status
+     and a thin progress bar. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"

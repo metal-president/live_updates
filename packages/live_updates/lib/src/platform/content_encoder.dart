@@ -99,7 +99,13 @@ mixin ContentEncoder {
             // Such as a missing file or asset (a FlutterError) or a failed
             // download; other errors are mistakes in the code.
             if (e is Error && e is! FlutterError) rethrow;
-            debugPrint('live_updates: extra image "$key" left out: $e');
+            // The reason only in debug builds: it can hold a signed URL.
+            var reason = '${e.runtimeType}';
+            assert(() {
+              reason = '$e';
+              return true;
+            }());
+            debugPrint('live_updates: extra image "$key" left out: $reason');
           }
         }
         if (names.isNotEmpty) json['extraImages'] = names;

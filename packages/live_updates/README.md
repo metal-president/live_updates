@@ -1214,6 +1214,13 @@ LiveUpdateContent(
 );
 ```
 
+The generated layouts in the example app (Android 17), collapsed and
+expanded:
+
+| Collapsed | Expanded |
+| --- | --- |
+| <img src="https://raw.githubusercontent.com/metal-president/live_updates/main/docs/screenshots/android_custom_layout/collapsed.png" alt="Collapsed custom notification layout" width="380"> | <img src="https://raw.githubusercontent.com/metal-president/live_updates/main/docs/screenshots/android_custom_layout/expanded.png" alt="Expanded custom notification layout" width="380"> |
+
 Without `expanded`, the collapsed layout is used for both. The plugin fills
 the views by id; a layout can leave out any of them:
 

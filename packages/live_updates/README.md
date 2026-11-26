@@ -45,7 +45,24 @@ Screenshots of the example app in this repository. See also the
 - [Getting started](#getting-started)
 - [Platform guidelines](#platform-guidelines)
 - [Usage](#usage)
+  - [Start, update and end](#start-update-and-end)
+  - [Taps and running updates](#taps-and-running-updates)
+  - [When the app is closed](#when-the-app-is-closed)
+  - [One live update per key](#one-live-update-per-key)
+  - [Layouts](#layouts)
+  - [Timers](#timers)
+  - [Images](#images)
+  - [Icons](#icons)
+  - [Buttons](#buttons)
+  - [Alerts](#alerts)
+  - [Hiding content on the Lock Screen](#hiding-content-on-the-lock-screen)
+  - [Scheduling](#scheduling)
+  - [Ending at a time](#ending-at-a-time)
 - [Platform-specific options](#platform-specific-options)
+  - [Colors and the Dynamic Island](#colors-and-the-dynamic-island)
+  - [Android display modes](#android-display-modes)
+  - [Android progress stages and timeout](#android-progress-stages-and-timeout)
+  - [Android 17 metrics and semantic colors](#android-17-metrics-and-semantic-colors)
 - [Custom layouts](#custom-layouts)
   - [Customizing the iOS widget](#customizing-the-ios-widget)
   - [Customizing the Android notification](#customizing-the-android-notification)
@@ -77,10 +94,6 @@ app with its route), and push-to-start needs iOS 17.2.
 
 Taps (`onTap`) and lifecycle events (`states`, `onStarted`) work wherever
 live updates do.
-
-"Android 16+" shows a Live Update when the system promotes it (Android 16
-QPR1 and later); otherwise it is an ongoing notification with the same
-features.
 
 ## Getting started
 
@@ -519,9 +532,9 @@ Each place shows the first icon that is set:
   [source][ios-hig-best-practices])
 - **Color:** symbols take `IosLiveUpdateOptions.color` (else the text
   color); images keep their colors, except asset catalog images set to
-  render as template, which take the text color. The Dynamic Island is
-  always black; check the contrast in Dark Mode and on the dimmed Always-On
-  display. ([source][ios-hig-colors])
+  render as template, which take the text color. Check the contrast as
+  described in [Colors and the Dynamic Island](#colors-and-the-dynamic-island).
+  ([source][ios-hig-colors])
 - **Remote updates:** a push updates the activity without running the app,
   so the widget only finds asset icons that the app stored before. `start`
   and `update` store their own; store the others at app start:
@@ -960,8 +973,11 @@ in a `LiveUpdateMetric.text`.
 
 Semantic styles let Android color the body text, the progress bar or a metric
 by meaning (info, safe, caution, danger); the system picks the colors and
-applies them to promoted Live Updates on Android 17. They are ignored on
-older versions. The same keys work in remote payloads (see
+applies them to promoted Live Updates on Android 17. Set them with
+`AndroidLiveUpdateOptions.bodySemanticStyle` and `progressSemanticStyle`, and
+`semanticStyle` on `LiveUpdateMetric`, `AndroidProgressSegment` and
+`AndroidProgressPoint`. They are ignored on older versions. The same keys
+work in remote payloads (see
 [docs/testing-remote.md](https://github.com/metal-president/live_updates/blob/main/docs/testing-remote.md)).
 
 ## Custom layouts

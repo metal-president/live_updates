@@ -2,7 +2,7 @@ name: live_updates_fcm
 description: >-
   Optional Firebase Cloud Messaging integration for live_updates: forwards
   remote Live Update payloads and push tokens.
-version: 0.5.0
+version: 0.5.1
 homepage: https://github.com/metal-president/live_updates
 repository: https://github.com/metal-president/live_updates/tree/main/packages/live_updates_fcm
 issue_tracker: https://github.com/metal-president/live_updates/issues

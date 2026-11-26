@@ -1,3 +1,8 @@
+## 0.5.1
+
+- Docs: "Add the package" is the first step of Getting started. No code
+  changes; works with live_updates 0.5.0 and later 0.5.x.
+
 ## 0.5.0
 
 - Requires live_updates 0.5.0. No changes in this package; remote payloads

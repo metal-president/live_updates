@@ -13,13 +13,19 @@ live_updates works without it.
 
 ## Getting started
 
-1. Set up [`live_updates`](https://pub.dev/packages/live_updates#getting-started)
+1. Add the package:
+
+   ```bash
+   flutter pub add live_updates_fcm
+   ```
+
+2. Set up [`live_updates`](https://pub.dev/packages/live_updates#getting-started)
    (on iOS, including the widget extension and the Push Notifications
    capability).
-2. Set up Firebase and
+3. Set up Firebase and
    [`firebase_messaging`](https://pub.dev/packages/firebase_messaging) as
    usual.
-3. Turn on Firebase Installation IDs, which `LiveUpdatesFcm.tokens()`
+4. Turn on Firebase Installation IDs, which `LiveUpdatesFcm.tokens()`
    reports (they are off by default):
 
    - Android, inside `<application>` in `android/app/src/main/AndroidManifest.xml`:
@@ -46,12 +52,6 @@ live_updates works without it.
    tokens, check that it supports installation IDs first, or keep them off
    and use `tokens(includeRegistrationToken: true)` (see
    [Registering tokens with your server](#registering-tokens-with-your-server)).
-
-4. Add the package:
-
-   ```bash
-   flutter pub add live_updates_fcm
-   ```
 
 On Android 13 and later, live updates appear only after the user grants the
 notification permission (`LiveUpdates.requestPermission()`), including ones
@@ -104,7 +104,7 @@ message also needs a target: the installation ID (`message.fid`), or
 [docs/server-fcm.md](https://github.com/metal-president/live_updates/blob/main/docs/server-fcm.md#ios-envelope).
 
 `fcmRegistrationToken` is only for apps that keep installation IDs off.
-While they are on (step 3 of [Getting started](#getting-started)),
+While they are on (step 4 of [Getting started](#getting-started)),
 `tokens(includeRegistrationToken: true)` reports an error instead of a token.
 Use one of the two, not both.
 

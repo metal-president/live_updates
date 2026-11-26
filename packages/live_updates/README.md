@@ -118,7 +118,7 @@ flutter pub add live_updates
 3. For push updates, add the **Push Notifications** capability to the Runner
    target.
 
-To change how the widget looks, see
+The generated widget works as is. To change how it looks (optional), see
 [Customizing the iOS widget](#customizing-the-ios-widget).
 
 #### Manual setup
@@ -171,7 +171,7 @@ the permission in `android/app/src/main/AndroidManifest.xml`:
 </manifest>
 ```
 
-To draw the notification with layouts of your own, see
+To draw the notification with layouts of your own (optional), see
 [Customizing the Android notification](#customizing-the-android-notification).
 
 ## Platform guidelines
@@ -1163,7 +1163,7 @@ and the Android layouts are `live_update_delivery*.xml` in its
 
 ### Customizing the iOS widget
 
-#### Generate the widget
+#### The generated files
 
 [Getting started](#ios) has already generated the widget with
 `dart run live_updates:create ios`. It writes two kinds of files to

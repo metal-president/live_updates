@@ -65,21 +65,17 @@ app with its route), and push-to-start needs iOS 17.2.
 | | iOS 16.2+ | Android 16+ | Android 7–15 | iOS 15.0–16.1, other |
 | --- | --- | --- | --- | --- |
 | Start / update / end | Live Activity | Live Update (when promoted) | Ongoing notification | no-op |
-| Progress | ✓ | `ProgressStyle` (segments, points) | progress bar | |
-| Timer (countdown, stopwatch) | ✓ (a countdown stops at zero) | chronometer (removed when a countdown ends) | chronometer (removed when a countdown ends, Android 8+) | |
-| Metrics | `metrics` layout | Android 17 `MetricStyle`, else text | text | |
-| Steps, journey | `stepper`, `journey` layouts | progress segments and points, text | progress bar, text | |
-| Semantic colors | – | Android 17+ | – | |
+| Progress, timer, image | ✓ | ✓ (`ProgressStyle`) | ✓ | |
+| [Layouts](#layouts) (metrics, steps, journey) | five layouts | Android 16 progress segments and points, Android 17 `MetricStyle`, else text | progress bar, text | |
 | Buttons (`actions`) | iOS 17+ | ✓ | ✓ | |
-| Image | ✓ | large icon (not with Android 17 metrics) | large icon | |
-| Custom layout | SwiftUI (`IosLiveUpdateLayout.custom`) | XML layout (ongoing, not promoted) | XML layout | |
-| Tap route (`onTap`) | ✓ | ✓ | ✓ | |
-| Scheduled start (`schedule`) | iOS 26+ | alarm | alarm | |
-| Ended content at a time (`endAt`) | stale date | alarm | alarm | |
-| Lifecycle events (`states`, `onStarted`) | ✓ | ✓ | ✓ | |
-| Live Activity push tokens | ✓ (push-to-start iOS 17.2+) | – (FCM via `live_updates_fcm`) | – (FCM via `live_updates_fcm`) | |
-| Remote updates | push to the system (APNs, or FCM), no app code | data message → `handleRemotePayload` | data message → `handleRemotePayload` | |
+| [Custom layout](#custom-layouts) | SwiftUI | XML layout (not promoted) | XML layout | |
+| Scheduled start (`schedule`) | iOS 26+ | ✓ (alarm) | ✓ (alarm) | |
+| Ended content at a time (`endAt`) | ✓ (stale date) | ✓ (alarm) | ✓ (alarm) | |
+| [Remote updates](#remote-updates) | APNs or FCM (push-to-start iOS 17.2+), no app code | data message → `handleRemotePayload` (FCM: `live_updates_fcm`) | data message → `handleRemotePayload` (FCM: `live_updates_fcm`) | |
 | One push to many devices | broadcast channels (iOS 18+) | FCM topics | FCM topics | |
+
+Taps (`onTap`) and lifecycle events (`states`, `onStarted`) work wherever
+live updates do.
 
 "Android 16+" shows a Live Update when the system promotes it (Android 16
 QPR1 and later); otherwise it is an ongoing notification with the same
@@ -151,10 +147,13 @@ starting on Android 13+; it asks for `POST_NOTIFICATIONS` only
 make it the default icon (see [Icons](#icons)); without one, Android shows the
 app icon as a solid shape.
 
-`POST_PROMOTED_NOTIFICATIONS` is required, in addition to
-`POST_NOTIFICATIONS`, for a notification to be promoted to a Live Update
-(Android 16 QPR1 and later). It is granted at install time without a prompt,
-and users can turn it off per app in Settings.
+Android promotes a notification to a Live Update (Android 16 QPR1 and
+later) only when the user allows it and the notification meets the
+system's criteria (see [Platform limits](#platform-limits)); otherwise it
+stays a regular ongoing notification. The permission for it,
+`POST_PROMOTED_NOTIFICATIONS`, is granted at install time without a prompt,
+and users can turn it off per app in Settings
+(`LiveUpdates.canPostPromotedNotifications()`).
 ([source][android-promoted-permission], [source][android-live-update])
 
 If your app only uses `AndroidLiveUpdateMode.ongoing` or
@@ -170,11 +169,6 @@ the permission in `android/app/src/main/AndroidManifest.xml`:
   ...
 </manifest>
 ```
-
-Android only promotes a notification to a Live Update when the build supports
-it, the user allows it (`LiveUpdates.canPostPromotedNotifications()`), and the
-notification meets the system's criteria. Otherwise it stays a regular
-ongoing notification.
 
 To draw the notification with layouts of your own, see
 [Customizing the Android notification](#customizing-the-android-notification).
@@ -564,8 +558,9 @@ await LiveUpdates.startOrUpdate(
   regular notification (title, body, icon, image, color and tap route; no
   progress, timer or buttons) that is no longer ongoing or promoted, so the
   user can swipe it away (reported as `dismissed`; as with any dismissal,
-  `startOrUpdate` then does not show the key again until you `end` it). Like scheduling, the
-  switch is on time only with exact alarms, otherwise within 10 minutes.
+  `startOrUpdate` then does not show the key again until you `end` it). As
+  with scheduling, the switch is on time only with exact alarms (see
+  [Platform limits](#platform-limits)), otherwise within 10 minutes.
   `AndroidLiveUpdateOptions(removeAtEnd: true)` removes the notification at
   `endAt` instead, exactly ([source][android-timeout-after]). With a
   countdown that ends by `endAt` (as in the example), the notification is
@@ -738,8 +733,8 @@ Android 17 notification shade):
 | `journey` | <img src="https://raw.githubusercontent.com/metal-president/live_updates/main/docs/screenshots/layouts/ios_journey.png" alt="iOS journey layout" width="260"> | <img src="https://raw.githubusercontent.com/metal-president/live_updates/main/docs/screenshots/layouts/android_live_update_journey.png" alt="Android Live Update with journey data" width="260"> | <img src="https://raw.githubusercontent.com/metal-president/live_updates/main/docs/screenshots/layouts/android_classic_journey.png" alt="Android ongoing notification with journey data" width="260"> |
 
 Android has no layout setting; it shows the data that the content carries.
-The Live Update column is `AndroidLiveUpdateMode.liveUpdate` on builds that
-support promoted notifications (Android 16 QPR1 and later); metrics use
+The Live Update column is `AndroidLiveUpdateMode.liveUpdate` when the
+system promotes the notification; metrics use
 `MetricStyle` only on Android 17. The ongoing notification column is
 `AndroidLiveUpdateMode.classic`, which is also what Android 15 and earlier
 show.
@@ -1330,7 +1325,7 @@ layouts do.
   `@android:style/TextAppearance.Material.Notification.Title`, as the
   generated layouts do) and no background color. Images are scaled down to
   at most 512 pixels in the layouts.
-- **Lock Screen:** the public version made from `publicContent` keeps the
+- **Lock screen:** the public version made from `publicContent` keeps the
   system template.
 - **Ended and stale:** after `end`, and from `endAt` on, the layout shows
   the final or ended content without progress or timer. `endedContent`
@@ -1441,9 +1436,7 @@ Deliver a data message and pass it to `LiveUpdates.handleRemotePayload`:
 | `live_updates_content` | Content as a JSON string, same keys as above |
 | `live_updates_dismiss_after` | Optional, seconds to keep final content on `end` (at most and by default 4 hours, like `dismissAfter` of `LiveUpdate.end`) |
 
-In the content, `androidLayout` and `androidExpandedLayout` select
-[custom layouts](#customizing-the-android-notification), and `extra` fills
-them.
+The content can also select [custom layouts](#android-notes).
 
 With Firebase, [`live_updates_fcm`](https://pub.dev/packages/live_updates_fcm)
 does this for you.

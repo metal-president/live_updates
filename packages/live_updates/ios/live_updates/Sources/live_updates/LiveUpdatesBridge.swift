@@ -33,7 +33,7 @@ public final class LiveUpdatesBridge: NSObject {
   /// Whether the app's Live Activity widget extension supports the running
   /// iOS. An extension that targets a newer iOS (17.2 before live_updates
   /// 0.4.0) is not loaded, and no activity would show. The extension made by
-  /// `create_widget` has `LiveUpdatesWidget` in its Info.plist (a Boolean, or
+  /// `create ios` has `LiveUpdatesWidget` in its Info.plist (a Boolean, or
   /// the string YES). Without that key (an extension not set up again since
   /// live_updates 0.4.0) any widget extension that supports the running iOS
   /// will do, as before. `true` when the app has no widget extension (as
@@ -847,7 +847,7 @@ extension Data {
 extension LiveUpdatesBridge {
   /// URL scheme used by the widget template's `widgetURL`:
   /// `liveupdates-<app bundle id>://tap?route=<percent-encoded route>`.
-  /// It is unique per app; `create_widget` registers it in Info.plist.
+  /// It is unique per app; `create ios` registers it in Info.plist.
   static var tapScheme: String { "liveupdates-" + (Bundle.main.bundleIdentifier ?? "") }
 
   /// Returns `true` if `url` is a live_updates tap URL.

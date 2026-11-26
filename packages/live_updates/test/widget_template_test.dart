@@ -29,11 +29,17 @@ void main() {
       final expected = File('$templates/$template')
           .readAsStringSync()
           .replaceAll('{{name}}', 'LiveUpdatesWidget');
-      expect(
-        File('example/ios/LiveUpdatesWidget/$name').readAsStringSync(),
-        expected,
-        reason: name,
-      );
+      // The example adds a layout of its own between example-only markers.
+      final example = File('example/ios/LiveUpdatesWidget/$name')
+          .readAsStringSync()
+          .replaceAll(
+            RegExp(
+              r'\n+[ \t]*// example-only:begin\n.*?// example-only:end\n',
+              dotAll: true,
+            ),
+            '\n',
+          );
+      expect(example, expected, reason: name);
     }
   });
 

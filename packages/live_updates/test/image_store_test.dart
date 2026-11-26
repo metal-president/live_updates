@@ -87,21 +87,65 @@ void main() {
     });
   });
 
-  testWidgets('extra images are stored on iOS only', (tester) async {
+  testWidgets('extra images are stored on both platforms', (tester) async {
     await tester.runAsync(() async {
       const content = LiveUpdateContent(
         title: 'Order',
+        extra: {'map': 'text'},
+        // Android stores pictures only for a custom layout.
+        android: AndroidLiveUpdateOptions(
+          customLayout: AndroidCustomLayout('live_update_custom'),
+        ),
+        extraImages: {
+          'map': LiveUpdateImage.file('example/assets/parcel.png'),
+          'courier': LiveUpdateImage.file(
+            'example/assets/parcel.png',
+            maxDimension: 64,
+          ),
+          // Cannot be stored: left out, not the whole content.
+          'missing': LiveUpdateImage.file('example/assets/none.png'),
+          'missingAsset': LiveUpdateImage.asset('assets/none.png'),
+        },
+      );
+      for (final ios in [true, false]) {
+        final json = jsonDecode(
+          await _Encoder(dir, ios: ios).encodeContent(content),
+        ) as Map<String, Object?>;
+        final images = json['extraImages']! as Map;
+        expect(images.keys, unorderedEquals(['map', 'courier']));
+        for (final name in images.values) {
+          expect(name, startsWith(ImageStore.prefix));
+          expect(File('${dir.path}/$name').existsSync(), isTrue);
+        }
+        // Its own key: extra keeps its text values.
+        expect(json['extra'], {'map': 'text'});
+      }
+      // Without an image directory the pictures are left out, not the
+      // content.
+      final noGroup = jsonDecode(
+        await _Encoder(null, ios: true).encodeContent(content),
+      ) as Map<String, Object?>;
+      expect(noGroup.containsKey('extraImages'), isFalse);
+      expect(noGroup['extra'], {'map': 'text'});
+    });
+  });
+
+  testWidgets('the deprecated iOS extra images are merged in', (tester) async {
+    await tester.runAsync(() async {
+      const content = LiveUpdateContent(
+        title: 'Order',
+        extraImages: {
+          'map': LiveUpdateImage.file('example/assets/parcel.png'),
+          'shared': LiveUpdateImage.file('example/assets/parcel.png'),
+        },
         ios: IosLiveUpdateOptions(
-          extra: {'map': 'text'},
+          // ignore: deprecated_member_use_from_same_package
           extraImages: {
-            'map': LiveUpdateImage.file('example/assets/parcel.png'),
-            'courier': LiveUpdateImage.file(
+            'map': LiveUpdateImage.file(
               'example/assets/parcel.png',
-              maxDimension: 64,
+              maxDimension: 32,
             ),
-            // Cannot be stored: left out, not the whole content.
-            'missing': LiveUpdateImage.file('example/assets/none.png'),
-            'missingAsset': LiveUpdateImage.asset('assets/none.png'),
+            'ios': LiveUpdateImage.file('example/assets/parcel.png'),
           },
         ),
       );
@@ -109,23 +153,62 @@ void main() {
         await _Encoder(dir, ios: true).encodeContent(content),
       ) as Map<String, Object?>;
       final images = json['extraImages']! as Map;
-      expect(images.keys, unorderedEquals(['map', 'courier']));
-      for (final name in images.values) {
-        expect(name, startsWith(ImageStore.prefix));
-        expect(File('${dir.path}/$name').existsSync(), isTrue);
-      }
-      // Its own key: extra keeps its text values.
-      expect(json['extra'], {'map': 'text'});
+      expect(images.keys, unorderedEquals(['map', 'shared', 'ios']));
+      // The iOS picture wins for its key: a smaller file than the shared one.
+      expect(images['map'], isNot(images['shared']));
+      expect(images['ios'], images['shared']);
+    });
+  });
+
+  testWidgets('Android leaves out the deprecated iOS values and pictures '
+      'without a custom layout', (tester) async {
+    await tester.runAsync(() async {
+      const content = LiveUpdateContent(
+        title: 'Order',
+        extra: {'a': 'shared'},
+        extraImages: {'map': LiveUpdateImage.file('example/assets/parcel.png')},
+        ios: IosLiveUpdateOptions(
+          // ignore: deprecated_member_use_from_same_package
+          extra: {'a': 'ios', 'b': 'ios'},
+          // ignore: deprecated_member_use_from_same_package
+          extraImages: {
+            'ios': LiveUpdateImage.file('example/assets/parcel.png'),
+          },
+        ),
+      );
       final android = jsonDecode(
         await _Encoder(dir).encodeContent(content),
       ) as Map<String, Object?>;
+      expect(android['extra'], {'a': 'shared'});
       expect(android.containsKey('extraImages'), isFalse);
-      // Without an App Group the pictures are left out, not the content.
-      final noGroup = jsonDecode(
-        await _Encoder(null, ios: true).encodeContent(content),
+      final withLayout = jsonDecode(
+        await _Encoder(dir).encodeContent(
+          content.copyWith(
+            android: const AndroidLiveUpdateOptions(
+              customLayout: AndroidCustomLayout('live_update_custom'),
+            ),
+          ),
+        ),
       ) as Map<String, Object?>;
-      expect(noGroup.containsKey('extraImages'), isFalse);
-      expect(noGroup['extra'], {'map': 'text'});
+      expect((withLayout['extraImages']! as Map).keys, ['map']);
+      const iosOnly = LiveUpdateContent(
+        title: 'Order',
+        // ignore: deprecated_member_use_from_same_package
+        ios: IosLiveUpdateOptions(extra: {'b': 'ios'}),
+      );
+      expect(
+        (jsonDecode(await _Encoder(dir).encodeContent(iosOnly)) as Map)
+            .containsKey('extra'),
+        isFalse,
+      );
+      final ios = jsonDecode(
+        await _Encoder(dir, ios: true).encodeContent(content),
+      ) as Map<String, Object?>;
+      expect(ios['extra'], {'a': 'ios', 'b': 'ios'});
+      expect(
+        (ios['extraImages']! as Map).keys,
+        unorderedEquals(['map', 'ios']),
+      );
     });
   });
 

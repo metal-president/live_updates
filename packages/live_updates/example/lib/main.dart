@@ -42,6 +42,7 @@ class _ExamplePageState extends State<ExamplePage> {
   bool _push = false;
   IosLiveUpdateLayout _layout = IosLiveUpdateLayout.standard;
   AndroidLiveUpdateMode _mode = AndroidLiveUpdateMode.liveUpdate;
+  bool _customLayout = false;
 
   static const _layouts = {
     'standard': IosLiveUpdateLayout.standard,
@@ -134,6 +135,29 @@ class _ExamplePageState extends State<ExamplePage> {
                 '${_eta.minute.toString().padLeft(2, '0')}',
           )
         : null,
+    // Values for layouts of your own ("Custom layout"): the Android layouts
+    // res/layout/live_update_delivery*.xml show them in the views
+    // live_update_extra_<key>, and the iOS layout "delivery" (in
+    // LiveUpdatesWidgetLiveActivity.swift) reads context.state.extra.
+    extra: {
+      'status': switch (_progress) {
+        >= 1 => 'Left at the door',
+        < .5 => 'Your order is on its way',
+        _ => 'The courier is nearby',
+      },
+      'distance': '${((1 - _progress) * 4).toStringAsFixed(1)} km',
+      'stops': '${((1 - _progress) * 3).round()}',
+      'arrival':
+          '${_eta.hour.toString().padLeft(2, '0')}:'
+          '${_eta.minute.toString().padLeft(2, '0')}',
+    },
+    extraImages: {
+      if (_customLayout)
+        'courier': const LiveUpdateImage.asset(
+          'assets/courier.png',
+          maxDimension: 96,
+        ),
+    },
     // Shown instead (keeping the progress and the countdown) while a locked
     // device hides sensitive content, if the person chose that in Settings.
     publicContent: const LiveUpdatePublicContent(
@@ -141,7 +165,9 @@ class _ExamplePageState extends State<ExamplePage> {
       body: 'Unlock for details',
     ),
     ios: IosLiveUpdateOptions(
-      layout: _layout,
+      layout: _customLayout
+          ? const IosLiveUpdateLayout.custom('delivery')
+          : _layout,
       // The compact Dynamic Island shows the countdown instead of the progress.
       compactTrailing: IosIslandContent.timer,
       // Accent for progress, buttons and the timer: readable on the dark
@@ -172,7 +198,17 @@ class _ExamplePageState extends State<ExamplePage> {
     android: AndroidLiveUpdateOptions(
       // Single-color status bar icon (res/drawable, kept by res/raw/keep.xml).
       smallIcon: const LiveUpdateIcon.native('ic_stat_parcel'),
-      mode: _mode,
+      // A custom layout is never promoted to a Live Update: an ongoing
+      // notification says so.
+      mode: _customLayout ? AndroidLiveUpdateMode.ongoing : _mode,
+      // res/layout/live_update_delivery*.xml, made from the layouts that
+      // `dart run live_updates:create android` writes.
+      customLayout: _customLayout
+          ? const AndroidCustomLayout(
+              'live_update_delivery',
+              expanded: 'live_update_delivery_expanded',
+            )
+          : null,
       shortCriticalText: 'ETA',
       // Gone after 2 hours even if the app never ends it.
       timeoutAfter: const Duration(hours: 2),
@@ -309,6 +345,11 @@ class _ExamplePageState extends State<ExamplePage> {
             ],
             onChanged: (v) => setState(() => _mode = v ?? _mode),
           ),
+        ),
+        SwitchListTile(
+          title: const Text('Custom layout (applies on Start / Update)'),
+          value: _customLayout,
+          onChanged: (v) => setState(() => _customLayout = v),
         ),
         SwitchListTile(
           title: const Text('Request push token (needs Push capability)'),

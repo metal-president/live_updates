@@ -155,11 +155,52 @@ void main() {
         title: 'With image',
         progress: .5,
         image: LiveUpdateImage.asset('assets/parcel.png', maxDimension: 64),
-        // Extra pictures for custom iOS layouts (ignored on Android).
-        ios: IosLiveUpdateOptions(
-          extraImages: {
-            'map': LiveUpdateImage.asset('assets/parcel.png', maxDimension: 48),
-          },
+        // Extra pictures for custom layouts.
+        extraImages: {
+          'map': LiveUpdateImage.asset('assets/parcel.png', maxDimension: 48),
+        },
+      ),
+    );
+    await update.end(dismissAfter: Duration.zero);
+  });
+
+  testWidgets('a custom Android layout is shown and never promoted', (
+    tester,
+  ) async {
+    if (!await LiveUpdates.isSupported()) return;
+    const android = AndroidLiveUpdateOptions(
+      mode: AndroidLiveUpdateMode.ongoing,
+      customLayout: AndroidCustomLayout(
+        'live_update_custom',
+        expanded: 'live_update_custom_expanded',
+      ),
+    );
+    final update = await LiveUpdates.start(
+      const LiveUpdateContent(
+        title: 'Custom',
+        body: 'Body',
+        progress: .4,
+        extra: {'status': 'Near you'},
+        image: LiveUpdateImage.asset('assets/parcel.png', maxDimension: 64),
+        android: android,
+      ),
+    );
+    await update.update(
+      const LiveUpdateContent(
+        title: 'Custom',
+        progress: .8,
+        extra: {'status': 'Here'},
+        android: android,
+      ),
+    );
+    expect(await update.isPromoted(), isFalse);
+    // A layout that does not exist falls back to the system template.
+    await update.update(
+      const LiveUpdateContent(
+        title: 'Custom',
+        android: AndroidLiveUpdateOptions(
+          mode: AndroidLiveUpdateMode.ongoing,
+          customLayout: AndroidCustomLayout('live_update_missing'),
         ),
       ),
     );

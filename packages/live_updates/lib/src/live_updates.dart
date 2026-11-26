@@ -483,7 +483,7 @@ abstract final class LiveUpdates {
   /// nothing.
   ///
   /// Throws a [LiveUpdateException] on iOS when no App Group is set up (see
-  /// `create_widget`).
+  /// `create ios`).
   static Future<void> preloadIcons(List<String> assets) =>
       _platform.preloadIcons(assets);
 

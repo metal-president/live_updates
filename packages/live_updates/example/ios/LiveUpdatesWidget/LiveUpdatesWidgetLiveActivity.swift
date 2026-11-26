@@ -3,14 +3,14 @@ import SwiftUI
 import WidgetKit
 
 /// Live Activity UI for live_updates. Generated once by
-/// `dart run live_updates:create_widget` and yours to edit: running
-/// create_widget again keeps this file (unless you pass --force).
+/// `dart run live_updates:create ios` and yours to edit: running
+/// the command again keeps this file (unless you pass --force).
 ///
 /// The building blocks (LiveUpdatesLockScreen, LiveUpdatesCompactTrailing,
-/// ...) live in LiveUpdatesViews.swift, which create_widget updates. Replace
+/// ...) live in LiveUpdatesViews.swift, which the command updates. Replace
 /// any of them with your own views; `context.state` has every field of
 /// `LiveUpdateContent`, and `context.state.extra["key"]` the values of
-/// `IosLiveUpdateOptions.extra`.
+/// `LiveUpdateContent.extra`.
 ///
 /// While the system hides private data on the Lock Screen, the building
 /// blocks show `LiveUpdateContent.publicContent` when it is set. A layout of
@@ -30,6 +30,9 @@ struct LiveUpdatesWidgetLiveActivity: Widget {
         // Layouts of your own, chosen with
         // IosLiveUpdateOptions(layout: IosLiveUpdateLayout.custom("name")):
         // case "name": MyLayout(state: state)
+        // example-only:begin
+        case "delivery": ExampleDeliveryLayout(state: state)
+        // example-only:end
         default:
           // The built-in patterns: standard, timer, metrics, stepper, journey.
           LiveUpdatesLockScreen(state: state, activityID: context.activityID)
@@ -67,3 +70,64 @@ struct LiveUpdatesWidgetLiveActivity: Widget {
     }
   }
 }
+
+// example-only:begin
+/// The example app's custom layout ("Custom layout" switch): the same
+/// `LiveUpdateContent.extra` and `extraImages` as the Android layouts in
+/// res/layout/live_update_delivery*.xml.
+struct ExampleDeliveryLayout: View {
+  let state: LiveUpdatesAttributes.ContentState
+  @Environment(\.redactionReasons) private var redactionReasons
+  @Environment(\.isLuminanceReduced) private var luminanceReduced
+
+  var body: some View {
+    if state.liveUpdatesShowsPublic(redactionReasons) {
+      LiveUpdatesPublicLockScreen(state: state)
+    } else {
+      let tint = LiveUpdatesPalette(state, luminanceReduced: luminanceReduced).tint
+      VStack(alignment: .leading, spacing: 10) {
+        HStack(spacing: 12) {
+          if let courier = LiveUpdatesPhoto(name: state.extraImages["courier"]) {
+            courier.frame(width: 48, height: 48).clipShape(Circle())
+          }
+          VStack(alignment: .leading, spacing: 2) {
+            Text(state.title).font(.headline).lineLimit(1)
+            if let status = state.extra["status"] {
+              Text(status).font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
+            }
+          }
+          Spacer(minLength: 8)
+          if let end = state.timerEnd, end * 1000 > Date().timeIntervalSince1970 * 1000 {
+            let date = Date(timeIntervalSince1970: end)
+            Text(timerInterval: min(Date(), date)...date, countsDown: true)
+              .font(.title2.weight(.semibold)).monospacedDigit()
+              .multilineTextAlignment(.trailing).frame(maxWidth: 90)
+              .foregroundStyle(tint ?? .primary)
+          }
+        }
+        HStack(alignment: .top) {
+          value("Distance", state.extra["distance"])
+          value("Stops", state.extra["stops"])
+          value("Arrives", state.extra["arrival"])
+          if let parcel = LiveUpdatesPhoto(name: state.image) {
+            parcel.frame(width: 36, height: 36)
+          }
+        }
+        if let progress = state.progress {
+          ProgressView(value: min(max(progress, 0), 1)).tint(tint)
+        }
+      }
+    }
+  }
+
+  @ViewBuilder private func value(_ label: String, _ value: String?) -> some View {
+    if let value {
+      VStack(alignment: .leading, spacing: 2) {
+        Text(label).font(.caption).foregroundStyle(.secondary)
+        Text(value).font(.subheadline.weight(.semibold)).lineLimit(1)
+      }
+      .frame(maxWidth: .infinity, alignment: .leading)
+    }
+  }
+}
+// example-only:end

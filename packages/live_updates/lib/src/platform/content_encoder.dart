@@ -45,18 +45,36 @@ mixin ContentEncoder {
       for (final w in iconWarnings(content, android: !storesIconAssets)) {
         debugPrint('live_updates: $w');
       }
+      if (!storesIconAssets) {
+        for (final w in customLayoutWarnings(content)) {
+          debugPrint('live_updates: $w');
+        }
+      }
       return true;
     }());
     if (content.image case final image?) {
       final store = _store ??= ImageStore(_directory);
       json['image'] = await store.store(image, keepUntil: showAt);
     }
-    // iOS custom layouts: more pictures, by name (the widget reads them from
-    // the same directory).
+    // Custom layouts: more pictures, by name (the iOS widget reads them from
+    // the same directory; Android from the image directory).
     // A picture that cannot be stored is left out (with a warning), not the
     // whole content.
-    if (storesIconAssets && (content.ios?.extraImages.isNotEmpty ?? false)) {
-      final images = content.ios!.extraImages;
+    // The deprecated iOS fields stay iOS only; Android stores pictures only
+    // for a custom layout, the only one that shows them.
+    if (!storesIconAssets) {
+      if (content.extra.isEmpty) {
+        json.remove('extra');
+      } else {
+        json['extra'] = content.extra;
+      }
+    }
+    final images = storesIconAssets
+        ? content.mergedExtraImages
+        : content.android?.customLayout == null
+        ? const <String, LiveUpdateImage>{}
+        : content.extraImages;
+    if (images.isNotEmpty) {
       // A wrong size is a mistake in the code, as for the main image.
       for (final MapEntry(:key, :value) in images.entries) {
         if (value.maxDimension <= 0) {
@@ -172,10 +190,12 @@ mixin ContentEncoder {
 
 /// Why Android will not promote [content] for lack of a title, or `null`.
 /// Only content that asks for promotion ([AndroidLiveUpdateMode.liveUpdate],
-/// the default) is checked.
+/// the default) is checked, not content with a custom layout, which is never
+/// promoted.
 String? titleWarning(LiveUpdateContent content) {
   final mode = content.android?.mode ?? AndroidLiveUpdateMode.liveUpdate;
   if (mode != AndroidLiveUpdateMode.liveUpdate) return null;
+  if (content.android?.customLayout != null) return null;
   // Android promotes a title of only spaces too, so only an empty one counts.
   if (content.title.isNotEmpty) return null;
   return 'title is empty; Android only promotes a notification to a Live '

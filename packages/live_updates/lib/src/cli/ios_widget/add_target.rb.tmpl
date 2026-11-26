@@ -1,5 +1,5 @@
 # Adds the live_updates widget extension target to the Runner project.
-# Generated and run by `dart run live_updates:create_widget`.
+# Generated and run by `dart run live_updates:create ios`.
 require 'xcodeproj'
 
 project_path, name, ext_dir, app_group = ARGV
@@ -89,7 +89,7 @@ def ensure_shared_intent(project, targets, name)
 end
 
 # Files added by newer plugin versions to an existing widget target (only
-# create_widget's own files, not anything else in the folder).
+# the create command's own files, not anything else in the folder).
 WIDGET_FILES = %w[LiveUpdatesAttributes.swift LiveUpdatesViews.swift LiveUpdatesActionIntent.swift].freeze
 
 def ensure_widget_files(project, target, name, ext_dir)

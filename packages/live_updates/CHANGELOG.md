@@ -1,3 +1,36 @@
+## 0.5.0
+
+- **Breaking:** `dart run live_updates:create_widget` is replaced by
+  `dart run live_updates:create ios`, with the same options and behavior
+  (your edited files are kept). `dart run live_updates:create android`
+  generates Android notification layouts, and `dart run live_updates:create`
+  without a platform generates both. See Upgrading in the README.
+- Android: custom notification layouts. `AndroidLiveUpdateOptions.customLayout`
+  (`AndroidCustomLayout('live_update_custom', expanded: ...)`) shows the
+  notification with XML layouts of the app, inside the system's notification
+  frame (`DecoratedCustomViewStyle`). The plugin fills views by id:
+  `live_update_title`, `live_update_body`, `live_update_progress`,
+  `live_update_timer`, `live_update_image`, `live_update_extra_<key>` and
+  `live_update_extra_image_<key>`. Ended and stale updates show the final or
+  ended content in the same layout without progress and timer; the lock
+  screen public version keeps the system template. Android never promotes a
+  notification with custom views to a Live Update, so it is shown as an
+  ongoing notification. A layout that cannot be found shows the system
+  template with a warning in the log. Remote payloads select layouts with
+  `androidLayout` and `androidExpandedLayout` (only layouts whose name
+  starts with `live_update_`). `dart run live_updates:create android`
+  writes a pair of layouts to start from and a keep file for release
+  builds.
+- `LiveUpdateContent.extra` and `LiveUpdateContent.extraImages`: values and
+  pictures for layouts of your own on both platforms (a customized iOS
+  widget and Android custom layouts). `IosLiveUpdateOptions.extra` and
+  `extraImages` are deprecated but still honored on iOS (merged in; the iOS
+  values win for the same key). Android stores `extraImages` only for
+  content with a custom layout. The keys in the iOS content state and push
+  payloads are unchanged; `extra` is now sent only when it has values.
+- The empty-title warning is not shown for custom layouts, which are never
+  promoted.
+
 ## 0.4.1
 
 - Lower minimum dependency versions so the package fits more apps:

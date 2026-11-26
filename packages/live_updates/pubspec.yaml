@@ -39,7 +39,7 @@ dev_dependencies:
   jnigen: ^1.1.0
 
 executables:
-  create_widget:
+  create:
 
 flutter:
   plugin:

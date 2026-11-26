@@ -42,10 +42,12 @@ sensitive content: `{"title": ..., "body": ..., "keepProgress": true,
 "keepTimer": true}`), `endAt` (seconds since 1970) with `endedContent`
 (`{"title": ..., "body": ..., "icon": {...}}`, shown from `endAt` on; its
 `image` is a file name like `image`), Android options such as `channelId`,
-`shortCriticalText`, `progressSegments` or `"androidLockScreenVisibility":
-"secret"`, and the iOS options `layout` / `compactLeading` /
-`compactTrailing` / `minimal` / `tintArgb` / `backgroundArgb` /
-`foregroundArgb`. Each platform ignores the keys it does not use. iOS
+`shortCriticalText`, `progressSegments`, `"androidLockScreenVisibility":
+"secret"` or `androidLayout` / `androidExpandedLayout` (a custom layout of
+the app, which shows `extra` values; see "Customizing the Android
+notification" in the package README), and the iOS options `layout` /
+`compactLeading` / `compactTrailing` / `minimal` / `tintArgb` /
+`backgroundArgb` / `foregroundArgb`. Each platform ignores the keys it does not use. iOS
 requires `title`, and `extra` must map strings to strings, or the activity
 rejects the content.
 

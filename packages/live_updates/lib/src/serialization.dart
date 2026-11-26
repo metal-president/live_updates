@@ -77,8 +77,9 @@ extension LiveUpdateContentJson on LiveUpdateContent {
       },
     // Not 'alert': that key holds the iOS alert.
     if ((android?.alert ?? false) || alert != null) 'androidAlert': true,
+    // Shared values, then the deprecated iOS ones (which win for a key).
+    if (mergedExtra case final e when e.isNotEmpty) 'extra': e,
     if (ios case final ios?) ...{
-      'extra': ios.extra,
       'relevanceScore': ?ios.relevanceScore,
       'compactLeading': ?ios.compactLeading?.value,
       'compactTrailing': ?ios.compactTrailing?.value,
@@ -135,7 +136,25 @@ extension LiveUpdateContentJson on LiveUpdateContent {
         },
       if (a.removeAtEnd) 'removeAtEnd': true,
       if (!a.removeAtCountdownEnd) 'removeAtCountdownEnd': false,
+      'androidLayout': ?a.customLayout?.collapsed,
+      'androidExpandedLayout': ?a.customLayout?.expanded,
     },
+  };
+
+  /// [LiveUpdateContent.extra] with the deprecated
+  /// [IosLiveUpdateOptions.extra] values on top.
+  Map<String, String> get mergedExtra => {
+    ...extra,
+    // ignore: deprecated_member_use_from_same_package
+    ...?ios?.extra,
+  };
+
+  /// [LiveUpdateContent.extraImages] with the deprecated
+  /// [IosLiveUpdateOptions.extraImages] on top.
+  Map<String, LiveUpdateImage> get mergedExtraImages => {
+    ...extraImages,
+    // ignore: deprecated_member_use_from_same_package
+    ...?ios?.extraImages,
   };
 }
 

@@ -7,7 +7,7 @@ fvm flutter run
 ```
 
 - iOS: the `LiveUpdatesWidget` extension was generated with
-  `dart run live_updates:create_widget`. Select a signing team for both
+  `dart run live_updates:create ios`. Select a signing team for both
   targets to run on a device. Enable the Push Notifications capability before
   turning on "Request push token".
 - Android: run the integration test with `tool/integration_test_android.sh`,

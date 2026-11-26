@@ -3,14 +3,14 @@ import SwiftUI
 import WidgetKit
 
 /// Live Activity UI for live_updates. Generated once by
-/// `dart run live_updates:create_widget` and yours to edit: running
-/// create_widget again keeps this file (unless you pass --force).
+/// `dart run live_updates:create ios` and yours to edit: running
+/// the command again keeps this file (unless you pass --force).
 ///
 /// The building blocks (LiveUpdatesLockScreen, LiveUpdatesCompactTrailing,
-/// ...) live in LiveUpdatesViews.swift, which create_widget updates. Replace
+/// ...) live in LiveUpdatesViews.swift, which the command updates. Replace
 /// any of them with your own views; `context.state` has every field of
 /// `LiveUpdateContent`, and `context.state.extra["key"]` the values of
-/// `IosLiveUpdateOptions.extra`.
+/// `LiveUpdateContent.extra`.
 ///
 /// While the system hides private data on the Lock Screen, the building
 /// blocks show `LiveUpdateContent.publicContent` when it is set. A layout of

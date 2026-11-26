@@ -22,7 +22,7 @@ class IosLiveUpdatesPlatform extends LiveUpdatesPlatform with ContentEncoder {
   @override
   String get missingImageDirectoryHint =>
       'Images need an App Group shared with the widget extension. Run '
-      '`dart run live_updates:create_widget` and enable the App Group '
+      '`dart run live_updates:create ios` and enable the App Group '
       'capability for Runner and the widget (see the README).';
 
   @override

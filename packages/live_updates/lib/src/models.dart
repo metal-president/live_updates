@@ -62,7 +62,7 @@ final class LiveUpdateContent {
   /// with [metrics]).
   ///
   /// On iOS it is shared with the widget extension through an App Group set
-  /// up by `create_widget`.
+  /// up by `create ios`.
   final LiveUpdateImage? image;
 
   /// Buttons. Presses arrive on [LiveUpdates.onAction] and
@@ -635,7 +635,7 @@ final class LiveUpdateIcon {
   ///
   /// On iOS it is scaled down to [maxDimension] pixels and copied into
   /// the App Group shared with the widget extension (set up by
-  /// `create_widget`); for remote updates call [LiveUpdates.preloadIcons]
+  /// `create ios`); for remote updates call [LiveUpdates.preloadIcons]
   /// first, because a push does not run the app.
   const LiveUpdateIcon.asset(String this.assetName)
     : name = null,

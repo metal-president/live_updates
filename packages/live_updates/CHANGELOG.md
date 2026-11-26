@@ -1,3 +1,8 @@
+## 0.4.1
+
+- Lower minimum dependency versions so the package fits more apps:
+  `crypto` 3.0.6 (was 3.0.8) and `ffi` 2.1.3 (was 2.2.0).
+
 ## 0.4.0
 
 - **Breaking (Android):** an ended live update stays visible for up to four

@@ -72,6 +72,10 @@ class _ExamplePageState extends State<ExamplePage> {
       ..add(LiveUpdates.onStarted.listen((u) => _add('started: ${u.id}')));
     LiveUpdates.isSupported().then((s) => _add('supported: $s'));
     LiveUpdates.canSchedule().then((s) => _add('can schedule: $s'));
+    // Android 16 QPR1+: whether the user allows promoted Live Updates.
+    LiveUpdates.canPostPromotedNotifications().then(
+      (s) => _add('can post promoted: $s'),
+    );
   }
 
   @override
@@ -230,6 +234,11 @@ class _ExamplePageState extends State<ExamplePage> {
   }
 
   Future<void> _start() => _run('start', () async {
+    // Android 13+ asks for the notification permission; without it, start
+    // throws. On iOS this is isSupported().
+    if (!await LiveUpdates.requestPermission()) {
+      throw StateError('not allowed or not supported on this device');
+    }
     _progress = 0;
     _eta = DateTime.now().add(const Duration(minutes: 15));
     // The order number is the key: pressing Start again updates instead of

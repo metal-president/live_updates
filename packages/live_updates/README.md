@@ -44,6 +44,7 @@ Screenshots of the example app in this repository. See also the
 - [Platform support](#platform-support)
 - [Getting started](#getting-started)
 - [Platform guidelines](#platform-guidelines)
+- [Permissions and settings](#permissions-and-settings)
 - [Usage](#usage)
   - [Start, update and end](#start-update-and-end)
   - [Taps and running updates](#taps-and-running-updates)
@@ -73,7 +74,8 @@ Screenshots of the example app in this repository. See also the
 
 ## Platform support
 
-**Requirements:** Flutter 3.50+, iOS 15.0+, Android 7.0 (API 24)+. Live
+**Requirements:** Flutter 3.50+, Xcode 26+ (the plugin uses iOS 26 APIs),
+iOS 15.0+, Android 7.0 (API 24)+. Live
 Activities need iOS 16.2: on iOS 15.0 to 16.1 every call does nothing and
 `isSupported()` returns `false`, as it does on iOS 16 when the app's widget
 extension targets a newer iOS. Some features need a newer iOS: buttons need
@@ -151,34 +153,47 @@ With `--no-xcode` only the widget sources are written. Then, in Xcode:
    files.
 5. In the widget's `Info.plist`, add `LiveUpdatesWidget` as a Boolean set to
    YES, so the plugin checks that this extension supports the running iOS.
+6. In the Runner target's Build Phases, drag *Embed Foundation Extensions*
+   above *Thin Binary*; otherwise Flutter builds fail with a build cycle.
+7. In the widget target's build settings, set `MARKETING_VERSION` to
+   `$(FLUTTER_BUILD_NAME)` and `CURRENT_PROJECT_VERSION` to
+   `$(FLUTTER_BUILD_NUMBER)`, and give each build configuration the same base
+   configuration file (`.xcconfig`) as Runner, which defines both. The
+   extension then has the app's version and build number, which app
+   extensions must share with their app ([source][ios-version-numbers]).
 
 ### Android
 
-No native setup is required: the plugin declares `POST_NOTIFICATIONS` and
-`POST_PROMOTED_NOTIFICATIONS`. Call `LiveUpdates.requestPermission()` before
-starting on Android 13+; it asks for `POST_NOTIFICATIONS` only
-([source][android-permission]). Also add a single-color status bar icon and
-make it the default icon (see [Icons](#icons)); without one, Android shows the
-app icon as a solid shape.
+No native setup is required. Call `LiveUpdates.requestPermission()` before
+starting (see [Permissions and settings](#permissions-and-settings)). Also add
+a single-color status bar icon and make it the default icon (see
+[Icons](#icons)); without one, Android shows the app icon as a solid shape.
 
-Android promotes a notification to a Live Update (Android 16 QPR1 and
-later) only when the user allows it and the notification meets the
-system's criteria (see [Platform limits](#platform-limits)); otherwise it
-stays a regular ongoing notification. The permission for it,
-`POST_PROMOTED_NOTIFICATIONS`, is granted at install time without a prompt,
-and users can turn it off per app in Settings
-(`LiveUpdates.canPostPromotedNotifications()`).
-([source][android-promoted-permission], [source][android-live-update])
+The plugin declares these permissions:
 
-If your app only uses `AndroidLiveUpdateMode.ongoing` or
-`AndroidLiveUpdateMode.classic`, which never ask for promotion, you can remove
-the permission in `android/app/src/main/AndroidManifest.xml`:
+- `POST_NOTIFICATIONS`: needed to show anything on Android 13+.
+- `POST_PROMOTED_NOTIFICATIONS`: lets Android 16 QPR1 and later promote the
+  notification to a Live Update when it meets the system's criteria (see
+  [Platform limits](#platform-limits)). It is granted at install time without
+  a prompt ([source][android-promoted-permission]).
+- `RECEIVE_BOOT_COMPLETED`: sets the alarms of
+  [scheduled](#scheduling) live updates again after a reboot.
+
+You can remove the last two in `android/app/src/main/AndroidManifest.xml`:
+`POST_PROMOTED_NOTIFICATIONS` if your app only uses
+`AndroidLiveUpdateMode.ongoing` or `AndroidLiveUpdateMode.classic`, which never
+ask for promotion, and `RECEIVE_BOOT_COMPLETED` if it never calls `schedule`.
+Without `RECEIVE_BOOT_COMPLETED`, an update scheduled before a reboot does not
+appear until the app starts again (at once if its time has passed).
 
 ```xml
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
   <uses-permission
       android:name="android.permission.POST_PROMOTED_NOTIFICATIONS"
+      tools:node="remove" />
+  <uses-permission
+      android:name="android.permission.RECEIVE_BOOT_COMPLETED"
       tools:node="remove" />
   ...
 </manifest>
@@ -211,6 +226,33 @@ Interface Guidelines for Live Activities and Android's
   it again: send one only for a new activity.
 - Keep `shortCriticalText` under 7 characters (see
   [Platform limits](#platform-limits)).
+
+## Permissions and settings
+
+What the user can allow or turn off, and how the app finds out:
+
+| Setting | Platforms | Check | Ask or open | When it is off |
+| --- | --- | --- | --- | --- |
+| Showing live updates: the notification permission (`POST_NOTIFICATIONS`) and notifications for the app; Live Activities for the app | Android (permission prompt on 13+), iOS 16.2+ | `isSupported()` | `requestPermission()` (Android 13+; on iOS it returns `isSupported()`) | `start`, `startOrUpdate` and `update` throw a `LiveUpdateException`; remote starts show nothing |
+| The notification channel | Android 8.0+ | none beforehand | none | as above: the exception is the only sign |
+| Live Update promotion | Android 16 QPR1+ | `canPostPromotedNotifications()`, `LiveUpdate.isPromoted()` | no prompt: granted at install, the user can turn it off | a regular ongoing notification |
+| [Exact alarms](#scheduling) (`SCHEDULE_EXACT_ALARM`, declared by your app) | Android 12+ | `canScheduleExactly()` | `openExactAlarmSettings()` | scheduled updates and `endedContent` appear within 10 minutes |
+| Frequent updates (`NSSupportsLiveActivitiesFrequentUpdates` in the Runner `Info.plist`) | iOS | none | none: the user can turn it off | pushes with `apns-priority: 10` are limited to the hourly budget (see [Platform limits](#platform-limits)) |
+
+([source][android-permission], [source][ios-activitykit],
+[source][android-live-update], [source][android-alarms], [source][ios-push])
+
+- **Settings change at any time,** and there is no event for it. Check again
+  when the app returns to the foreground, for example with an
+  `AppLifecycleListener`, before you show a "Track on Lock Screen" option.
+- **Android prompt:** after the user denies the notification permission more
+  than once, the system no longer shows the prompt
+  ([source][android-permission-denial]), and `requestPermission()` returns
+  `false` at once; only Settings can turn notifications on then. It also
+  returns `false` without a prompt while no activity is attached, for
+  example in a background handler.
+- **iOS:** Live Activities need no prompt. A Live Activity scheduled before
+  the user turned them off still starts (see [Scheduling](#scheduling)).
 
 ## Usage
 
@@ -1254,10 +1296,10 @@ differently.
   large `extra` maps count toward it. ([source][ios-activitykit])
 - **Height:** the Lock Screen view is 84 to 160 points high; content beyond
   that is cut off. ([source][ios-hig-specs])
-- **User settings:** users can turn off Live Activities for your app in
-  Settings. `LiveUpdates.isSupported()` returns `false` then, and `start`
-  throws a `LiveUpdateException`. Check it before you offer a "Track on Lock
-  Screen" option. ([source][ios-activitykit])
+- **User settings:** users can turn off Live Activities and frequent
+  updates for your app in Settings (see
+  [Permissions and settings](#permissions-and-settings)).
+  ([source][ios-activitykit])
 - **Number of activities:** the system limits how many Live Activities can
   run at once (per app and per device; the exact number varies). Handle a
   `LiveUpdateException` from `start`, and prefer one activity that you update
@@ -1287,9 +1329,8 @@ differently.
   makers can apply additional criteria. ([source][android-live-update])
 - **User settings:** users can demote or dismiss a Live Update and turn off
   Live Updates for your app in Settings. Updates then appear as regular
-  ongoing notifications. `LiveUpdates.canPostPromotedNotifications()` tells
-  you whether Live Updates are allowed for your app (the permission), and
-  `LiveUpdate.isPromoted()` whether the system promoted one shown update. To send
+  ongoing notifications (see
+  [Permissions and settings](#permissions-and-settings)). To send
   users to the setting, open the
   `Settings.ACTION_APP_NOTIFICATION_PROMOTION_SETTINGS` intent (the Live
   Update guide names it `ACTION_MANAGE_APP_PROMOTED_NOTIFICATIONS`, which is
@@ -1304,12 +1345,10 @@ differently.
 - **Permissions:** on Android 13 and later nothing is shown until the user
   grants the notification permission, including updates started by a
   remote message. ([source][android-permission]) While notifications are
-  turned off for the app or for its channel, `start`, `startOrUpdate` and
-  `update` throw a `LiveUpdateException`, as on iOS with Live Activities
-  turned off. `schedule` and `reschedule` with a past time throw too, and a
-  schedule that comes due meanwhile shows nothing. `isSupported()` tells
-  you beforehand whether notifications are on for the app; a turned-off
-  channel shows only in the exception.
+  turned off for the app or for its channel, `schedule` and `reschedule`
+  with a past time throw like `start` (see
+  [Permissions and settings](#permissions-and-settings)), and a schedule
+  that comes due meanwhile shows nothing.
 - **After `end`:** the final content (or the content shown last)
   stays as a regular notification for up to 4 hours, as on iOS, and the
   user can swipe it away. Running timers (and timer or stopwatch metrics)
@@ -1367,6 +1406,8 @@ differently.
 [ios-hig-specs]: https://developer.apple.com/design/human-interface-guidelines/live-activities#Specifications
 [android-live-update]: https://developer.android.com/develop/ui/views/notifications/live-update
 [android-permission]: https://developer.android.com/develop/ui/views/notifications/notification-permission
+[android-permission-denial]: https://developer.android.com/training/permissions/requesting#handle-denial
+[ios-version-numbers]: https://developer.apple.com/library/archive/technotes/tn2420/_index.html
 [android-promoted-permission]: https://developer.android.com/reference/android/Manifest.permission#POST_PROMOTED_NOTIFICATIONS
 [android-promotion-settings]: https://developer.android.com/reference/android/provider/Settings#ACTION_APP_NOTIFICATION_PROMOTION_SETTINGS
 [android-12-custom]: https://developer.android.com/about/versions/12/behavior-changes-12#custom-notifications

@@ -171,6 +171,13 @@ abstract final class LiveUpdates {
   /// Asks for the permission needed to show live updates and returns whether
   /// they can be shown. Android 13+ shows the notification permission prompt;
   /// on iOS Live Activities need no prompt, so this returns [isSupported].
+  ///
+  /// On Android it returns `false` without a prompt when no activity is
+  /// attached to the Flutter engine (for example in a background handler),
+  /// and when the user has denied the permission more than once: the system
+  /// then no longer shows the prompt, and the user can only allow
+  /// notifications in Settings. It also returns `false` when the permission
+  /// is granted but notifications are turned off for the app.
   static Future<bool> requestPermission() => _platform.requestPermission();
 
   /// Whether Android shows this app's live updates as promoted Live Updates

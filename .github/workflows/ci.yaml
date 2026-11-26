@@ -9,6 +9,11 @@ permissions:
   contents: read
 
 jobs:
+  # Whether this pull request changes more than documentation.
+  changes:
+    uses: ./.github/workflows/changes.yaml
+
+  # Always runs: it also compiles the README code examples.
   analyze-test:
     runs-on: ubuntu-latest
     steps:
@@ -34,6 +39,9 @@ jobs:
         working-directory: packages/live_updates
 
   build-android:
+    needs: changes
+    # Skipped for docs-only pull requests; runs if the check itself failed.
+    if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -52,6 +60,9 @@ jobs:
         working-directory: packages/live_updates/example
 
   ios-unit-test:
+    needs: changes
+    # Skipped for docs-only pull requests; runs if the check itself failed.
+    if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
     runs-on: macos-latest
     timeout-minutes: 40
     steps:
@@ -98,6 +109,9 @@ jobs:
         working-directory: packages/live_updates/example/ios
 
   android-unit-test:
+    needs: changes
+    # Skipped for docs-only pull requests; runs if the check itself failed.
+    if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -122,29 +136,44 @@ jobs:
         working-directory: packages/live_updates/example/android
 
   build-ios:
-    runs-on: macos-latest
+    needs: changes
+    # A required check: skipping a matrix job as a whole would not report
+    # "build-ios (swiftpm)" and "build-ios (cocoapods)", so for docs-only
+    # pull requests the job runs and skips its steps instead, on a Linux
+    # runner (the check name stays the same).
+    if: ${{ !cancelled() }}
+    runs-on: ${{ needs.changes.outputs.code != 'false' && 'macos-latest' || 'ubuntu-latest' }}
+    env:
+      CODE: ${{ needs.changes.outputs.code != 'false' }}
     strategy:
       matrix:
         dependency-manager: [swiftpm, cocoapods]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: env.CODE == 'true'
         with:
           persist-credentials: false
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        if: env.CODE == 'true'
         with:
           flutter-version-file: .fvmrc
           cache: true
       - name: Switch example to CocoaPods
-        if: matrix.dependency-manager == 'cocoapods'
+        if: env.CODE == 'true' && matrix.dependency-manager == 'cocoapods'
         run: sed -i '' '/enable-swift-package-manager/d; /^  config:$/d' pubspec.yaml
         working-directory: packages/live_updates/example
       - run: xcodebuild -version
+        if: env.CODE == 'true'
       - run: flutter build ios --simulator --debug
+        if: env.CODE == 'true'
         working-directory: packages/live_updates/example
 
   # Xcode 27 is a preview image on GitHub; not a required check, so the
   # required build-ios jobs (Xcode 26 on macos-latest) keep their names.
   build-ios-xcode-27:
+    needs: changes
+    # Skipped for docs-only pull requests; runs if the check itself failed.
+    if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
     runs-on: xcode-27
     strategy:
       matrix:

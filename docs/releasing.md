@@ -33,7 +33,9 @@ Every release of `live_updates` and `live_updates_fcm` follows these steps.
 5. **Pull request.** Bump versions and changelogs, open a PR and wait for all
    CI jobs (`analyze-test`, `android-unit-test`, `ios-unit-test`,
    `build-android`, `build-ios (swiftpm)`, `build-ios (cocoapods)` and the
-   integration tests) to pass, then squash-merge.
+   integration tests) to pass, then squash-merge. (Pull requests that change
+   only `*.md` files and `docs/` skip every job but `analyze-test`; a release
+   PR changes `pubspec.yaml`, so all of them run.)
 6. **Publish** from a clean, up-to-date `main`: `dart pub publish --dry-run`
    (0 warnings), then `dart pub publish` for `live_updates` first and
    `live_updates_fcm` after the new core version is visible on pub.dev.

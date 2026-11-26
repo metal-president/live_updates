@@ -1,0 +1,45 @@
+name: Changes
+
+# Tells the CI and integration workflows whether a pull request changes
+# anything besides documentation, so that docs-only pull requests skip the
+# builds and tests. Pushes and manual runs always count as code changes.
+on:
+  workflow_call:
+    outputs:
+      code:
+        description: "'false' when a pull request changes only documentation, else 'true'."
+        value: ${{ jobs.detect.outputs.code }}
+
+permissions:
+  contents: read
+
+jobs:
+  detect:
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.diff.outputs.code }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: github.event_name == 'pull_request'
+        with:
+          persist-credentials: false
+          # The pull request's merge commit and its first parent, the base.
+          fetch-depth: 2
+      - id: diff
+        run: |
+          code=true
+          if [ "$GITHUB_EVENT_NAME" = pull_request ] \
+            && files=$(git -c core.quotePath=false diff --name-only --no-renames HEAD^1 HEAD) \
+            && [ -n "$files" ]; then
+            code=false
+            while IFS= read -r f; do
+              case "$f" in
+                # Files in an asset catalog are part of the app build.
+                *.xcassets/*) code=true ;;
+                *.md | docs/*) ;;
+                *) code=true ;;
+              esac
+            done <<< "$files"
+          fi
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          echo "Changes besides documentation: $code"

@@ -1,3 +1,16 @@
+## Unreleased
+
+- Docs: a "Permissions and settings" section lists what the user can allow
+  or turn off (notifications, Live Activities, the notification channel,
+  Live Update promotion, exact alarms, frequent updates), how to check and
+  ask, and what happens when it is off. `requestPermission` documents when
+  it returns `false` without a prompt. The README now lists Xcode 26 as a
+  requirement, two more manual iOS setup steps (build phase order, widget
+  version numbers) and the `RECEIVE_BOOT_COMPLETED` permission the plugin
+  declares, with how to remove it.
+- Example: asks for the permission before starting and logs
+  `canPostPromotedNotifications()`.
+
 ## 0.5.1
 
 - Docs: README reorganized. Screenshots come first, shared usage comes

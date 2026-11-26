@@ -45,6 +45,73 @@ void main() {
     });
   });
 
+  test('extra is emitted without iOS options and only when not empty', () {
+    expect(
+      const LiveUpdateContent(title: 'T', extra: {'eta': '5 min'}).toJson(),
+      {
+        'title': 'T',
+        'extra': {'eta': '5 min'},
+      },
+    );
+    expect(
+      const LiveUpdateContent(
+        title: 'T',
+        ios: IosLiveUpdateOptions(),
+      ).toJson().containsKey('extra'),
+      isFalse,
+    );
+  });
+
+  test('the deprecated iOS extra is merged in and wins for a key', () {
+    final json = const LiveUpdateContent(
+      title: 'T',
+      extra: {'a': 'shared', 'b': 'shared'},
+      // ignore: deprecated_member_use_from_same_package
+      ios: IosLiveUpdateOptions(extra: {'b': 'ios', 'c': 'ios'}),
+    ).toJson();
+    expect(json['extra'], {'a': 'shared', 'b': 'ios', 'c': 'ios'});
+  });
+
+  test('a custom layout is encoded with the Android options', () {
+    expect(
+      const LiveUpdateContent(
+        title: 'T',
+        android: AndroidLiveUpdateOptions(
+          mode: AndroidLiveUpdateMode.ongoing,
+          customLayout: AndroidCustomLayout(
+            'live_update_courier',
+            expanded: 'live_update_courier_expanded',
+          ),
+        ),
+      ).toJson(),
+      containsPair('androidLayout', 'live_update_courier'),
+    );
+    final json = const LiveUpdateContent(
+      title: 'T',
+      android: AndroidLiveUpdateOptions(
+        customLayout: AndroidCustomLayout('live_update_courier'),
+      ),
+    ).toJson();
+    expect(json['androidLayout'], 'live_update_courier');
+    expect(json.containsKey('androidExpandedLayout'), isFalse);
+    expect(
+      const LiveUpdateContent(
+        title: 'T',
+        android: AndroidLiveUpdateOptions(
+          customLayout: AndroidCustomLayout('a', expanded: 'b'),
+        ),
+      ).toJson()['androidExpandedLayout'],
+      'b',
+    );
+    expect(
+      const LiveUpdateContent(
+        title: 'T',
+        android: AndroidLiveUpdateOptions(),
+      ).toJson().containsKey('androidLayout'),
+      isFalse,
+    );
+  });
+
   test('actions are encoded', () {
     expect(
       const LiveUpdateContent(

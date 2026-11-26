@@ -27,6 +27,63 @@ void main() {
     expect(b, isNot(a));
   });
 
+  test('shared extra values and pictures take part in equality', () {
+    const a = LiveUpdateContent(
+      title: 'T',
+      extra: {'k': 'v'},
+      extraImages: {'map': LiveUpdateImage.asset('assets/map.png')},
+    );
+    expect(
+      a,
+      const LiveUpdateContent(
+        title: 'T',
+        extra: {'k': 'v'},
+        extraImages: {'map': LiveUpdateImage.asset('assets/map.png')},
+      ),
+    );
+    expect(
+      a.hashCode,
+      const LiveUpdateContent(
+        title: 'T',
+        extra: {'k': 'v'},
+        extraImages: {'map': LiveUpdateImage.asset('assets/map.png')},
+      ).hashCode,
+    );
+    expect(a, isNot(const LiveUpdateContent(title: 'T', extra: {'k': 'v'})));
+    expect(a.copyWith(title: 'U').extra, {'k': 'v'});
+    expect(a.copyWith(title: 'U').extraImages, a.extraImages);
+    expect(a.copyWith(extra: {'k': 'w'}).extra, {'k': 'w'});
+  });
+
+  test('custom layouts have value equality', () {
+    const a = AndroidCustomLayout('live_update_a', expanded: 'live_update_b');
+    expect(
+      a,
+      const AndroidCustomLayout('live_update_a', expanded: 'live_update_b'),
+    );
+    expect(
+      a.hashCode,
+      const AndroidCustomLayout(
+        'live_update_a',
+        expanded: 'live_update_b',
+      ).hashCode,
+    );
+    expect(a, isNot(const AndroidCustomLayout('live_update_a')));
+    expect(
+      a.toString(),
+      'AndroidCustomLayout(live_update_a, expanded: live_update_b)',
+    );
+    expect(
+      const AndroidLiveUpdateOptions(customLayout: a),
+      const AndroidLiveUpdateOptions(customLayout: a),
+    );
+    expect(
+      const AndroidLiveUpdateOptions(customLayout: a),
+      isNot(const AndroidLiveUpdateOptions()),
+    );
+    expect(() => AndroidCustomLayout(''), throwsAssertionError);
+  });
+
   test('extra images take part in equality', () {
     const a = IosLiveUpdateOptions(
       extraImages: {'map': LiveUpdateImage.asset('assets/map.png')},

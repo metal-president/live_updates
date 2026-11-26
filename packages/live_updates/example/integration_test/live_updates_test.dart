@@ -155,12 +155,10 @@ void main() {
         title: 'With image',
         progress: .5,
         image: LiveUpdateImage.asset('assets/parcel.png', maxDimension: 64),
-        // Extra pictures for custom iOS layouts (ignored on Android).
-        ios: IosLiveUpdateOptions(
-          extraImages: {
-            'map': LiveUpdateImage.asset('assets/parcel.png', maxDimension: 48),
-          },
-        ),
+        // Extra pictures for custom layouts.
+        extraImages: {
+          'map': LiveUpdateImage.asset('assets/parcel.png', maxDimension: 48),
+        },
       ),
     );
     await update.end(dismissAfter: Duration.zero);

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Test layout with every bound view id. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
+    <TextView android:id="@+id/live_update_title"
+        android:layout_width="wrap_content" android:layout_height="wrap_content" />
+    <TextView android:id="@+id/live_update_body"
+        android:layout_width="wrap_content" android:layout_height="wrap_content" />
+    <ProgressBar android:id="@+id/live_update_progress"
+        style="@android:style/Widget.Material.ProgressBar.Horizontal"
+        android:layout_width="match_parent" android:layout_height="wrap_content" />
+    <Chronometer android:id="@+id/live_update_timer"
+        android:layout_width="wrap_content" android:layout_height="wrap_content" />
+    <ImageView android:id="@+id/live_update_image"
+        android:layout_width="40dp" android:layout_height="40dp" />
+    <TextView android:id="@+id/live_update_extra_status"
+        android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:visibility="gone" />
+    <ImageView android:id="@+id/live_update_extra_image_map"
+        android:layout_width="40dp" android:layout_height="40dp"
+        android:visibility="gone" />
+</LinearLayout>

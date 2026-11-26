@@ -42,16 +42,18 @@ import org.json.JSONObject;
  *
  * <p>Content is exchanged as the same JSON used on iOS ({@code title, body,
  * progress, icon, androidSmallIcon, route, image, actions, metrics, criticalMetric, steps,
- * journey, publicContent}) plus Android options: {@code channelId, channelName,
+ * journey, publicContent, extra, extraImages}) plus Android options: {@code channelId, channelName,
  * shortCriticalText, colorArgb, whenEpochMillis, showChronometer, androidMode,
  * bodySemanticStyle, progressSemanticStyle, progressSegments, progressPoints,
- * progressTrackerIcon, timeoutAfterMillis, androidAlert, androidLockScreenVisibility} and the timer
+ * progressTrackerIcon, timeoutAfterMillis, androidAlert, androidLockScreenVisibility,
+ * androidLayout, androidExpandedLayout} and the timer
  * ({@code timerStart} or {@code timerEnd}, seconds since 1970). On Android 16+ progress uses
  * {@link Notification.ProgressStyle} and promotion to a Live Update is
  * requested (shown on builds that support promoted notifications, Android 16
  * QPR1 and later); Android 17 shows {@code metrics} with {@code MetricStyle}
  * instead (see {@link LiveUpdatesApi37}). Older versions get a regular ongoing
- * notification with a progress bar.
+ * notification with a progress bar. A custom layout ({@code androidLayout}, see {@link
+ * LiveUpdatesCustomLayout}) replaces the system template and is never promoted.
  */
 @Keep
 public final class LiveUpdatesBridge {
@@ -971,6 +973,12 @@ public final class LiveUpdatesBridge {
     String template = copy.extras.getString(Notification.EXTRA_TEMPLATE);
     if (template != null && template.endsWith("MetricStyle")) b.setStyle(null);
     requestPromotedOngoing(b, false);
+    // Custom layouts: the progress and timer views (the system template's
+    // are handled above).
+    LiveUpdatesCustomLayout.hideRunning(c, copy.contentView);
+    if (copy.bigContentView != copy.contentView) {
+      LiveUpdatesCustomLayout.hideRunning(c, copy.bigContentView);
+    }
     android.os.Bundle extras = b.getExtras();
     extras.remove(EXTRA_STALE);
     extras.remove(EXTRA_KEYED);
@@ -1503,8 +1511,8 @@ public final class LiveUpdatesBridge {
 
   /**
    * The notification shown from endAt on: {@code ended}'s title, body, icon (else the content's)
-   * and image with the channel, small icon option, color, tap route, lock screen setting and time
-   * limits (maxDuration, timeoutAfter) of {@code content}.
+   * and image with the channel, small icon option, color, tap route, lock screen setting, custom
+   * layout and time limits (maxDuration, timeoutAfter) of {@code content}.
    */
   static JSONObject staleContent(JSONObject content, JSONObject ended) {
     JSONObject out = new JSONObject();
@@ -1521,7 +1529,9 @@ public final class LiveUpdatesBridge {
             "route",
             "androidLockScreenVisibility",
             "maxDurationMillis",
-            "timeoutAfterMillis"
+            "timeoutAfterMillis",
+            "androidLayout",
+            "androidExpandedLayout"
           });
       out.put("title", ended.optString("title"));
       String body = optString(ended, "body");
@@ -1605,8 +1615,11 @@ public final class LiveUpdatesBridge {
           LiveUpdatesApi37.styledText(
               body, LiveUpdatesApi37.semanticStyle(optString(content, "bodySemanticStyle"))));
     }
+    // Custom layouts (androidLayout) replace the system template: no progress
+    // style, metrics, promotion or large icon (the layout shows the image).
+    android.widget.RemoteViews[] custom = LiveUpdatesCustomLayout.views(c, content, ended);
     String image = optString(content, "image");
-    if (image != null && !image.contains("/")) {
+    if (custom == null && image != null && !image.contains("/")) {
       android.graphics.Bitmap bitmap =
           android.graphics.BitmapFactory.decodeFile(new java.io.File(imageDir(c), image).getPath());
       if (bitmap != null) b.setLargeIcon(Icon.createWithBitmap(bitmap));
@@ -1643,7 +1656,9 @@ public final class LiveUpdatesBridge {
     String mode = androidMode(content);
     boolean metrics = false;
     boolean styled = false;
-    if (Build.VERSION.SDK_INT >= 36 && !"classic".equals(mode)) {
+    if (custom != null) {
+      LiveUpdatesCustomLayout.apply(b, custom);
+    } else if (Build.VERSION.SDK_INT >= 36 && !"classic".equals(mode)) {
       requestPromotedOngoing(b, "liveUpdate".equals(mode));
       String chip = optString(content, "shortCriticalText");
       if (chip != null) b.setShortCriticalText(chip);
@@ -1671,7 +1686,7 @@ public final class LiveUpdatesBridge {
     // (liveUpdate, ongoing); the regular notification (classic, Android 15 and
     // earlier) squeezes the sub text into the header, so there it becomes a
     // second line of the expanded notification instead.
-    String detail = detailText(content, !metrics);
+    String detail = custom != null ? null : detailText(content, !metrics);
     if (detail != null) {
       if (body == null) {
         b.setContentText(detail);
@@ -1834,7 +1849,7 @@ public final class LiveUpdatesBridge {
    * from before {@code androidMode} existed may send {@code requestPromotion:
    * false}, which means {@code ongoing}.
    */
-  private static String androidMode(JSONObject content) {
+  static String androidMode(JSONObject content) {
     String mode = optString(content, "androidMode");
     if ("ongoing".equals(mode) || "classic".equals(mode)) return mode;
     if (mode == null && !content.optBoolean("requestPromotion", true)) return "ongoing";
@@ -1847,7 +1862,9 @@ public final class LiveUpdatesBridge {
    * content}.
    */
   private static JSONObject warnIfUntitled(JSONObject content) {
+    // A custom layout is never promoted.
     if ("liveUpdate".equals(androidMode(content))
+        && !LiveUpdatesCustomLayout.requested(content)
         && content.optString("title").isEmpty()) {
       Log.w(
           LOG_TAG,

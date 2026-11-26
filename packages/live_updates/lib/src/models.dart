@@ -24,6 +24,8 @@ final class LiveUpdateContent {
     this.criticalMetric,
     this.steps,
     this.journey,
+    this.extra = const {},
+    this.extraImages = const {},
     this.publicContent,
     this.endAt,
     this.endedContent,
@@ -106,6 +108,33 @@ final class LiveUpdateContent {
   /// [IosLiveUpdateLayout.journey]; Android shows "from → to" in the text.
   final LiveUpdateJourney? journey;
 
+  /// Additional text values for layouts of your own, by key, such as
+  /// `{'driver': 'Alex'}`.
+  ///
+  /// A customized iOS widget reads them as `context.state.extra["driver"]`
+  /// (and [IosIslandContent.extra] shows one in the Dynamic Island). An
+  /// Android custom layout ([AndroidLiveUpdateOptions.customLayout]) shows
+  /// each in the `TextView` with the id `live_update_extra_<key>`; Android
+  /// uses only keys made of lowercase letters, digits and underscores.
+  /// The built-in layouts do not show them. On iOS they count toward
+  /// ActivityKit's 4 KB limit for the content.
+  final Map<String, String> extra;
+
+  /// Additional pictures for layouts of your own, by key, stored like
+  /// [image] (scaled to [LiveUpdateImage.maxDimension], reused when
+  /// identical and cleaned up when unused for a day).
+  ///
+  /// A customized iOS widget reads one as
+  /// `LiveUpdatesImages.url(context.state.extraImages["map"])` (they are
+  /// saved in the App Group). An Android custom layout
+  /// ([AndroidLiveUpdateOptions.customLayout]) shows each in the
+  /// `ImageView` with the id `live_update_extra_image_<key>`. Keep them few
+  /// and small: the iOS widget extension has little memory and Android
+  /// limits the size of a notification. A picture that cannot be stored
+  /// (such as a missing asset) is left out with a warning. A push or remote
+  /// payload cannot add pictures.
+  final Map<String, LiveUpdateImage> extraImages;
+
   /// What the Lock Screen shows instead of this content while the system
   /// hides sensitive content there. `null` shows this content as usual.
   ///
@@ -184,6 +213,8 @@ final class LiveUpdateContent {
     int? criticalMetric,
     LiveUpdateSteps? steps,
     LiveUpdateJourney? journey,
+    Map<String, String>? extra,
+    Map<String, LiveUpdateImage>? extraImages,
     LiveUpdatePublicContent? publicContent,
     DateTime? endAt,
     LiveUpdateEndedContent? endedContent,
@@ -203,6 +234,8 @@ final class LiveUpdateContent {
     criticalMetric: criticalMetric ?? this.criticalMetric,
     steps: steps ?? this.steps,
     journey: journey ?? this.journey,
+    extra: extra ?? this.extra,
+    extraImages: extraImages ?? this.extraImages,
     publicContent: publicContent ?? this.publicContent,
     endAt: endAt ?? this.endAt,
     endedContent: endedContent ?? this.endedContent,
@@ -227,6 +260,8 @@ final class LiveUpdateContent {
       other.criticalMetric == criticalMetric &&
       other.steps == steps &&
       other.journey == journey &&
+      mapEquals(other.extra, extra) &&
+      mapEquals(other.extraImages, extraImages) &&
       other.publicContent == publicContent &&
       other.endAt == endAt &&
       other.endedContent == endedContent &&
@@ -248,6 +283,8 @@ final class LiveUpdateContent {
     criticalMetric,
     steps,
     journey,
+    Object.hashAllUnordered(extra.entries.map((e) => (e.key, e.value))),
+    Object.hashAllUnordered(extraImages.entries.map((e) => (e.key, e.value))),
     publicContent,
     endAt,
     endedContent,
@@ -718,7 +755,9 @@ final class IosLiveUpdateOptions {
     this.staleDate,
     this.relevanceScore,
     this.alert,
+    @Deprecated('Use LiveUpdateContent.extra, which Android reads too.')
     this.extra = const {},
+    @Deprecated('Use LiveUpdateContent.extraImages, which Android reads too.')
     this.extraImages = const {},
     this.compactLeading,
     this.compactTrailing,
@@ -742,16 +781,18 @@ final class IosLiveUpdateOptions {
 
   /// Additional values available to a customized widget as
   /// `context.state.extra`.
+  ///
+  /// Still honored on iOS: merged with [LiveUpdateContent.extra], whose
+  /// values these replace for the same key.
+  @Deprecated('Use LiveUpdateContent.extra, which Android reads too.')
   final Map<String, String> extra;
 
-  /// Additional pictures for a customized widget, stored like
-  /// [LiveUpdateContent.image] (scaled to [LiveUpdateImage.maxDimension],
-  /// saved in the App Group, reused when identical and cleaned up when
-  /// unused for a day). The widget reads one as
-  /// `LiveUpdatesImages.url(context.state.extraImages["map"])`. Keep them
-  /// few and small: the widget extension has little memory. A picture that
-  /// cannot be stored (such as a missing asset) is left out with a warning.
-  /// A push replaces the content state and cannot add pictures.
+  /// Additional pictures for a customized widget, as
+  /// [LiveUpdateContent.extraImages].
+  ///
+  /// Still honored on iOS: merged with [LiveUpdateContent.extraImages],
+  /// whose pictures these replace for the same key.
+  @Deprecated('Use LiveUpdateContent.extraImages, which Android reads too.')
   final Map<String, LiveUpdateImage> extraImages;
 
   /// What the generated widget shows on the leading side of the compact
@@ -825,7 +866,9 @@ final class IosLiveUpdateOptions {
       other.staleDate == staleDate &&
       other.relevanceScore == relevanceScore &&
       other.alert == alert &&
+      // ignore: deprecated_member_use_from_same_package
       mapEquals(other.extra, extra) &&
+      // ignore: deprecated_member_use_from_same_package
       mapEquals(other.extraImages, extraImages) &&
       other.compactLeading == compactLeading &&
       other.compactTrailing == compactTrailing &&
@@ -842,7 +885,9 @@ final class IosLiveUpdateOptions {
     staleDate,
     relevanceScore,
     alert,
+    // ignore: deprecated_member_use_from_same_package
     Object.hashAllUnordered(extra.entries.map((e) => (e.key, e.value))),
+    // ignore: deprecated_member_use_from_same_package
     Object.hashAllUnordered(extraImages.entries.map((e) => (e.key, e.value))),
     compactLeading,
     compactTrailing,
@@ -928,7 +973,7 @@ final class IosIslandContent {
   /// as described there).
   static const icon = IosIslandContent._('icon');
 
-  /// The value of [IosLiveUpdateOptions.extra] for [key], such as a short
+  /// The value of [LiveUpdateContent.extra] for [key], such as a short
   /// gate number.
   const IosIslandContent.extra(String key) : value = 'extra:$key';
 
@@ -1023,6 +1068,7 @@ final class AndroidLiveUpdateOptions {
     this.maxDuration = const Duration(hours: 8),
     this.removeAtEnd = false,
     this.removeAtCountdownEnd = true,
+    this.customLayout,
   });
 
   /// Notification channel id. The channel is created on first use.
@@ -1145,6 +1191,23 @@ final class AndroidLiveUpdateOptions {
   /// your server updates it at that time. Android 8+.
   final bool removeAtCountdownEnd;
 
+  /// Shows the notification with layouts of your own (XML files in
+  /// `res/layout`) instead of the system template, which the app fills
+  /// by view id. See [AndroidCustomLayout] and "Customizing the Android
+  /// notification" in the README.
+  ///
+  /// Android never promotes a notification with a custom layout to a Live
+  /// Update, so it shows as a regular ongoing notification in every [mode]
+  /// (use [AndroidLiveUpdateMode.ongoing] to say so); progress styles,
+  /// metrics, the status bar chip and [shortCriticalText] are not used.
+  /// Android 12+ draws the layout inside the system's notification frame
+  /// (with the app icon and name), and keeps the collapsed layout to 48 dp
+  /// in height. The lock screen version made from
+  /// [LiveUpdateContent.publicContent] keeps the system template. A layout
+  /// that cannot be found shows the system template, with a warning in the
+  /// log.
+  final AndroidCustomLayout? customLayout;
+
   @override
   bool operator ==(Object other) =>
       other is AndroidLiveUpdateOptions &&
@@ -1166,7 +1229,8 @@ final class AndroidLiveUpdateOptions {
       other.lockScreenVisibility == lockScreenVisibility &&
       other.maxDuration == maxDuration &&
       other.removeAtEnd == removeAtEnd &&
-      other.removeAtCountdownEnd == removeAtCountdownEnd;
+      other.removeAtCountdownEnd == removeAtCountdownEnd &&
+      other.customLayout == customLayout;
 
   @override
   int get hashCode => Object.hash(
@@ -1189,7 +1253,64 @@ final class AndroidLiveUpdateOptions {
     maxDuration,
     removeAtEnd,
     removeAtCountdownEnd,
+    customLayout,
   );
+}
+
+/// Layouts of your own for an Android notification
+/// ([AndroidLiveUpdateOptions.customLayout]), by resource name: `'courier'`
+/// is the file `res/layout/courier.xml` of the app.
+///
+/// The library fills views with these ids (missing ones are skipped):
+///
+/// * `live_update_title` (`TextView`): [LiveUpdateContent.title].
+/// * `live_update_body` (`TextView`): [LiveUpdateContent.body]; hidden
+///   without one.
+/// * `live_update_progress` (`ProgressBar`): [LiveUpdateContent.progress];
+///   hidden without one.
+/// * `live_update_timer` (`Chronometer`): [LiveUpdateContent.timer];
+///   hidden without one.
+/// * `live_update_image` (`ImageView`): [LiveUpdateContent.image]; hidden
+///   without one.
+/// * `live_update_extra_<key>` (`TextView`): the value of
+///   [LiveUpdateContent.extra] for `<key>`, made visible.
+/// * `live_update_extra_image_<key>` (`ImageView`): the picture of
+///   [LiveUpdateContent.extraImages] for `<key>`, made visible.
+///
+/// Metrics, steps and the journey are not filled in: pass what the layout
+/// should show in [LiveUpdateContent.extra]. Views of extra values keep
+/// what the layout defines while the content has no value for them, so
+/// give them `android:visibility="gone"`.
+///
+/// `dart run live_updates:create_android_layout` writes a pair of layouts
+/// to start from. The release build's resource shrinker removes layouts
+/// that are only used by name; see the README to keep them.
+@immutable
+final class AndroidCustomLayout {
+  /// Uses the layout named [collapsed], and [expanded] (if given) when the
+  /// notification is expanded.
+  const AndroidCustomLayout(this.collapsed, {this.expanded})
+    : assert(collapsed != '', 'collapsed must name a layout');
+
+  /// Resource name of the layout of the collapsed notification, such as
+  /// `'live_update_courier'` for `res/layout/live_update_courier.xml`.
+  final String collapsed;
+
+  /// Resource name of the layout of the expanded notification, or `null` to
+  /// use [collapsed] there too.
+  final String? expanded;
+
+  @override
+  bool operator ==(Object other) =>
+      other is AndroidCustomLayout &&
+      other.collapsed == collapsed &&
+      other.expanded == expanded;
+
+  @override
+  int get hashCode => Object.hash(collapsed, expanded);
+
+  @override
+  String toString() => 'AndroidCustomLayout($collapsed, expanded: $expanded)';
 }
 
 /// What a secure Android lock screen shows of a notification

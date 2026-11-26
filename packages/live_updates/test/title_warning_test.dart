@@ -27,6 +27,20 @@ void main() {
     );
   });
 
+  test('a custom layout, which is never promoted, is not reported', () {
+    expect(
+      titleWarning(
+        const LiveUpdateContent(
+          title: '',
+          android: AndroidLiveUpdateOptions(
+            customLayout: AndroidCustomLayout('live_update_custom'),
+          ),
+        ),
+      ),
+      isNull,
+    );
+  });
+
   test('a title, or a mode without promotion, is not reported', () {
     expect(titleWarning(const LiveUpdateContent(title: 'Order')), isNull);
     for (final mode in [

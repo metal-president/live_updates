@@ -1137,7 +1137,7 @@ LiveUpdateContent(
 );
 ```
 
-The example app's "Custom layout" shows such a content (iOS 27 Lock Screen,
+The example app's "Custom layout" shows such content (iOS 27 Lock Screen,
 Android 17 notification shade):
 
 | iOS | Android collapsed | Android expanded |
@@ -1221,7 +1221,7 @@ blocks, which you can replace in the same file.
 
 #### iOS notes
 
-- **Lock screen:** the building blocks show `publicContent` while the
+- **Lock Screen:** the building blocks show `publicContent` while the
   system hides private data (see
   [Hiding content on the Lock Screen](#hiding-content-on-the-lock-screen)).
   A layout of your own should do the same:
@@ -1330,7 +1330,7 @@ layouts do.
   `@android:style/TextAppearance.Material.Notification.Title`, as the
   generated layouts do) and no background color. Images are scaled down to
   at most 512 pixels in the layouts.
-- **Lock screen:** the public version made from `publicContent` keeps the
+- **Lock Screen:** the public version made from `publicContent` keeps the
   system template.
 - **Ended and stale:** after `end`, and from `endAt` on, the layout shows
   the final or ended content without progress or timer. `endedContent`

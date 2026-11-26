@@ -234,7 +234,7 @@ class _ExamplePageState extends State<ExamplePage> {
     // Android 13+ asks for the notification permission; without it, start
     // throws. On iOS this is isSupported().
     if (!await LiveUpdates.requestPermission()) {
-      throw StateError('not allowed: check the app in Settings');
+      throw StateError('not allowed or not supported on this device');
     }
     _progress = 0;
     _eta = DateTime.now().add(const Duration(minutes: 15));

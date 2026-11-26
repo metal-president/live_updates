@@ -155,12 +155,11 @@ With `--no-xcode` only the widget sources are written. Then, in Xcode:
    YES, so the plugin checks that this extension supports the running iOS.
 6. In the Runner target's Build Phases, drag *Embed Foundation Extensions*
    above *Thin Binary*; otherwise Flutter builds fail with a build cycle.
-7. In the widget target's build settings, set `MARKETING_VERSION` to
-   `$(FLUTTER_BUILD_NAME)` and `CURRENT_PROJECT_VERSION` to
-   `$(FLUTTER_BUILD_NUMBER)`, and give each build configuration the same base
-   configuration file (`.xcconfig`) as Runner, which defines both. The
-   extension then has the app's version and build number, which app
-   extensions must share with their app ([source][ios-version-numbers]).
+7. Give each build configuration of the widget target the same base
+   configuration file (`.xcconfig`) as Runner, then set `MARKETING_VERSION`
+   to `$(FLUTTER_BUILD_NAME)` and `CURRENT_PROJECT_VERSION` to
+   `$(FLUTTER_BUILD_NUMBER)`. App extensions must have the same version and
+   build number as their app ([source][ios-version-numbers]).
 
 ### Android
 
@@ -171,20 +170,23 @@ a single-color status bar icon and make it the default icon (see
 
 The plugin declares these permissions:
 
-- `POST_NOTIFICATIONS`: needed to show anything on Android 13+.
+- `POST_NOTIFICATIONS`: the notification permission (see
+  [Permissions and settings](#permissions-and-settings)).
 - `POST_PROMOTED_NOTIFICATIONS`: lets Android 16 QPR1 and later promote the
   notification to a Live Update when it meets the system's criteria (see
   [Platform limits](#platform-limits)). It is granted at install time without
   a prompt ([source][android-promoted-permission]).
 - `RECEIVE_BOOT_COMPLETED`: sets the alarms of
-  [scheduled](#scheduling) live updates again after a reboot.
+  [scheduled](#scheduling) live updates again after a reboot, which cancels
+  all alarms ([source][android-alarms]).
 
 You can remove the last two in `android/app/src/main/AndroidManifest.xml`:
 `POST_PROMOTED_NOTIFICATIONS` if your app only uses
 `AndroidLiveUpdateMode.ongoing` or `AndroidLiveUpdateMode.classic`, which never
 ask for promotion, and `RECEIVE_BOOT_COMPLETED` if it never calls `schedule`.
 Without `RECEIVE_BOOT_COMPLETED`, an update scheduled before a reboot does not
-appear until the app starts again (at once if its time has passed).
+appear until the app (or a background handler of the plugin) runs again or the
+app is updated; it then appears at once if its time has passed.
 
 ```xml
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
@@ -233,26 +235,25 @@ What the user can allow or turn off, and how the app finds out:
 
 | Setting | Platforms | Check | Ask or open | When it is off |
 | --- | --- | --- | --- | --- |
-| Showing live updates: the notification permission (`POST_NOTIFICATIONS`) and notifications for the app; Live Activities for the app | Android (permission prompt on 13+), iOS 16.2+ | `isSupported()` | `requestPermission()` (Android 13+; on iOS it returns `isSupported()`) | `start`, `startOrUpdate` and `update` throw a `LiveUpdateException`; remote starts show nothing |
-| The notification channel | Android 8.0+ | none beforehand | none | as above: the exception is the only sign |
-| Live Update promotion | Android 16 QPR1+ | `canPostPromotedNotifications()`, `LiveUpdate.isPromoted()` | no prompt: granted at install, the user can turn it off | a regular ongoing notification |
-| [Exact alarms](#scheduling) (`SCHEDULE_EXACT_ALARM`, declared by your app) | Android 12+ | `canScheduleExactly()` | `openExactAlarmSettings()` | scheduled updates and `endedContent` appear within 10 minutes |
-| Frequent updates (`NSSupportsLiveActivitiesFrequentUpdates` in the Runner `Info.plist`) | iOS | none | none: the user can turn it off | pushes with `apns-priority: 10` are limited to the hourly budget (see [Platform limits](#platform-limits)) |
+| Notifications for the app (the `POST_NOTIFICATIONS` permission on Android 13+) | Android | `isSupported()` | `requestPermission()` (prompt on Android 13+) | `start`, `startOrUpdate` and `update` throw a `LiveUpdateException`; remote starts show nothing ([source][android-permission]) |
+| Live Activities for the app | iOS 16.2+ | `isSupported()` | none (`requestPermission()` returns `isSupported()`) | `start` and `startOrUpdate` throw a `LiveUpdateException` ([source][ios-activitykit]) |
+| The notification channel | Android 8.0+ | none | none | `start`, `startOrUpdate` and `update` throw a `LiveUpdateException` ([source][android-channels]) |
+| Live Update promotion (`POST_PROMOTED_NOTIFICATIONS`, granted at install) | Android 16 QPR1+ | `canPostPromotedNotifications()`, `LiveUpdate.isPromoted()` | none (see the promotion settings in [Platform limits](#platform-limits)) | a regular ongoing notification ([source][android-live-update]) |
+| Exact alarms (`SCHEDULE_EXACT_ALARM`, declared by your app) | Android 12+ | `canScheduleExactly()` | `openExactAlarmSettings()` | scheduled updates appear within `AndroidScheduleOptions.window`, `endedContent` within 10 minutes ([source][android-alarms]) |
+| Frequent updates (`NSSupportsLiveActivitiesFrequentUpdates` in the Runner `Info.plist`) | iOS | none | none | pushes with `apns-priority: 10` are limited to the hourly budget ([source][ios-push]) |
 
-([source][android-permission], [source][ios-activitykit],
-[source][android-live-update], [source][android-alarms], [source][ios-push])
+"None" means this plugin offers no call for it; the user changes the
+setting in the system Settings app.
 
-- **Settings change at any time,** and there is no event for it. Check again
-  when the app returns to the foreground, for example with an
+- **Settings change at any time,** and the plugin reports no event for it.
+  Check again when the app returns to the foreground, for example with an
   `AppLifecycleListener`, before you show a "Track on Lock Screen" option.
 - **Android prompt:** after the user denies the notification permission more
   than once, the system no longer shows the prompt
   ([source][android-permission-denial]), and `requestPermission()` returns
-  `false` at once; only Settings can turn notifications on then. It also
-  returns `false` without a prompt while no activity is attached, for
-  example in a background handler.
-- **iOS:** Live Activities need no prompt. A Live Activity scheduled before
-  the user turned them off still starts (see [Scheduling](#scheduling)).
+  `false` at once; only Settings can turn notifications on then. Until the
+  permission is granted, it also returns `false` without a prompt while no
+  activity is attached, for example in a background handler.
 
 ## Usage
 
@@ -1322,9 +1323,9 @@ differently.
 
 ### Android
 
-- **Promotion:** besides the requirements in
-  [Getting started](#android), Android only promotes notifications on a
-  channel whose importance is above "min". If you pass your own
+- **Promotion:** Android only promotes notifications on a channel whose
+  importance is above "min", and only while the app may post promoted
+  notifications (`POST_PROMOTED_NOTIFICATIONS`). If you pass your own
   `channelId`, do not create that channel with `IMPORTANCE_MIN`. Device
   makers can apply additional criteria. ([source][android-live-update])
 - **User settings:** users can demote or dismiss a Live Update and turn off
@@ -1346,7 +1347,7 @@ differently.
   grants the notification permission, including updates started by a
   remote message. ([source][android-permission]) While notifications are
   turned off for the app or for its channel, `schedule` and `reschedule`
-  with a past time throw like `start` (see
+  with a past time throw a `LiveUpdateException`, as `start` does (see
   [Permissions and settings](#permissions-and-settings)), and a schedule
   that comes due meanwhile shows nothing.
 - **After `end`:** the final content (or the content shown last)

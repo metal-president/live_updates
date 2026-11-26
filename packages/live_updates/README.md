@@ -1165,13 +1165,9 @@ and the Android layouts are `live_update_delivery*.xml` in its
 
 #### Generate the widget
 
-[Getting started](#ios) has already generated the widget with:
-
-```bash
-dart run live_updates:create ios
-```
-
-It writes two kinds of files to `ios/LiveUpdatesWidget/`:
+[Getting started](#ios) has already generated the widget with
+`dart run live_updates:create ios`. It writes two kinds of files to
+`ios/LiveUpdatesWidget/`:
 
 - **Yours to edit:** `LiveUpdatesWidgetLiveActivity.swift` (the layout of
   the Lock Screen and every Dynamic Island presentation), the widget bundle

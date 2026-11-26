@@ -44,11 +44,12 @@ Screenshots of the example app in this repository. See also the
 - [Platform support](#platform-support)
 - [Getting started](#getting-started)
 - [Platform guidelines](#platform-guidelines)
-- [Platform limits](#platform-limits)
 - [Usage](#usage)
+- [Platform-specific options](#platform-specific-options)
 - [Custom layouts](#custom-layouts)
   - [Customizing the iOS widget](#customizing-the-ios-widget)
   - [Customizing the Android notification](#customizing-the-android-notification)
+- [Platform limits](#platform-limits)
 - [Remote updates](#remote-updates)
 - [Upgrading](#upgrading)
 - [How it works](#how-it-works)
@@ -117,7 +118,7 @@ flutter pub add live_updates
 3. For push updates, add the **Push Notifications** capability to the Runner
    target.
 
-To change how the widget looks, see
+The generated widget works as is. To change how it looks (optional), see
 [Customizing the iOS widget](#customizing-the-ios-widget).
 
 #### Manual setup
@@ -170,7 +171,7 @@ the permission in `android/app/src/main/AndroidManifest.xml`:
 </manifest>
 ```
 
-To draw the notification with layouts of your own, see
+To draw the notification with layouts of your own (optional), see
 [Customizing the Android notification](#customizing-the-android-notification).
 
 ## Platform guidelines
@@ -197,150 +198,6 @@ Interface Guidelines for Live Activities and Android's
   it again: send one only for a new activity.
 - Keep `shortCriticalText` under 7 characters (see
   [Platform limits](#platform-limits)).
-
-## Platform limits
-
-Each limit links to the platform documentation it comes from. The systems
-change between OS versions, so check the source when something behaves
-differently.
-
-### iOS
-
-- **Duration:** a Live Activity can run for up to 8 hours. Then the system
-  ends it and removes it from the Dynamic Island; the Lock Screen keeps it
-  for up to 4 more hours (12 hours in total). For longer activities, end the
-  activity and start a new one, or use a regular notification.
-  ([source][ios-activitykit])
-- **After `end`:** the final content stays on the Lock Screen for up to
-  4 hours. `dismissAfter` longer than that is capped at 4 hours.
-  ([source][ios-activitykit]) As on Android, the plugin removes buttons, the
-  timer and timer or stopwatch metrics from it, since they would keep
-  running; an `end` sent by push shows what the server sends. Without
-  `finalContent` it starts from the content as the app last received it,
-  which can be older than a push update shown a moment ago: if you update
-  by push, pass `finalContent` to `end`.
-- **Size:** the attributes and the content together must stay under 4 KB,
-  for local updates and push payloads alike. Long texts, many buttons and
-  large `extra` maps count toward it. ([source][ios-activitykit])
-- **Height:** the Lock Screen view is 84 to 160 points high; content beyond
-  that is cut off. ([source][ios-hig-specs])
-- **User settings:** users can turn off Live Activities for your app in
-  Settings. `LiveUpdates.isSupported()` returns `false` then, and `start`
-  throws a `LiveUpdateException`. Check it before you offer a "Track on Lock
-  Screen" option. ([source][ios-activitykit])
-- **Number of activities:** the system limits how many Live Activities can
-  run at once (per app and per device; the exact number varies). Handle a
-  `LiveUpdateException` from `start`, and prefer one activity that you update
-  over several. ([source][ios-activitykit])
-- **Updates from the app:** `update` and `end` only run while your app runs.
-  To keep an activity current while the app is suspended or closed, update
-  it with [push notifications](#remote-updates). ([source][ios-push])
-- **Push budget:** iOS limits pushes with `apns-priority: 10` per hour and
-  throttles them beyond that budget. Send routine updates with
-  `apns-priority: 5` (not counted) and use `10` only for updates the user
-  must see at once. For many updates per hour (such as a live score), add
-  `NSSupportsLiveActivitiesFrequentUpdates` = YES to the Runner `Info.plist`;
-  users can still turn frequent updates off in Settings. ([source][ios-push])
-- **Where it appears:** the Lock Screen of iPhone and iPad, the Dynamic
-  Island on iPhone models that have one, StandBy, the Mac menu bar, the
-  Apple Watch Smart Stack and CarPlay. Devices without the Dynamic Island
-  show the Lock Screen view as a banner for updates with an alert. Buttons do
-  nothing in CarPlay, so make sure the content works without them.
-  ([source][ios-hig])
-
-### Android
-
-- **Promotion:** besides the requirements in
-  [Getting started](#android), Android only promotes notifications on a
-  channel whose importance is above "min". If you pass your own
-  `channelId`, do not create that channel with `IMPORTANCE_MIN`. Device
-  makers can apply additional criteria. ([source][android-live-update])
-- **User settings:** users can demote or dismiss a Live Update and turn off
-  Live Updates for your app in Settings. Updates then appear as regular
-  ongoing notifications. `LiveUpdates.canPostPromotedNotifications()` tells
-  you whether Live Updates are allowed for your app (the permission), and
-  `LiveUpdate.isPromoted()` whether the system promoted one shown update. To send
-  users to the setting, open the
-  `Settings.ACTION_APP_NOTIFICATION_PROMOTION_SETTINGS` intent (the Live
-  Update guide names it `ACTION_MANAGE_APP_PROMOTED_NOTIFICATIONS`, which is
-  not in the SDK) with `Settings.EXTRA_APP_PACKAGE`; some devices have no
-  matching screen, so handle that case. ([source][android-live-update],
-  [source][android-promotion-settings])
-- **Status bar chip:** the chip is at most 96 dp wide. `shortCriticalText`
-  is shown in full only if it is shorter than 7 characters; longer text is
-  cut, or only the icon is shown when less than half of it fits. Without
-  `shortCriticalText`, a countdown timer at least 2 minutes in the future is
-  shown as the remaining time. ([source][android-live-update])
-- **Permissions:** on Android 13 and later nothing is shown until the user
-  grants the notification permission, including updates started by a
-  remote message. ([source][android-permission]) While notifications are
-  turned off for the app or for its channel, `start`, `startOrUpdate` and
-  `update` throw a `LiveUpdateException`, as on iOS with Live Activities
-  turned off. `schedule` and `reschedule` with a past time throw too, and a
-  schedule that comes due meanwhile shows nothing. `isSupported()` tells
-  you beforehand whether notifications are on for the app; a turned-off
-  channel shows only in the exception.
-- **After `end`:** the final content (or the content shown last)
-  stays as a regular notification for up to 4 hours, as on iOS, and the
-  user can swipe it away. Running timers (and timer or stopwatch metrics)
-  are left out of it, so a countdown does not run past zero. This applies to
-  `end` and remote `end` payloads; an update removed by `maxDuration`,
-  `timeoutAfter`, `removeAtEnd` or at the end of a countdown is removed at
-  once. Unlike iOS, Android
-  does not report `dismissed` when the ended notification goes away.
-  `dismissAfter` longer than 4 hours is capped at 4 hours; `Duration.zero`
-  removes it at once. Below Android 8.0 the system cannot remove a
-  notification later, so only `finalContent` stays there, until the user
-  dismisses it ([source][android-timeout-after]).
-- **Sound:** the first post of a live update plays the sound of its
-  channel, while iOS starts a Live Activity silently. The plugin creates its
-  channels with the default importance; to start silently, create your own
-  channel with `IMPORTANCE_LOW` before the first post and pass its
-  `channelId` (`alert: true` then plays no sound either). Users can change
-  a channel's sound in Settings. ([source][android-channels])
-- **Duration:** a live update is removed 8 hours after it started by
-  default, as on iOS, even if the app is not running; later updates do not
-  reset it (`AndroidLiveUpdateOptions.maxDuration`; `null` for no limit).
-- **Exact alarms:** scheduled updates and `endedContent` are on time only
-  while the app may set exact alarms (`SCHEDULE_EXACT_ALARM`, from Android
-  14 denied by default for most newly installed apps that target Android 13
-  or higher). If the user takes
-  the permission away, Android cancels the exact alarms without telling the
-  app; the plugin sets them again (inexact) the next time the app starts.
-  Otherwise Android delivers alarms within a window of at least 10 minutes.
-  ([source][android-alarms], [source][android-14-exact-alarms])
-- **Custom layouts:** a notification with custom views (`RemoteViews`) is
-  never promoted to a Live Update: Android requires that a Live Update has
-  no custom content view and advises against custom notifications, so
-  [`customLayout`](#customizing-the-android-notification) shows a regular
-  ongoing notification. ([source][android-live-update])
-- **Custom layout size:** for apps that target Android 12 or higher, the
-  system draws custom content inside its standard notification frame (like
-  `DecoratedCustomViewStyle`) with the app icon and name, keeps the collapsed
-  view to 48 dp in height (106 dp before) and leaves less horizontal space.
-  Depending on the Android version, the expanded view can be limited to as
-  little as 252 dp. ([source][android-12-custom],
-  [source][android-custom-notification]) Test the layouts on several screen
-  sizes and in light and dark themes: the background differs between devices
-  and versions.
-
-[ios-activitykit]: https://developer.apple.com/documentation/activitykit/displaying-live-data-with-live-activities
-[ios-button-intent]: https://developer.apple.com/documentation/swiftui/button/init(intent:label:)
-[ios-request-start]: https://developer.apple.com/documentation/activitykit/activity/request(attributes:content:pushtype:style:alertconfiguration:start:)
-[ios-stale-date]: https://developer.apple.com/documentation/activitykit/activitycontent/staledate
-[android-alarms]: https://developer.android.com/develop/background-work/services/alarms
-[android-14-exact-alarms]: https://developer.android.com/about/versions/14/changes/schedule-exact-alarms
-[android-channels]: https://developer.android.com/develop/ui/views/notifications/channels
-[android-timeout-after]: https://developer.android.com/reference/android/app/Notification.Builder#setTimeoutAfter(long)
-[ios-push]: https://developer.apple.com/documentation/activitykit/starting-and-updating-live-activities-with-activitykit-push-notifications
-[ios-hig]: https://developer.apple.com/design/human-interface-guidelines/live-activities
-[ios-hig-specs]: https://developer.apple.com/design/human-interface-guidelines/live-activities#Specifications
-[android-live-update]: https://developer.android.com/develop/ui/views/notifications/live-update
-[android-permission]: https://developer.android.com/develop/ui/views/notifications/notification-permission
-[android-promoted-permission]: https://developer.android.com/reference/android/Manifest.permission#POST_PROMOTED_NOTIFICATIONS
-[android-promotion-settings]: https://developer.android.com/reference/android/provider/Settings#ACTION_APP_NOTIFICATION_PROMOTION_SETTINGS
-[android-12-custom]: https://developer.android.com/about/versions/12/behavior-changes-12#custom-notifications
-[android-custom-notification]: https://developer.android.com/develop/ui/views/notifications/custom-notification
 
 ## Usage
 
@@ -447,247 +304,6 @@ activity adds a second one (iOS cannot replace an activity, and does not say
 which of the two is newer). Send a push-to-start only for a key that is not
 running, and update a running one with its push token instead.
 
-### Scheduling
-
-`schedule` shows a live update at a later time, even if the app is not
-running then. At that time it behaves like `startOrUpdate`: a running update
-with the key is updated, otherwise one starts.
-
-```dart
-if (await LiveUpdates.canSchedule()) {
-  final scheduled = await LiveUpdates.schedule(
-    'order-1234',
-    content,
-    at: DateTime.now().add(const Duration(hours: 1)),
-  );
-  // Later: move it, change it or cancel it.
-  await scheduled.reschedule(at: DateTime.now().add(const Duration(hours: 2)));
-  await scheduled.cancel();
-}
-final pending = await LiveUpdates.scheduled();
-```
-
-- Scheduling again with the same key replaces the schedule. A time that is
-  not in the future shows the update now.
-- A scheduled update is not part of `active()` or `find` until it is shown;
-  then it appears on `onStarted` while the app runs. `startOrUpdate` does
-  not cancel a schedule; use `cancelScheduled`, `ScheduledLiveUpdate.cancel`
-  or `cancelAllScheduled`. `endAll()` ends running updates and cancels
-  schedules too, such as when the user logs out or switches accounts;
-  `endAll(includeScheduled: false)` leaves schedules alone.
-- Schedules live on the device, and only the app can cancel them. If the
-  user is logged out on the server or does not open the app, a schedule
-  still shows its update at its time; on iOS a push cannot cancel it either,
-  because a scheduled activity gets its push token only once it starts. Call
-  `endAll()` at logout and at app start when the session is no longer valid,
-  and keep sensitive details out of scheduled content (or give it a
-  `publicContent`, see [Hiding content on the Lock Screen](#hiding-content-on-the-lock-screen)).
-- **iOS 26 and later:** the system starts the Live Activity at that time
-  ([source][ios-request-start]) and presents an alert:
-  `IosLiveUpdateOptions.alert`, else `LiveUpdateContent.alert`, else the
-  public text (`publicContent`) or the title and body. Call `schedule`
-  and `reschedule` while the app is in the foreground; they throw a
-  `LiveUpdateException` in the background and before iOS 26 (check
-  `canSchedule`). ActivityKit drops content updates made before the start,
-  so `reschedule` replaces the scheduled activity. With `pushUpdates`, the
-  activity's push token is issued only once it starts. If an update with the
-  key is running at that time, the system shows both until the app runs; the
-  plugin then ends the older one. In tests the activity started 3 to 4
-  seconds after the requested time. Turning off Live Activities for the app
-  in Settings blocks new requests but does not cancel a schedule made
-  before: in tests (iOS 27.2) it still started at its time, with its alert
-  and sound. Call `cancelAllScheduled()` when the user opts out in your
-  app.
-- **Android:** an alarm posts the notification. It is on time only with
-  exact alarms: add `SCHEDULE_EXACT_ALARM` to your app's manifest (this
-  package does not declare it), ask the user with
-  `LiveUpdates.openExactAlarmSettings()` (Android 14 and later deny it by
-  default for most new installs, see [Platform limits](#platform-limits)) and
-  check `LiveUpdates.canScheduleExactly()`. Without it the update appears
-  within `AndroidScheduleOptions.window` (10 minutes by
-  default, which is also the shortest window Android allows from Android 12;
-  [source][android-alarms]).
-  Schedules survive reboots, app updates and clock changes. A force-stopped
-  app gets no alarms; the plugin sets them again the next time the app
-  starts and then shows overdue updates.
-
-```xml
-<!-- android/app/src/main/AndroidManifest.xml, for exact timing -->
-<uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
-```
-
-### Ending at a time
-
-`endAt` says when the activity is over, such as the delivery time.
-`endedContent` is what the update shows from then on, even if the app is not
-running:
-
-```dart
-await LiveUpdates.startOrUpdate(
-  'order-1234',
-  LiveUpdateContent(
-    title: 'Order #1234',
-    body: 'On the way',
-    timer: LiveUpdateTimer.countdown(eta),
-    endAt: eta,
-    endedContent: const LiveUpdateEndedContent(
-      title: 'Order #1234',
-      body: 'Delivered',
-    ),
-  ),
-);
-```
-
-- At `endAt` the update reports `LiveUpdateState.stale` on both platforms
-  and keeps running: it stays in `active()` and `find`, until the app ends
-  it or it reaches its time limit. Updating it with new content makes it
-  active again.
-- Without `endedContent`, nothing visible changes at `endAt`.
-- `LiveUpdateEndedContent` can also set an `icon` (used instead of the
-  content's icon; platform icon options still win) and an `image` (without
-  one, the ended display shows no image).
-- **iOS:** `endAt` becomes the activity's stale date (an explicit
-  `IosLiveUpdateOptions.staleDate` wins), and the generated widget shows
-  `endedContent` once the activity is stale ([source][ios-stale-date]). In
-  tests the system marked the activity stale about a minute after the stale
-  date. The activity keeps running until the app ends it or the system
-  removes it after at most 8 hours (see [Platform limits](#platform-limits)). The
-  switch lives in your layout file; if yours lacks it, see
-  [Upgrading](#upgrading).
-- **Android:** an alarm replaces the notification with `endedContent` as a
-  regular notification (title, body, icon, image, color and tap route; no
-  progress, timer or buttons) that is no longer ongoing or promoted, so the
-  user can swipe it away (reported as `dismissed`; as with any dismissal,
-  `startOrUpdate` then does not show the key again until you `end` it). As
-  with scheduling, the switch is on time only with exact alarms (see
-  [Platform limits](#platform-limits)), otherwise within 10 minutes.
-  `AndroidLiveUpdateOptions(removeAtEnd: true)` removes the notification at
-  `endAt` instead, exactly ([source][android-timeout-after]). With a
-  countdown that ends by `endAt` (as in the example), the notification is
-  removed at the countdown's end instead when the app may not set exact
-  alarms, so it never counts below zero (see [Timers](#timers)).
-
-### Buttons
-
-```dart
-const LiveUpdateContent(
-  title: 'Order #1234',
-  actions: [
-    LiveUpdateAction(
-      id: 'cancel',
-      title: 'Cancel',
-      icon: LiveUpdateIcon.symbol('xmark'),
-      requiresUnlock: true,
-    ),
-    LiveUpdateAction(id: 'track', title: 'Track', opensApp: true),
-  ],
-);
-
-LiveUpdates.onAction.listen((event) {
-  // event.updateId, event.actionId
-});
-```
-
-Where a press is delivered:
-
-| Button | App in the foreground | App in the background or not running |
-| --- | --- | --- |
-| Without `opensApp` | `onAction`; the [background handler](#handling-presses-while-the-app-is-not-running) if no listener takes it | the background handler; without one, queued until the app listens in the foreground |
-| `opensApp: true` | `onAction`; the background handler if no listener takes it within 5 seconds | opens the app, then `onAction`; the background handler if no listener takes it within 5 seconds |
-
-- Buttons without `opensApp` run without opening the app: on iOS through
-  `LiveUpdatesActionIntent` (a `LiveActivityIntent` that `create ios`
-  compiles into both the app and the widget), on Android through a broadcast
-  receiver. Use `opensApp: true` when the press must open the app.
-- `LiveUpdate.actions` receives only that update's presses; presses of other
-  updates go to `onAction` or the background handler.
-- Presses work on the Lock Screen without unlocking the device. Set
-  `requiresUnlock: true` on buttons with consequences, such as cancelling an
-  order: iOS asks for Face ID or the passcode first, and Android 12+ asks the
-  user to unlock.
-- On iOS 16.2 to 16.x no buttons are shown: they use App Intents in Live
-  Activities, which need iOS 17 ([source][ios-button-intent]). A tap on the
-  activity still opens the app with its `route`.
-- Android shows up to three actions. On iOS keep labels short: the whole
-  content must stay under ActivityKit's 4 KB limit.
-
-#### Handling presses while the app is not running
-
-Register a background handler to act on a press immediately, even when the
-app is not running. The plugin starts a headless Flutter engine, runs the
-handler and shuts the engine down:
-
-```dart
-import 'package:flutter/widgets.dart';
-import 'package:live_updates/live_updates.dart';
-
-@pragma('vm:entry-point')
-Future<void> onBackgroundAction(LiveUpdateActionEvent event) async {
-  if (event.actionId == 'cancel') {
-    await api.cancelOrder(event.updateId);
-    final updates = await LiveUpdates.active();
-    await updates
-        .where((u) => u.id == event.updateId)
-        .firstOrNull
-        ?.end(dismissAfter: Duration.zero);
-  }
-}
-
-Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await LiveUpdates.setBackgroundActionHandler(onBackgroundAction);
-  runApp(const App());
-}
-```
-
-- It must be a top-level or static function with
-  `@pragma('vm:entry-point')`, and it has limited time (about 9 seconds on
-  Android, 25 seconds on iOS).
-- live_updates itself works in the handler. On iOS, other plugins that use
-  platform channels need to be registered for the background engine:
-
-  ```swift
-  // AppDelegate.swift
-  LiveUpdatesPlugin.setPluginRegistrantCallback { registry in
-    GeneratedPluginRegistrant.register(with: registry)
-  }
-  ```
-
-  On Android, plugins are registered automatically.
-
-### Timers
-
-A countdown or a stopwatch keeps running between updates because the system
-counts it: iOS draws it in the widget template, Android shows the
-notification's chronometer. Use it instead of updating a text every second,
-which uses up the update budget.
-
-```dart
-LiveUpdateContent(
-  title: 'Order #1234',
-  timer: LiveUpdateTimer.countdown(eta), // or LiveUpdateTimer.stopwatch(startedAt)
-);
-```
-
-When a countdown ends, iOS stops it at zero and keeps showing the activity.
-An Android notification's countdown cannot stop and would count below zero,
-so Android removes the notification when the countdown ends:
-exactly, even if the app is not running, with no extra permission
-([source][android-timeout-after]). The update then reports `ended`. Content
-whose countdown is already over is still shown, without the timer. If an
-`endedContent` is due at or before the countdown's end (see
-[Ending at a time](#ending-at-a-time)), it replaces the notification instead
-when the app may set exact alarms; should that alarm not come, the
-notification is removed 10 minutes later. Without exact alarms the removal
-wins, as the replacement could come up to 10 minutes late. Timer metrics
-(`LiveUpdateMetric.timer`) do not remove the notification.
-
-To show something else at that time on both platforms, update the content
-from your server, for example to "Arrived", before the countdown ends. To
-keep the Android notification after the countdown, pass
-`AndroidLiveUpdateOptions(removeAtCountdownEnd: false)` (it then counts below
-zero until you update it).
-
 ### Layouts
 
 Describe what the update is about, then choose how the iOS Lock Screen shows
@@ -737,7 +353,7 @@ The Live Update column is `AndroidLiveUpdateMode.liveUpdate` when the
 system promotes the notification; metrics use
 `MetricStyle` only on Android 17. The ongoing notification column is
 `AndroidLiveUpdateMode.classic`, which is also what Android 15 and earlier
-show.
+show (see [Android display modes](#android-display-modes)).
 
 A layout whose data is missing falls back to `standard`. The expanded Dynamic
 Island shows the metrics, steps or journey of the chosen layout in place of
@@ -745,214 +361,38 @@ the body (there is no room for both), and buttons stay at the bottom of every
 layout. The layout can change with each update. For a layout of your own, see
 [Custom layouts](#custom-layouts).
 
-### Colors and the Dynamic Island
+### Timers
 
-`IosLiveUpdateOptions(color: ..., backgroundColor: ..., foregroundColor: ...)`
-sets the accent (progress, buttons, timer, Dynamic Island keyline), the Lock
-Screen background and its text color, like `AndroidLiveUpdateOptions.color`
-on Android.
-
-- **Choose an accent that reads well on dark and on light backgrounds:**
-  the same activity can appear on both. The Dynamic Island is always black,
-  while the Lock Screen card follows the system: in our tests on iOS 27
-  (device and simulator) it was black in Light and Dark Mode alike, but
-  Apple's guidelines describe a light background in Light Mode, which other
-  versions or setups (such as iOS 16) may show. The template's text uses the
-  system colors, so only colors you set need checking.
-- With a custom background, set the text color too, for example
-  `backgroundColor: Color(0xFFFFFFFF), foregroundColor: Color(0xFF000000)`.
-- While the Always-On display dims the Lock Screen, the system colors are
-  used.
-
-Choose what the small Dynamic Island areas show:
-
-```dart
-const LiveUpdateContent(
-  title: 'Flight 123',
-  extra: {'gate': 'B12'},
-  ios: IosLiveUpdateOptions(
-    compactLeading: IosIslandContent.timer,           // default: icon
-    compactTrailing: IosIslandContent.extra('gate'), // or progress, title, body
-    minimal: IosIslandContent.progress,               // or icon, ...
-  ),
-);
-```
-
-If the chosen content is missing (such as `progress` without a progress), the
-default is shown. Text is left out when the island is narrow, for example in
-landscape on iOS 27. These options need the Dynamic Island building blocks
-in your layout file; if yours lacks them, see [Upgrading](#upgrading).
-
-### Android display modes
-
-`AndroidLiveUpdateOptions.mode` chooses how Android 16 and later show the
-update (older versions always show a regular ongoing notification with a
-progress bar):
-
-| Mode | Android 16+ look | Promoted to a Live Update |
-| --- | --- | --- |
-| `liveUpdate` (default) | `ProgressStyle` / Android 17 `MetricStyle` | requested |
-| `ongoing` | `ProgressStyle` / Android 17 `MetricStyle` | no |
-| `classic` | the same as Android 15 and earlier | no |
-
-Use `liveUpdate` only for activities that fit Android's Live Update guidance,
-`ongoing` for other activities that benefit from the richer progress, and
-`classic` for the same look on every version (the body is always shown,
-metrics are added to the text, and segments, points and semantic colors are
-not used).
-
-### Alerts
-
-Set `alert` on content the user must notice, such as "Your order is here".
-The device plays a sound and may light up the screen or show a banner:
-
-```dart
-await LiveUpdates.startOrUpdate(
-  'order-1234',
-  const LiveUpdateContent(
-    title: 'Order #1234',
-    body: 'At your door',
-    alert: LiveUpdateAlert(), // or LiveUpdateAlert(title: ..., body: ...)
-  ),
-);
-```
-
-- **iOS:** an update (or a scheduled start) shows the alert, with the
-  content's title and body unless the alert sets its own; the system shows
-  them on devices without the Dynamic Island and on Apple Watch (with a
-  `publicContent`, its title and body are the default). Starting
-  a Live Activity from the app is always silent. `IosLiveUpdateOptions.alert`
-  (with a custom sound) takes precedence.
-- **Android:** the post plays the sound and vibration of the notification
-  channel (`AndroidLiveUpdateOptions.alert` does the same). The first post of
-  an update alerts anyway (see [Platform limits](#platform-limits)), and Android allows
-  one requested alert per update every 10 seconds.
-- **Remote:** an `"alert": {"title": ..., "body": ...}` object in the
-  Android content alerts too (unless it says `"androidAlert": false`), so
-  one content works for both; on iOS the alert goes in `aps.alert`, next to
-  `content-state`.
-- `copyWith` does not carry `alert` over: it belongs to one post.
-- `end` never alerts (iOS ends a Live Activity silently): to announce
-  "Delivered", `update` with an alert first, then `end`.
-
-### Android progress stages and timeout
+A countdown or a stopwatch keeps running between updates because the system
+counts it: iOS draws it in the widget template, Android shows the
+notification's chronometer. Use it instead of updating a text every second,
+which uses up the update budget.
 
 ```dart
 LiveUpdateContent(
   title: 'Order #1234',
-  progress: 0.6,
-  android: const AndroidLiveUpdateOptions(
-    // Android 16+: preparing, on the way, delivered (relative lengths).
-    progressSegments: [
-      AndroidProgressSegment(1),
-      AndroidProgressSegment(2),
-      AndroidProgressSegment(1),
-    ],
-    progressPoints: [AndroidProgressPoint(.25), AndroidProgressPoint(.75)],
-    progressTrackerIcon: LiveUpdateIcon.native('ic_courier'), // see Icons
-    // Removed after 2 hours even if the app never ends it.
-    timeoutAfter: Duration(hours: 2),
-  ),
+  timer: LiveUpdateTimer.countdown(eta), // or LiveUpdateTimer.stopwatch(startedAt)
 );
 ```
 
-- `progress` still runs from 0 to 1 over the whole bar. Segments, points and
-  the tracker icon need it (or `steps`); explicit segments and points take
-  precedence over those made from `steps`.
-- Below Android 16 segments, points and the tracker icon are ignored. On
-  Android 17 `metrics` replace the progress bar.
-- `timeoutAfter` counts from the latest post.
+When a countdown ends, iOS stops it at zero and keeps showing the activity.
+An Android notification's countdown cannot stop and would count below zero,
+so Android removes the notification when the countdown ends:
+exactly, even if the app is not running, with no extra permission
+([source][android-timeout-after]). The update then reports `ended`. Content
+whose countdown is already over is still shown, without the timer. If an
+`endedContent` is due at or before the countdown's end (see
+[Ending at a time](#ending-at-a-time)), it replaces the notification instead
+when the app may set exact alarms; should that alarm not come, the
+notification is removed 10 minutes later. Without exact alarms the removal
+wins, as the replacement could come up to 10 minutes late. Timer metrics
+(`LiveUpdateMetric.timer`) do not remove the notification.
 
-### Android 17 metrics and semantic colors
-
-On Android 17 a Live Update with `metrics` (see [Layouts](#layouts)) shows
-them with `MetricStyle` instead of the progress bar. Timers and stopwatches
-are counted by the system, so they keep running between updates.
-`criticalMetric` picks the one that may appear in the status bar chip.
-
-While metrics are set, Android 17 does not show the body text (its metric
-template has no room for it), so put anything users must read in the title or
-in a `LiveUpdateMetric.text`.
-
-Semantic styles let Android color the body text, the progress bar or a metric
-by meaning (info, safe, caution, danger); the system picks the colors and
-applies them to promoted Live Updates on Android 17. They are ignored on
-older versions. The same keys work in remote payloads (see
-[docs/testing-remote.md](https://github.com/metal-president/live_updates/blob/main/docs/testing-remote.md)).
-
-### Hiding content on the Lock Screen
-
-People can choose to hide sensitive content on a locked device. For those
-moments, give the update a `publicContent` without personal details:
-
-```dart
-await LiveUpdates.start(
-  const LiveUpdateContent(
-    title: 'Order #1234',
-    body: 'Courier at the door, gate code 4321',
-    progress: 0.6,
-    publicContent: LiveUpdatePublicContent(
-      title: 'Delivery',
-      body: 'On the way',
-    ),
-  ),
-);
-```
-
-The library never hides content on its own; the person's settings decide:
-
-- **Android:** when the person hides sensitive notification content on the
-  lock screen, Android shows the public version of the notification
-  ([`setPublicVersion`][android-public-version]) while the device is locked.
-  By default, live_updates posts notifications as
-  [`VISIBILITY_PRIVATE`][android-visibility] (Android's default). Without
-  `publicContent`, a secure lock screen then shows only basic information
-  without the content. People can also change lock screen visibility per
-  notification channel ([lock screen visibility][android-lock-screen]).
-- **iOS:** when the system hides private data, the widget sees the
-  [`privacy`][ios-privacy] or [`placeholder`][ios-placeholder] redaction
-  reason, and the generated widget shows `publicContent`. Without
-  `publicContent`, the widget shows the full content, and the system may
-  draw it as a placeholder.
-
-  For widgets, Apple says people control this with Lock Screen widgets under
-  Settings > Face ID & Passcode > Allow Access When Locked
-  ([hide sensitive content][ios-hide-sensitive]). Apple does not document it
-  for Live Activities. In tests on iOS 27, the Live Activity showed
-  `publicContent` while the device was locked with Live Activities turned
-  off under that setting, and the full content after unlocking.
-
-The public version keeps the icon, the colors, the tap route and, unless you
-pass `keepProgress: false` or `keepTimer: false`, the progress and the
-timer. Images, buttons, metrics, steps, the journey, `extra` values and
-Android's `shortCriticalText` are left out.
-
-To always hide the whole notification on a secure Android lock screen,
-whatever the person's setting, use
-[`VISIBILITY_SECRET`][android-visibility-secret]. `publicContent` is then
-not used on Android:
-
-```dart
-android: const AndroidLiveUpdateOptions(
-  lockScreenVisibility: AndroidLockScreenVisibility.secret,
-),
-```
-
-There is no option to always show the full content: it would override the
-person's choice.
-
-In remote payloads, put `publicContent` in the content (`content-state` on
-iOS, `live_updates_content` on Android). It is an object with `title`,
-optional `body`, and `keepProgress` / `keepTimer`, which default to `true`.
-For Android, add `"androidLockScreenVisibility": "secret"` to the content.
-
-[android-public-version]: https://developer.android.com/reference/android/app/Notification.Builder#setPublicVersion(android.app.Notification)
-[android-visibility]: https://developer.android.com/reference/android/app/Notification#visibility
-[android-visibility-secret]: https://developer.android.com/reference/android/app/Notification#VISIBILITY_SECRET
-[android-lock-screen]: https://developer.android.com/develop/ui/compose/notifications/create-notification#lockscreenNotification
-[ios-privacy]: https://developer.apple.com/documentation/swiftui/redactionreasons/privacy
-[ios-placeholder]: https://developer.apple.com/documentation/swiftui/redactionreasons/placeholder
-[ios-hide-sensitive]: https://developer.apple.com/documentation/widgetkit/creating-a-widget-extension#Hide-sensitive-content
+To show something else at that time on both platforms, update the content
+from your server, for example to "Arrived", before the countdown ends. To
+keep the Android notification after the countdown, pass
+`AndroidLiveUpdateOptions(removeAtCountdownEnd: false)` (it then counts below
+zero until you update it).
 
 ### Images
 
@@ -1102,6 +542,428 @@ Each place shows the first icon that is set:
 [ios-hig-best-practices]: https://developer.apple.com/design/human-interface-guidelines/live-activities#Best-practices
 [ios-hig-colors]: https://developer.apple.com/design/human-interface-guidelines/live-activities#Choosing-colors
 
+### Buttons
+
+```dart
+const LiveUpdateContent(
+  title: 'Order #1234',
+  actions: [
+    LiveUpdateAction(
+      id: 'cancel',
+      title: 'Cancel',
+      icon: LiveUpdateIcon.symbol('xmark'),
+      requiresUnlock: true,
+    ),
+    LiveUpdateAction(id: 'track', title: 'Track', opensApp: true),
+  ],
+);
+
+LiveUpdates.onAction.listen((event) {
+  // event.updateId, event.actionId
+});
+```
+
+Where a press is delivered:
+
+| Button | App in the foreground | App in the background or not running |
+| --- | --- | --- |
+| Without `opensApp` | `onAction`; the [background handler](#handling-presses-while-the-app-is-not-running) if no listener takes it | the background handler; without one, queued until the app listens in the foreground |
+| `opensApp: true` | `onAction`; the background handler if no listener takes it within 5 seconds | opens the app, then `onAction`; the background handler if no listener takes it within 5 seconds |
+
+- Buttons without `opensApp` run without opening the app: on iOS through
+  `LiveUpdatesActionIntent` (a `LiveActivityIntent` that `create ios`
+  compiles into both the app and the widget), on Android through a broadcast
+  receiver. Use `opensApp: true` when the press must open the app.
+- `LiveUpdate.actions` receives only that update's presses; presses of other
+  updates go to `onAction` or the background handler.
+- Presses work on the Lock Screen without unlocking the device. Set
+  `requiresUnlock: true` on buttons with consequences, such as cancelling an
+  order: iOS asks for Face ID or the passcode first, and Android 12+ asks the
+  user to unlock.
+- On iOS 16.2 to 16.x no buttons are shown: they use App Intents in Live
+  Activities, which need iOS 17 ([source][ios-button-intent]). A tap on the
+  activity still opens the app with its `route`.
+- Android shows up to three actions. On iOS keep labels short: the whole
+  content must stay under ActivityKit's 4 KB limit.
+
+#### Handling presses while the app is not running
+
+Register a background handler to act on a press immediately, even when the
+app is not running. The plugin starts a headless Flutter engine, runs the
+handler and shuts the engine down:
+
+```dart
+import 'package:flutter/widgets.dart';
+import 'package:live_updates/live_updates.dart';
+
+@pragma('vm:entry-point')
+Future<void> onBackgroundAction(LiveUpdateActionEvent event) async {
+  if (event.actionId == 'cancel') {
+    await api.cancelOrder(event.updateId);
+    final updates = await LiveUpdates.active();
+    await updates
+        .where((u) => u.id == event.updateId)
+        .firstOrNull
+        ?.end(dismissAfter: Duration.zero);
+  }
+}
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await LiveUpdates.setBackgroundActionHandler(onBackgroundAction);
+  runApp(const App());
+}
+```
+
+- It must be a top-level or static function with
+  `@pragma('vm:entry-point')`, and it has limited time (about 9 seconds on
+  Android, 25 seconds on iOS).
+- live_updates itself works in the handler. On iOS, other plugins that use
+  platform channels need to be registered for the background engine:
+
+  ```swift
+  // AppDelegate.swift
+  LiveUpdatesPlugin.setPluginRegistrantCallback { registry in
+    GeneratedPluginRegistrant.register(with: registry)
+  }
+  ```
+
+  On Android, plugins are registered automatically.
+
+### Alerts
+
+Set `alert` on content the user must notice, such as "Your order is here".
+The device plays a sound and may light up the screen or show a banner:
+
+```dart
+await LiveUpdates.startOrUpdate(
+  'order-1234',
+  const LiveUpdateContent(
+    title: 'Order #1234',
+    body: 'At your door',
+    alert: LiveUpdateAlert(), // or LiveUpdateAlert(title: ..., body: ...)
+  ),
+);
+```
+
+- **iOS:** an update (or a scheduled start) shows the alert, with the
+  content's title and body unless the alert sets its own; the system shows
+  them on devices without the Dynamic Island and on Apple Watch (with a
+  `publicContent`, its title and body are the default). Starting
+  a Live Activity from the app is always silent. `IosLiveUpdateOptions.alert`
+  (with a custom sound) takes precedence.
+- **Android:** the post plays the sound and vibration of the notification
+  channel (`AndroidLiveUpdateOptions.alert` does the same). The first post of
+  an update alerts anyway (see [Platform limits](#platform-limits)), and Android allows
+  one requested alert per update every 10 seconds.
+- **Remote:** an `"alert": {"title": ..., "body": ...}` object in the
+  Android content alerts too (unless it says `"androidAlert": false`), so
+  one content works for both; on iOS the alert goes in `aps.alert`, next to
+  `content-state`.
+- `copyWith` does not carry `alert` over: it belongs to one post.
+- `end` never alerts (iOS ends a Live Activity silently): to announce
+  "Delivered", `update` with an alert first, then `end`.
+
+### Hiding content on the Lock Screen
+
+People can choose to hide sensitive content on a locked device. For those
+moments, give the update a `publicContent` without personal details:
+
+```dart
+await LiveUpdates.start(
+  const LiveUpdateContent(
+    title: 'Order #1234',
+    body: 'Courier at the door, gate code 4321',
+    progress: 0.6,
+    publicContent: LiveUpdatePublicContent(
+      title: 'Delivery',
+      body: 'On the way',
+    ),
+  ),
+);
+```
+
+The library never hides content on its own; the person's settings decide:
+
+- **Android:** when the person hides sensitive notification content on the
+  lock screen, Android shows the public version of the notification
+  ([`setPublicVersion`][android-public-version]) while the device is locked.
+  By default, live_updates posts notifications as
+  [`VISIBILITY_PRIVATE`][android-visibility] (Android's default). Without
+  `publicContent`, a secure lock screen then shows only basic information
+  without the content. People can also change lock screen visibility per
+  notification channel ([lock screen visibility][android-lock-screen]).
+- **iOS:** when the system hides private data, the widget sees the
+  [`privacy`][ios-privacy] or [`placeholder`][ios-placeholder] redaction
+  reason, and the generated widget shows `publicContent`. Without
+  `publicContent`, the widget shows the full content, and the system may
+  draw it as a placeholder.
+
+  For widgets, Apple says people control this with Lock Screen widgets under
+  Settings > Face ID & Passcode > Allow Access When Locked
+  ([hide sensitive content][ios-hide-sensitive]). Apple does not document it
+  for Live Activities. In tests on iOS 27, the Live Activity showed
+  `publicContent` while the device was locked with Live Activities turned
+  off under that setting, and the full content after unlocking.
+
+The public version keeps the icon, the colors, the tap route and, unless you
+pass `keepProgress: false` or `keepTimer: false`, the progress and the
+timer. Images, buttons, metrics, steps, the journey, `extra` values and
+Android's `shortCriticalText` are left out.
+
+To always hide the whole notification on a secure Android lock screen,
+whatever the person's setting, use
+[`VISIBILITY_SECRET`][android-visibility-secret]. `publicContent` is then
+not used on Android:
+
+```dart
+android: const AndroidLiveUpdateOptions(
+  lockScreenVisibility: AndroidLockScreenVisibility.secret,
+),
+```
+
+There is no option to always show the full content: it would override the
+person's choice.
+
+In remote payloads, put `publicContent` in the content (`content-state` on
+iOS, `live_updates_content` on Android). It is an object with `title`,
+optional `body`, and `keepProgress` / `keepTimer`, which default to `true`.
+For Android, add `"androidLockScreenVisibility": "secret"` to the content.
+
+[android-public-version]: https://developer.android.com/reference/android/app/Notification.Builder#setPublicVersion(android.app.Notification)
+[android-visibility]: https://developer.android.com/reference/android/app/Notification#visibility
+[android-visibility-secret]: https://developer.android.com/reference/android/app/Notification#VISIBILITY_SECRET
+[android-lock-screen]: https://developer.android.com/develop/ui/compose/notifications/create-notification#lockscreenNotification
+[ios-privacy]: https://developer.apple.com/documentation/swiftui/redactionreasons/privacy
+[ios-placeholder]: https://developer.apple.com/documentation/swiftui/redactionreasons/placeholder
+[ios-hide-sensitive]: https://developer.apple.com/documentation/widgetkit/creating-a-widget-extension#Hide-sensitive-content
+
+### Scheduling
+
+`schedule` shows a live update at a later time, even if the app is not
+running then. At that time it behaves like `startOrUpdate`: a running update
+with the key is updated, otherwise one starts.
+
+```dart
+if (await LiveUpdates.canSchedule()) {
+  final scheduled = await LiveUpdates.schedule(
+    'order-1234',
+    content,
+    at: DateTime.now().add(const Duration(hours: 1)),
+  );
+  // Later: move it, change it or cancel it.
+  await scheduled.reschedule(at: DateTime.now().add(const Duration(hours: 2)));
+  await scheduled.cancel();
+}
+final pending = await LiveUpdates.scheduled();
+```
+
+- Scheduling again with the same key replaces the schedule. A time that is
+  not in the future shows the update now.
+- A scheduled update is not part of `active()` or `find` until it is shown;
+  then it appears on `onStarted` while the app runs. `startOrUpdate` does
+  not cancel a schedule; use `cancelScheduled`, `ScheduledLiveUpdate.cancel`
+  or `cancelAllScheduled`. `endAll()` ends running updates and cancels
+  schedules too, such as when the user logs out or switches accounts;
+  `endAll(includeScheduled: false)` leaves schedules alone.
+- Schedules live on the device, and only the app can cancel them. If the
+  user is logged out on the server or does not open the app, a schedule
+  still shows its update at its time; on iOS a push cannot cancel it either,
+  because a scheduled activity gets its push token only once it starts. Call
+  `endAll()` at logout and at app start when the session is no longer valid,
+  and keep sensitive details out of scheduled content (or give it a
+  `publicContent`, see [Hiding content on the Lock Screen](#hiding-content-on-the-lock-screen)).
+- **iOS 26 and later:** the system starts the Live Activity at that time
+  ([source][ios-request-start]) and presents an alert:
+  `IosLiveUpdateOptions.alert`, else `LiveUpdateContent.alert`, else the
+  public text (`publicContent`) or the title and body. Call `schedule`
+  and `reschedule` while the app is in the foreground; they throw a
+  `LiveUpdateException` in the background and before iOS 26 (check
+  `canSchedule`). ActivityKit drops content updates made before the start,
+  so `reschedule` replaces the scheduled activity. With `pushUpdates`, the
+  activity's push token is issued only once it starts. If an update with the
+  key is running at that time, the system shows both until the app runs; the
+  plugin then ends the older one. In tests the activity started 3 to 4
+  seconds after the requested time. Turning off Live Activities for the app
+  in Settings blocks new requests but does not cancel a schedule made
+  before: in tests (iOS 27.2) it still started at its time, with its alert
+  and sound. Call `cancelAllScheduled()` when the user opts out in your
+  app.
+- **Android:** an alarm posts the notification. It is on time only with
+  exact alarms: add `SCHEDULE_EXACT_ALARM` to your app's manifest (this
+  package does not declare it), ask the user with
+  `LiveUpdates.openExactAlarmSettings()` (Android 14 and later deny it by
+  default for most new installs, see [Platform limits](#platform-limits)) and
+  check `LiveUpdates.canScheduleExactly()`. Without it the update appears
+  within `AndroidScheduleOptions.window` (10 minutes by
+  default, which is also the shortest window Android allows from Android 12;
+  [source][android-alarms]).
+  Schedules survive reboots, app updates and clock changes. A force-stopped
+  app gets no alarms; the plugin sets them again the next time the app
+  starts and then shows overdue updates.
+
+```xml
+<!-- android/app/src/main/AndroidManifest.xml, for exact timing -->
+<uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+```
+
+### Ending at a time
+
+`endAt` says when the activity is over, such as the delivery time.
+`endedContent` is what the update shows from then on, even if the app is not
+running:
+
+```dart
+await LiveUpdates.startOrUpdate(
+  'order-1234',
+  LiveUpdateContent(
+    title: 'Order #1234',
+    body: 'On the way',
+    timer: LiveUpdateTimer.countdown(eta),
+    endAt: eta,
+    endedContent: const LiveUpdateEndedContent(
+      title: 'Order #1234',
+      body: 'Delivered',
+    ),
+  ),
+);
+```
+
+- At `endAt` the update reports `LiveUpdateState.stale` on both platforms
+  and keeps running: it stays in `active()` and `find`, until the app ends
+  it or it reaches its time limit. Updating it with new content makes it
+  active again.
+- Without `endedContent`, nothing visible changes at `endAt`.
+- `LiveUpdateEndedContent` can also set an `icon` (used instead of the
+  content's icon; platform icon options still win) and an `image` (without
+  one, the ended display shows no image).
+- **iOS:** `endAt` becomes the activity's stale date (an explicit
+  `IosLiveUpdateOptions.staleDate` wins), and the generated widget shows
+  `endedContent` once the activity is stale ([source][ios-stale-date]). In
+  tests the system marked the activity stale about a minute after the stale
+  date. The activity keeps running until the app ends it or the system
+  removes it after at most 8 hours (see [Platform limits](#platform-limits)). The
+  switch lives in your layout file; if yours lacks it, see
+  [Upgrading](#upgrading).
+- **Android:** an alarm replaces the notification with `endedContent` as a
+  regular notification (title, body, icon, image, color and tap route; no
+  progress, timer or buttons) that is no longer ongoing or promoted, so the
+  user can swipe it away (reported as `dismissed`; as with any dismissal,
+  `startOrUpdate` then does not show the key again until you `end` it). As
+  with scheduling, the switch is on time only with exact alarms (see
+  [Platform limits](#platform-limits)), otherwise within 10 minutes.
+  `AndroidLiveUpdateOptions(removeAtEnd: true)` removes the notification at
+  `endAt` instead, exactly ([source][android-timeout-after]). With a
+  countdown that ends by `endAt` (as in the example), the notification is
+  removed at the countdown's end instead when the app may not set exact
+  alarms, so it never counts below zero (see [Timers](#timers)).
+
+## Platform-specific options
+
+Options for one platform only, beyond the shared fields used in
+Usage. Everything above works without them.
+
+### Colors and the Dynamic Island
+
+`IosLiveUpdateOptions(color: ..., backgroundColor: ..., foregroundColor: ...)`
+sets the accent (progress, buttons, timer, Dynamic Island keyline), the Lock
+Screen background and its text color, like `AndroidLiveUpdateOptions.color`
+on Android.
+
+- **Choose an accent that reads well on dark and on light backgrounds:**
+  the same activity can appear on both. The Dynamic Island is always black,
+  while the Lock Screen card follows the system: in our tests on iOS 27
+  (device and simulator) it was black in Light and Dark Mode alike, but
+  Apple's guidelines describe a light background in Light Mode, which other
+  versions or setups (such as iOS 16) may show. The template's text uses the
+  system colors, so only colors you set need checking.
+- With a custom background, set the text color too, for example
+  `backgroundColor: Color(0xFFFFFFFF), foregroundColor: Color(0xFF000000)`.
+- While the Always-On display dims the Lock Screen, the system colors are
+  used.
+
+Choose what the small Dynamic Island areas show:
+
+```dart
+const LiveUpdateContent(
+  title: 'Flight 123',
+  extra: {'gate': 'B12'},
+  ios: IosLiveUpdateOptions(
+    compactLeading: IosIslandContent.timer,           // default: icon
+    compactTrailing: IosIslandContent.extra('gate'), // or progress, title, body
+    minimal: IosIslandContent.progress,               // or icon, ...
+  ),
+);
+```
+
+If the chosen content is missing (such as `progress` without a progress), the
+default is shown. Text is left out when the island is narrow, for example in
+landscape on iOS 27. These options need the Dynamic Island building blocks
+in your layout file; if yours lacks them, see [Upgrading](#upgrading).
+
+### Android display modes
+
+`AndroidLiveUpdateOptions.mode` chooses how Android 16 and later show the
+update (older versions always show a regular ongoing notification with a
+progress bar):
+
+| Mode | Android 16+ look | Promoted to a Live Update |
+| --- | --- | --- |
+| `liveUpdate` (default) | `ProgressStyle` / Android 17 `MetricStyle` | requested |
+| `ongoing` | `ProgressStyle` / Android 17 `MetricStyle` | no |
+| `classic` | the same as Android 15 and earlier | no |
+
+Use `liveUpdate` only for activities that fit Android's Live Update guidance,
+`ongoing` for other activities that benefit from the richer progress, and
+`classic` for the same look on every version (the body is always shown,
+metrics are added to the text, and segments, points and semantic colors are
+not used).
+
+### Android progress stages and timeout
+
+```dart
+LiveUpdateContent(
+  title: 'Order #1234',
+  progress: 0.6,
+  android: const AndroidLiveUpdateOptions(
+    // Android 16+: preparing, on the way, delivered (relative lengths).
+    progressSegments: [
+      AndroidProgressSegment(1),
+      AndroidProgressSegment(2),
+      AndroidProgressSegment(1),
+    ],
+    progressPoints: [AndroidProgressPoint(.25), AndroidProgressPoint(.75)],
+    progressTrackerIcon: LiveUpdateIcon.native('ic_courier'), // see Icons
+    // Removed after 2 hours even if the app never ends it.
+    timeoutAfter: Duration(hours: 2),
+  ),
+);
+```
+
+- `progress` still runs from 0 to 1 over the whole bar. Segments, points and
+  the tracker icon need it (or `steps`); explicit segments and points take
+  precedence over those made from `steps`.
+- Below Android 16 segments, points and the tracker icon are ignored. On
+  Android 17 `metrics` replace the progress bar.
+- `timeoutAfter` counts from the latest post.
+
+### Android 17 metrics and semantic colors
+
+On Android 17 a Live Update with `metrics` (see [Layouts](#layouts)) shows
+them with `MetricStyle` instead of the progress bar. Timers and stopwatches
+are counted by the system, so they keep running between updates.
+`criticalMetric` picks the one that may appear in the status bar chip.
+
+While metrics are set, Android 17 does not show the body text (its metric
+template has no room for it), so put anything users must read in the title or
+in a `LiveUpdateMetric.text`.
+
+Semantic styles let Android color the body text, the progress bar or a metric
+by meaning (info, safe, caution, danger); the system picks the colors and
+applies them to promoted Live Updates on Android 17. They are ignored on
+older versions. The same keys work in remote payloads (see
+[docs/testing-remote.md](https://github.com/metal-president/live_updates/blob/main/docs/testing-remote.md)).
+
 ## Custom layouts
 
 The built-in layouts cover common cases. For a design of your own, draw the
@@ -1157,15 +1019,11 @@ and the Android layouts are `live_update_delivery*.xml` in its
 
 ### Customizing the iOS widget
 
-#### Generate the widget
+#### The generated files
 
-[Getting started](#ios) has already generated the widget with:
-
-```bash
-dart run live_updates:create ios
-```
-
-It writes two kinds of files to `ios/LiveUpdatesWidget/`:
+[Getting started](#ios) has already generated the widget with
+`dart run live_updates:create ios`. It writes two kinds of files to
+`ios/LiveUpdatesWidget/`:
 
 - **Yours to edit:** `LiveUpdatesWidgetLiveActivity.swift` (the layout of
   the Lock Screen and every Dynamic Island presentation), the widget bundle
@@ -1353,6 +1211,150 @@ names, add them to its `tools:keep` attribute (comma separated), for
 example `tools:keep="@layout/live_update_*,@layout/courier"`
 ([source][android-keep-resources]).
 
+## Platform limits
+
+Each limit links to the platform documentation it comes from. The systems
+change between OS versions, so check the source when something behaves
+differently.
+
+### iOS
+
+- **Duration:** a Live Activity can run for up to 8 hours. Then the system
+  ends it and removes it from the Dynamic Island; the Lock Screen keeps it
+  for up to 4 more hours (12 hours in total). For longer activities, end the
+  activity and start a new one, or use a regular notification.
+  ([source][ios-activitykit])
+- **After `end`:** the final content stays on the Lock Screen for up to
+  4 hours. `dismissAfter` longer than that is capped at 4 hours.
+  ([source][ios-activitykit]) As on Android, the plugin removes buttons, the
+  timer and timer or stopwatch metrics from it, since they would keep
+  running; an `end` sent by push shows what the server sends. Without
+  `finalContent` it starts from the content as the app last received it,
+  which can be older than a push update shown a moment ago: if you update
+  by push, pass `finalContent` to `end`.
+- **Size:** the attributes and the content together must stay under 4 KB,
+  for local updates and push payloads alike. Long texts, many buttons and
+  large `extra` maps count toward it. ([source][ios-activitykit])
+- **Height:** the Lock Screen view is 84 to 160 points high; content beyond
+  that is cut off. ([source][ios-hig-specs])
+- **User settings:** users can turn off Live Activities for your app in
+  Settings. `LiveUpdates.isSupported()` returns `false` then, and `start`
+  throws a `LiveUpdateException`. Check it before you offer a "Track on Lock
+  Screen" option. ([source][ios-activitykit])
+- **Number of activities:** the system limits how many Live Activities can
+  run at once (per app and per device; the exact number varies). Handle a
+  `LiveUpdateException` from `start`, and prefer one activity that you update
+  over several. ([source][ios-activitykit])
+- **Updates from the app:** `update` and `end` only run while your app runs.
+  To keep an activity current while the app is suspended or closed, update
+  it with [push notifications](#remote-updates). ([source][ios-push])
+- **Push budget:** iOS limits pushes with `apns-priority: 10` per hour and
+  throttles them beyond that budget. Send routine updates with
+  `apns-priority: 5` (not counted) and use `10` only for updates the user
+  must see at once. For many updates per hour (such as a live score), add
+  `NSSupportsLiveActivitiesFrequentUpdates` = YES to the Runner `Info.plist`;
+  users can still turn frequent updates off in Settings. ([source][ios-push])
+- **Where it appears:** the Lock Screen of iPhone and iPad, the Dynamic
+  Island on iPhone models that have one, StandBy, the Mac menu bar, the
+  Apple Watch Smart Stack and CarPlay. Devices without the Dynamic Island
+  show the Lock Screen view as a banner for updates with an alert. Buttons do
+  nothing in CarPlay, so make sure the content works without them.
+  ([source][ios-hig])
+
+### Android
+
+- **Promotion:** besides the requirements in
+  [Getting started](#android), Android only promotes notifications on a
+  channel whose importance is above "min". If you pass your own
+  `channelId`, do not create that channel with `IMPORTANCE_MIN`. Device
+  makers can apply additional criteria. ([source][android-live-update])
+- **User settings:** users can demote or dismiss a Live Update and turn off
+  Live Updates for your app in Settings. Updates then appear as regular
+  ongoing notifications. `LiveUpdates.canPostPromotedNotifications()` tells
+  you whether Live Updates are allowed for your app (the permission), and
+  `LiveUpdate.isPromoted()` whether the system promoted one shown update. To send
+  users to the setting, open the
+  `Settings.ACTION_APP_NOTIFICATION_PROMOTION_SETTINGS` intent (the Live
+  Update guide names it `ACTION_MANAGE_APP_PROMOTED_NOTIFICATIONS`, which is
+  not in the SDK) with `Settings.EXTRA_APP_PACKAGE`; some devices have no
+  matching screen, so handle that case. ([source][android-live-update],
+  [source][android-promotion-settings])
+- **Status bar chip:** the chip is at most 96 dp wide. `shortCriticalText`
+  is shown in full only if it is shorter than 7 characters; longer text is
+  cut, or only the icon is shown when less than half of it fits. Without
+  `shortCriticalText`, a countdown timer at least 2 minutes in the future is
+  shown as the remaining time. ([source][android-live-update])
+- **Permissions:** on Android 13 and later nothing is shown until the user
+  grants the notification permission, including updates started by a
+  remote message. ([source][android-permission]) While notifications are
+  turned off for the app or for its channel, `start`, `startOrUpdate` and
+  `update` throw a `LiveUpdateException`, as on iOS with Live Activities
+  turned off. `schedule` and `reschedule` with a past time throw too, and a
+  schedule that comes due meanwhile shows nothing. `isSupported()` tells
+  you beforehand whether notifications are on for the app; a turned-off
+  channel shows only in the exception.
+- **After `end`:** the final content (or the content shown last)
+  stays as a regular notification for up to 4 hours, as on iOS, and the
+  user can swipe it away. Running timers (and timer or stopwatch metrics)
+  are left out of it, so a countdown does not run past zero. This applies to
+  `end` and remote `end` payloads; an update removed by `maxDuration`,
+  `timeoutAfter`, `removeAtEnd` or at the end of a countdown is removed at
+  once. Unlike iOS, Android
+  does not report `dismissed` when the ended notification goes away.
+  `dismissAfter` longer than 4 hours is capped at 4 hours; `Duration.zero`
+  removes it at once. Below Android 8.0 the system cannot remove a
+  notification later, so only `finalContent` stays there, until the user
+  dismisses it ([source][android-timeout-after]).
+- **Sound:** the first post of a live update plays the sound of its
+  channel, while iOS starts a Live Activity silently. The plugin creates its
+  channels with the default importance; to start silently, create your own
+  channel with `IMPORTANCE_LOW` before the first post and pass its
+  `channelId` (`alert: true` then plays no sound either). Users can change
+  a channel's sound in Settings. ([source][android-channels])
+- **Duration:** a live update is removed 8 hours after it started by
+  default, as on iOS, even if the app is not running; later updates do not
+  reset it (`AndroidLiveUpdateOptions.maxDuration`; `null` for no limit).
+- **Exact alarms:** scheduled updates and `endedContent` are on time only
+  while the app may set exact alarms (`SCHEDULE_EXACT_ALARM`, from Android
+  14 denied by default for most newly installed apps that target Android 13
+  or higher). If the user takes
+  the permission away, Android cancels the exact alarms without telling the
+  app; the plugin sets them again (inexact) the next time the app starts.
+  Otherwise Android delivers alarms within a window of at least 10 minutes.
+  ([source][android-alarms], [source][android-14-exact-alarms])
+- **Custom layouts:** a notification with custom views (`RemoteViews`) is
+  never promoted to a Live Update: Android requires that a Live Update has
+  no custom content view and advises against custom notifications, so
+  [`customLayout`](#customizing-the-android-notification) shows a regular
+  ongoing notification. ([source][android-live-update])
+- **Custom layout size:** for apps that target Android 12 or higher, the
+  system draws custom content inside its standard notification frame (like
+  `DecoratedCustomViewStyle`) with the app icon and name, keeps the collapsed
+  view to 48 dp in height (106 dp before) and leaves less horizontal space.
+  Depending on the Android version, the expanded view can be limited to as
+  little as 252 dp. ([source][android-12-custom],
+  [source][android-custom-notification]) Test the layouts on several screen
+  sizes and in light and dark themes: the background differs between devices
+  and versions.
+
+[ios-activitykit]: https://developer.apple.com/documentation/activitykit/displaying-live-data-with-live-activities
+[ios-button-intent]: https://developer.apple.com/documentation/swiftui/button/init(intent:label:)
+[ios-request-start]: https://developer.apple.com/documentation/activitykit/activity/request(attributes:content:pushtype:style:alertconfiguration:start:)
+[ios-stale-date]: https://developer.apple.com/documentation/activitykit/activitycontent/staledate
+[android-alarms]: https://developer.android.com/develop/background-work/services/alarms
+[android-14-exact-alarms]: https://developer.android.com/about/versions/14/changes/schedule-exact-alarms
+[android-channels]: https://developer.android.com/develop/ui/views/notifications/channels
+[android-timeout-after]: https://developer.android.com/reference/android/app/Notification.Builder#setTimeoutAfter(long)
+[ios-push]: https://developer.apple.com/documentation/activitykit/starting-and-updating-live-activities-with-activitykit-push-notifications
+[ios-hig]: https://developer.apple.com/design/human-interface-guidelines/live-activities
+[ios-hig-specs]: https://developer.apple.com/design/human-interface-guidelines/live-activities#Specifications
+[android-live-update]: https://developer.android.com/develop/ui/views/notifications/live-update
+[android-permission]: https://developer.android.com/develop/ui/views/notifications/notification-permission
+[android-promoted-permission]: https://developer.android.com/reference/android/Manifest.permission#POST_PROMOTED_NOTIFICATIONS
+[android-promotion-settings]: https://developer.android.com/reference/android/provider/Settings#ACTION_APP_NOTIFICATION_PROMOTION_SETTINGS
+[android-12-custom]: https://developer.android.com/about/versions/12/behavior-changes-12#custom-notifications
+[android-custom-notification]: https://developer.android.com/develop/ui/views/notifications/custom-notification
+
 ## Remote updates
 
 The content JSON is the same on both platforms; only the push envelope
@@ -1448,7 +1450,10 @@ for a sender.
 
 ## Upgrading
 
-After updating live_updates, generate the widget again:
+For breaking changes and what to change in your app for each version,
+see
+[doc/upgrading.md](https://github.com/metal-president/live_updates/blob/main/packages/live_updates/doc/upgrading.md).
+After any update, also generate the widget again:
 
 ```bash
 dart run live_updates:create ios
@@ -1473,92 +1478,6 @@ apply them again:
   the start of both the Lock Screen and the Dynamic Island closures, with
   `state` passed to the building blocks instead of `context.state`, so the
   activity shows `endedContent` from `endAt` on (0.3.0).
-
-### From 0.4.x to 0.5.0
-
-- **`create_widget` is now `create ios`:** replace
-  `dart run live_updates:create_widget` with
-  `dart run live_updates:create ios`. The options and the behavior are the
-  same, and your layout file and other edited files are kept.
-  `dart run live_updates:create` with no platform sets up every platform
-  the app has, including the optional
-  [Android custom layouts](#customizing-the-android-notification); use
-  `create ios` if you only need the widget.
-- **`extra` and `extraImages` moved to `LiveUpdateContent`:** move them
-  from `IosLiveUpdateOptions` to
-  `LiveUpdateContent(extra: ..., extraImages: ...)`. The old fields are
-  deprecated. They still work on iOS (merged with the new ones; the iOS
-  value wins for the same key), but Android custom layouts read only the
-  new fields. The keys in the iOS content state and in push payloads are
-  unchanged.
-
-### From 0.3.x to 0.4.0
-
-- **Android keeps an ended update for up to 4 hours by default**, as iOS
-  does: `end()` without `finalContent` no longer removes the notification at
-  once but leaves the content shown last as a regular notification, and
-  `dismissAfter: null` (also a remote `end` without
-  `live_updates_dismiss_after`) means 4 hours instead of "until dismissed".
-  To remove it at once as before, pass `dismissAfter: Duration.zero` (remote:
-  `"live_updates_dismiss_after": 0`). `endAll()` removes these too.
-- **Android `start`, `startOrUpdate` and `update` throw a
-  `LiveUpdateException`** while notifications are turned off for the app or
-  its channel, as on iOS (`schedule` and `reschedule` too, for a time that
-  has passed). Before, they returned as if the update were
-  shown. Check `isSupported()` first, or catch the exception.
-- **Android removes a notification when its countdown ends** (a
-  notification's countdown cannot stop at zero), and leaves out the timer of
-  a countdown that is already over. Pass
-  `AndroidLiveUpdateOptions(removeAtCountdownEnd: false)` to keep it.
-- **iOS 16.2 and later:** Live Activities now work from iOS 16.2. Run
-  `create ios` again, then lower the deployment target of the
-  `LiveUpdatesWidget` target to 16.2 in Xcode and check that your layout file
-  builds for it (`create ios` does not change an existing target, and
-  says when it is higher; with `--no-xcode` check it yourself).
-  `create ios` also adds `LiveUpdatesWidget` = YES to the widget's
-  `Info.plist`, so the plugin checks that extension: until it supports the
-  device's iOS, `isSupported()` stays `false` there, so the app does not
-  start activities that no widget can show. Without the key, any widget
-  extension of the app that supports the device's iOS counts: on iOS 16.2
-  to 17.1, `isSupported()` can then return `true` while the Live Activity
-  extension still targets 17.2 (as in 0.3.x), and activities may start
-  without being shown. If you set up the extension by hand, add the key
-  yourself (see [Manual setup](#manual-setup)).
-- **What stays after `end` has no buttons or running timers** on either
-  platform (the final content, or the content shown last).
-- **iOS `startOrUpdate` replaces an ended activity** with the key that is
-  still on the Lock Screen, instead of doing nothing; only an activity the
-  user dismissed still keeps the key from starting.
-- **Android remote `alert`:** an `alert` object in `live_updates_content`
-  now alerts. Send `"androidAlert": false` to keep such an update silent.
-
-### From 0.2.x to 0.3.0
-
-- **Android live updates are removed after 8 hours by default**
-  (`AndroidLiveUpdateOptions.maxDuration`), as iOS ends Live Activities after
-  at most 8 hours. To keep the old behavior, pass
-  `AndroidLiveUpdateOptions(maxDuration: null)`; remote payloads send
-  `"maxDurationMillis": 0`.
-- Run `create ios` again (and update your layout file as above) to show
-  `endedContent` on iOS.
-
-### From 0.1.x to 0.2.0
-
-Icons are now `LiveUpdateIcon` values (see [Icons](#icons)):
-
-| 0.1.x | 0.2.0 |
-| --- | --- |
-| `iconName: 'ic_stat'` | `icon: LiveUpdateIcon.native('ic_stat')` |
-| `progressTrackerIcon: 'ic_car'` | `progressTrackerIcon: LiveUpdateIcon.native('ic_car')` |
-| `LiveUpdateAction(iosSystemImage: 'xmark')` | `LiveUpdateAction(icon: LiveUpdateIcon.symbol('xmark'))` |
-| `LiveUpdateAction(androidIcon: 'ic_close')` | `LiveUpdateAction(androidIcon: LiveUpdateIcon.native('ic_close'))` |
-
-In remote payloads, `"iconName": "ic_stat"` becomes
-`"icon": {"native": "ic_stat"}`, and so on for `progressTrackerIcon` and the
-button keys (`systemImage` becomes `"icon": {"symbol": ...}`). Run
-`create ios` again so the widget reads the new keys and gets its asset
-catalog. On iOS, activities started before the upgrade show the default
-icon until their next update.
 
 ## How it works
 

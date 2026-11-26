@@ -1214,12 +1214,20 @@ LiveUpdateContent(
 );
 ```
 
-The generated layouts in the example app (Android 17), collapsed and
-expanded:
+Layouts can hold several rows and columns, pictures, a countdown and a
+progress bar. The example app's "Custom layout" shows one `LiveUpdateContent`
+(with `extra` values for the distance, stops and arrival time and the
+courier picture in `extraImages`) with a custom iOS layout and Android
+layouts of its own (iOS 27 Lock Screen, Android 17 notification shade):
 
-| Collapsed | Expanded |
-| --- | --- |
-| <img src="https://raw.githubusercontent.com/metal-president/live_updates/main/docs/screenshots/android_custom_layout/collapsed.png" alt="Collapsed custom notification layout" width="380"> | <img src="https://raw.githubusercontent.com/metal-president/live_updates/main/docs/screenshots/android_custom_layout/expanded.png" alt="Expanded custom notification layout" width="380"> |
+| iOS | Android collapsed | Android expanded |
+| --- | --- | --- |
+| <img src="https://raw.githubusercontent.com/metal-president/live_updates/main/docs/screenshots/custom_layout/ios_lock_screen.png" alt="iOS Lock Screen with a custom delivery layout" width="260"> | <img src="https://raw.githubusercontent.com/metal-president/live_updates/main/docs/screenshots/custom_layout/android_collapsed.png" alt="Collapsed Android notification with a custom delivery layout" width="260"> | <img src="https://raw.githubusercontent.com/metal-president/live_updates/main/docs/screenshots/custom_layout/android_expanded.png" alt="Expanded Android notification with a custom delivery layout" width="260"> |
+
+The Android layouts are in the example's
+[`res/layout`](https://github.com/metal-president/live_updates/tree/main/packages/live_updates/example/android/app/src/main/res/layout)
+(`live_update_delivery*.xml`), and the iOS one is the `delivery` case in
+[`LiveUpdatesWidgetLiveActivity.swift`](https://github.com/metal-president/live_updates/blob/main/packages/live_updates/example/ios/LiveUpdatesWidget/LiveUpdatesWidgetLiveActivity.swift).
 
 Without `expanded`, the collapsed layout is used for both. The plugin fills
 the views by id; a layout can leave out any of them:

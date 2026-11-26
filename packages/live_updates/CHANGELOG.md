@@ -14,7 +14,6 @@
 - `dart run live_updates:create ios` now sets `NSSupportsLiveActivities`
   to YES when the Runner `Info.plist` has it set to NO (it was left as it
   was).
-- Example: an "Open settings" button.
 - Docs: a "Permissions and settings" section lists what the user can allow
   or turn off (notifications, Live Activities, the notification channel,
   Live Update promotion, exact alarms, frequent updates), how to check and
@@ -23,8 +22,8 @@
   requirement, two more manual iOS setup steps (build phase order, widget
   version numbers) and the `RECEIVE_BOOT_COMPLETED` permission the plugin
   declares, with how to remove it.
-- Example: asks for the permission before starting and logs
-  `canPostPromotedNotifications()`.
+- Example: asks for the permission before starting, logs
+  `canPostPromotedNotifications()`, and has an "Open settings" button.
 
 ## 0.5.1
 

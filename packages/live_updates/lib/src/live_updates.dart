@@ -196,7 +196,8 @@ abstract final class LiveUpdates {
   ///
   /// Throws a [LiveUpdateException] when it cannot be shown: on iOS when Live
   /// Activities are turned off for the app, the system limit of running
-  /// activities is reached or the app is in the background; on Android when
+  /// activities is reached, the app is in the background or the device or
+  /// iOS version does not support the call; on Android when
   /// notifications are turned off for the app or for its channel. Check
   /// [isSupported] before you offer to track something on the Lock Screen
   /// (it does not cover a turned-off Android channel).

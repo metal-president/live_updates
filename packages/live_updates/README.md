@@ -1,35 +1,7 @@
 # live_updates
 
 iOS **Live Activities** and Android **Live Update** notifications with one Dart API.
-
-- **One API for both platforms:** start, update and end with a title, body,
-  progress, a system-counted timer, an image, buttons and a tap route.
-- **Scheduling and ending at a time:** show a live update later, even if
-  the app is not running then (iOS 26+ and Android), and switch it to ended
-  content such as "Delivered" at a set time.
-- **iOS 16.2+:** Lock Screen and Dynamic Island, with five built-in layouts
-  (standard, timer, metrics, stepper, journey) and a SwiftUI widget you
-  generate with one command and can customize.
-- **Android:** `ProgressStyle` notifications on Android 16+, promoted to a
-  Live Update with a status bar chip when the system allows it (Android 16
-  QPR1 and later), and an ongoing notification with a progress bar on older
-  versions.
-- **Custom layouts:** draw the iOS widget in SwiftUI and the Android
-  notification with XML layouts of your own (Android shows them as an
-  ongoing notification), both filled from the same content.
-- **Remote updates:** start, update and end from your server (APNs on iOS, a
-  data message on Android; optional FCM helper:
-  [`live_updates_fcm`](https://pub.dev/packages/live_updates_fcm)).
-- **Lightweight:** no platform channels (native code is called through
-  [FFIgen](https://pub.dev/packages/ffigen) and
-  [JNIgen](https://pub.dev/packages/jnigen)), and runtime dependencies are only
-  Dart and Flutter team packages (`ffi`, `objective_c`, `jni`, `crypto`,
-  `meta`). Other platforms are a safe no-op.
-
-In this README, a *live update* is either a Live Activity (iOS) or a Live
-Update notification (Android).
-
-> **Status:** 0.5.x. Breaking changes come with a new minor version (0.6.0); pin the version you test with.
+In this README, a *live update* is either of them.
 
 | iOS Lock Screen | iOS Dynamic Island |
 | --- | --- |
@@ -37,7 +9,35 @@ Update notification (Android).
 | **Android 16** | **Android 17** |
 | <img src="https://raw.githubusercontent.com/metal-president/live_updates/main/packages/live_updates/doc/screenshots/android_16.png" alt="Android 16 Live Update with progress stages" width="360"> | <img src="https://raw.githubusercontent.com/metal-president/live_updates/main/packages/live_updates/doc/screenshots/android_17.png" alt="Android 17 Live Update with metrics" width="360"> |
 
-Screenshots of the example app in this repository.
+Screenshots of the example app in this repository. See also the
+[built-in layouts](#layouts) and a [custom layout](#custom-layouts).
+
+- **One API for both platforms:** start, update and end with a title, body,
+  progress, a system-counted timer, an image, buttons and a tap route.
+- **Scheduling and ending at a time:** show a live update later, even if
+  the app is not running then (iOS 26+ and Android), and switch it to ended
+  content such as "Delivered" at a set time ([Scheduling](#scheduling),
+  [Ending at a time](#ending-at-a-time)).
+- **iOS 16.2+:** Lock Screen and Dynamic Island, with five built-in
+  [layouts](#layouts) (standard, timer, metrics, stepper, journey) and a
+  SwiftUI widget you generate with one command and can customize.
+- **Android:** `ProgressStyle` notifications on Android 16+, promoted to a
+  Live Update with a status bar chip when the system allows it (Android 16
+  QPR1 and later), and an ongoing notification with a progress bar on older
+  versions.
+- **[Custom layouts](#custom-layouts):** draw the iOS widget in SwiftUI and
+  the Android notification with XML layouts of your own (Android shows them
+  as an ongoing notification), both filled from the same content.
+- **[Remote updates](#remote-updates):** start, update and end from your
+  server (APNs on iOS, a data message on Android; optional FCM helper:
+  [`live_updates_fcm`](https://pub.dev/packages/live_updates_fcm)).
+- **Lightweight:** no platform channels (native code is called through
+  [FFIgen](https://pub.dev/packages/ffigen) and
+  [JNIgen](https://pub.dev/packages/jnigen)), and runtime dependencies are only
+  Dart and Flutter team packages (`ffi`, `objective_c`, `jni`, `crypto`,
+  `meta`). Other platforms are a safe no-op.
+
+> **Status:** 0.5.x. Breaking changes come with a new minor version (0.6.0); pin the version you test with.
 
 ## Contents
 
@@ -46,8 +46,9 @@ Screenshots of the example app in this repository.
 - [Platform guidelines](#platform-guidelines)
 - [Platform limits](#platform-limits)
 - [Usage](#usage)
-- [Customizing the iOS widget](#customizing-the-ios-widget)
-- [Customizing the Android notification](#customizing-the-android-notification)
+- [Custom layouts](#custom-layouts)
+  - [Customizing the iOS widget](#customizing-the-ios-widget)
+  - [Customizing the Android notification](#customizing-the-android-notification)
 - [Remote updates](#remote-updates)
 - [Upgrading](#upgrading)
 - [How it works](#how-it-works)
@@ -120,6 +121,9 @@ flutter pub add live_updates
 3. For push updates, add the **Push Notifications** capability to the Runner
    target.
 
+To change how the widget looks, see
+[Customizing the iOS widget](#customizing-the-ios-widget).
+
 #### Manual setup
 
 With `--no-xcode` only the widget sources are written. Then, in Xcode:
@@ -189,15 +193,14 @@ Interface Guidelines for Live Activities and Android's
   `AndroidLiveUpdateOptions(mode: AndroidLiveUpdateMode.ongoing)` (or
   `classic`) for anything that is not a Live Update; it then stays a regular
   notification.
-- Do not bring back an update the user dismissed. On Android `update` fails
-  for a dismissed update, and remote `update` payloads for it are ignored.
-  A remote `start` (or an iOS push-to-start) shows it again: send one only
-  for a new activity. `startOrUpdate` does not show a dismissed key again
-  until you `end` it on
-  Android; iOS cannot always tell a dismissal from other ends (for example
-  while the app is not running), so there the key can start again once the
-  system no longer lists the dismissed activity. Use a new key for a new
-  activity.
+- Do not bring back an update the user dismissed, and use a new key for a
+  new activity. On Android, `update` fails for a dismissed update, remote
+  `update` payloads for it are ignored, and `startOrUpdate` does not show
+  the key again until you `end` it. On iOS the plugin cannot always tell a
+  dismissal from other ends (for example while the app is not running), so
+  `startOrUpdate` can start the key again once the system no longer lists
+  the dismissed activity. A remote `start` (or an iOS push-to-start) shows
+  it again: send one only for a new activity.
 - Keep `shortCriticalText` under 7 characters (see
   [Platform limits](#platform-limits)).
 
@@ -216,9 +219,9 @@ differently.
   ([source][ios-activitykit])
 - **After `end`:** the final content stays on the Lock Screen for up to
   4 hours. `dismissAfter` longer than that is capped at 4 hours.
-  ([source][ios-activitykit]) From 0.4.0 the plugin leaves out buttons, the
-  timer and timer or stopwatch metrics, which would keep running (as on
-  Android); an `end` sent by push shows what the server sends. Without
+  ([source][ios-activitykit]) As on Android, the plugin removes buttons, the
+  timer and timer or stopwatch metrics from it, since they would keep
+  running; an `end` sent by push shows what the server sends. Without
   `finalContent` it starts from the content as the app last received it,
   which can be older than a push update shown a moment ago: if you update
   by push, pass `finalContent` to `end`.
@@ -258,14 +261,11 @@ differently.
   channel whose importance is above "min". If you pass your own
   `channelId`, do not create that channel with `IMPORTANCE_MIN`. Device
   makers can apply additional criteria. ([source][android-live-update])
-  `LiveUpdate.isPromoted()` tells you whether a shown update was promoted:
-  unlike `LiveUpdates.canPostPromotedNotifications()`, which only reports
-  the permission, it reflects the system's decision for that notification.
 - **User settings:** users can demote or dismiss a Live Update and turn off
   Live Updates for your app in Settings. Updates then appear as regular
   ongoing notifications. `LiveUpdates.canPostPromotedNotifications()` tells
-  you whether Live Updates are turned off for your app, and
-  `LiveUpdate.isPromoted()` whether one shown update is promoted. To send
+  you whether Live Updates are allowed for your app (the permission), and
+  `LiveUpdate.isPromoted()` whether the system promoted one shown update. To send
   users to the setting, open the
   `Settings.ACTION_APP_NOTIFICATION_PROMOTION_SETTINGS` intent (the Live
   Update guide names it `ACTION_MANAGE_APP_PROMOTED_NOTIFICATIONS`, which is
@@ -282,12 +282,12 @@ differently.
   remote message. ([source][android-permission]) While notifications are
   turned off for the app or for its channel, `start`, `startOrUpdate` and
   `update` throw a `LiveUpdateException`, as on iOS with Live Activities
-  turned off (from 0.4.0), and so do `schedule` and `reschedule` for a time
-  that has passed. A schedule whose time comes then shows nothing. `isSupported()` tells you beforehand
-  whether notifications are on for the app; a turned-off channel shows only
-  in the exception.
-- **After `end`:** from 0.4.0 the final content (or the content shown last)
-  stays as a regular notification for up to 4 hours, like on iOS, and the
+  turned off. `schedule` and `reschedule` with a past time throw too, and a
+  schedule that comes due meanwhile shows nothing. `isSupported()` tells
+  you beforehand whether notifications are on for the app; a turned-off
+  channel shows only in the exception.
+- **After `end`:** the final content (or the content shown last)
+  stays as a regular notification for up to 4 hours, as on iOS, and the
   user can swipe it away. Running timers (and timer or stopwatch metrics)
   are left out of it, so a countdown does not run past zero. This applies to
   `end` and remote `end` payloads; an update removed by `maxDuration`,
@@ -304,9 +304,9 @@ differently.
   channel with `IMPORTANCE_LOW` before the first post and pass its
   `channelId` (`alert: true` then plays no sound either). Users can change
   a channel's sound in Settings. ([source][android-channels])
-- **Duration:** from 0.3.0 a live update is removed 8 hours after it
-  started by default, like on iOS (`AndroidLiveUpdateOptions.maxDuration`;
-  `null` for no limit).
+- **Duration:** a live update is removed 8 hours after it started by
+  default, as on iOS, even if the app is not running; later updates do not
+  reset it (`AndroidLiveUpdateOptions.maxDuration`; `null` for no limit).
 - **Exact alarms:** scheduled updates and `endedContent` are on time only
   while the app may set exact alarms (`SCHEDULE_EXACT_ALARM`, from Android
   14 denied by default for most newly installed apps that target Android 13
@@ -506,13 +506,13 @@ final pending = await LiveUpdates.scheduled();
   app.
 - **Android:** an alarm posts the notification. It is on time only with
   exact alarms: add `SCHEDULE_EXACT_ALARM` to your app's manifest (this
-  package does not declare it). From Android 14 it is denied by default for
-  most newly installed apps that target Android 13 or higher, so ask the user with
-  `LiveUpdates.openExactAlarmSettings()` and check
-  `LiveUpdates.canScheduleExactly()`
-  ([source][android-alarms], [source][android-14-exact-alarms]). Without it
-  the update appears within `AndroidScheduleOptions.window` (10 minutes by
-  default, which is also the shortest window Android allows from Android 12).
+  package does not declare it), ask the user with
+  `LiveUpdates.openExactAlarmSettings()` (Android 14 and later deny it by
+  default for most new installs, see [Platform limits](#platform-limits)) and
+  check `LiveUpdates.canScheduleExactly()`. Without it the update appears
+  within `AndroidScheduleOptions.window` (10 minutes by
+  default, which is also the shortest window Android allows from Android 12;
+  [source][android-alarms]).
   Schedules survive reboots, app updates and clock changes. A force-stopped
   app gets no alarms; the plugin sets them again the next time the app
   starts and then shows overdue updates.
@@ -558,8 +558,8 @@ await LiveUpdates.startOrUpdate(
   tests the system marked the activity stale about a minute after the stale
   date. The activity keeps running until the app ends it or the system
   removes it after at most 8 hours (see [Platform limits](#platform-limits)). The
-  switch lives in your layout file: one generated before 0.3.0 needs it
-  added (see [Upgrading](#upgrading)).
+  switch lives in your layout file; if yours lacks it, see
+  [Upgrading](#upgrading).
 - **Android:** an alarm replaces the notification with `endedContent` as a
   regular notification (title, body, icon, image, color and tap route; no
   progress, timer or buttons) that is no longer ongoing or promoted, so the
@@ -571,10 +571,6 @@ await LiveUpdates.startOrUpdate(
   countdown that ends by `endAt` (as in the example), the notification is
   removed at the countdown's end instead when the app may not set exact
   alarms, so it never counts below zero (see [Timers](#timers)).
-- **Android time limit:** `AndroidLiveUpdateOptions.maxDuration` removes the
-  notification that long after the update started (later updates do not
-  reset it), even if the app is not running. It defaults to 8 hours, like
-  the iOS limit; pass `maxDuration: null` for no limit.
 
 ### Buttons
 
@@ -680,17 +676,16 @@ LiveUpdateContent(
 
 When a countdown ends, iOS stops it at zero and keeps showing the activity.
 An Android notification's countdown cannot stop and would count below zero,
-so from 0.4.0 Android removes the notification when the countdown ends:
+so Android removes the notification when the countdown ends:
 exactly, even if the app is not running, with no extra permission
 ([source][android-timeout-after]). The update then reports `ended`. Content
-whose countdown is already over is still shown, without the timer. With
-`endedContent` at an `endAt` up to the countdown's end (see
-[Ending at a time](#ending-at-a-time)), the ended content replaces it instead
-when the app may set exact alarms (should that alarm not come, for example
-because the user revoked the permission, the notification is removed 10
-minutes later); otherwise the removal wins, as the replacement could come up
-to 10 minutes late. Timer metrics
-(`LiveUpdateMetric.timer`) are not covered.
+whose countdown is already over is still shown, without the timer. If an
+`endedContent` is due at or before the countdown's end (see
+[Ending at a time](#ending-at-a-time)), it replaces the notification instead
+when the app may set exact alarms; should that alarm not come, the
+notification is removed 10 minutes later. Without exact alarms the removal
+wins, as the replacement could come up to 10 minutes late. Timer metrics
+(`LiveUpdateMetric.timer`) do not remove the notification.
 
 To show something else at that time on both platforms, update the content
 from your server, for example to "Arrived", before the countdown ends. To
@@ -753,8 +748,7 @@ A layout whose data is missing falls back to `standard`. The expanded Dynamic
 Island shows the metrics, steps or journey of the chosen layout in place of
 the body (there is no room for both), and buttons stay at the bottom of every
 layout. The layout can change with each update. For a layout of your own, see
-[Custom layouts](#custom-layouts) (iOS) and
-[Customizing the Android notification](#customizing-the-android-notification).
+[Custom layouts](#custom-layouts).
 
 ### Colors and the Dynamic Island
 
@@ -791,8 +785,8 @@ const LiveUpdateContent(
 
 If the chosen content is missing (such as `progress` without a progress), the
 default is shown. Text is left out when the island is narrow, for example in
-landscape on iOS 27. A layout file generated by an older version may ignore
-these options; see [Upgrading](#upgrading).
+landscape on iOS 27. These options need the Dynamic Island building blocks
+in your layout file; if yours lacks them, see [Upgrading](#upgrading).
 
 ### Android display modes
 
@@ -846,7 +840,7 @@ await LiveUpdates.startOrUpdate(
 - `end` never alerts (iOS ends a Live Activity silently): to announce
   "Delivered", `update` with an alert first, then `end`.
 
-### Android progress stages, timeout and alerts
+### Android progress stages and timeout
 
 ```dart
 LiveUpdateContent(
@@ -863,8 +857,6 @@ LiveUpdateContent(
     progressTrackerIcon: LiveUpdateIcon.native('ic_courier'), // see Icons
     // Removed after 2 hours even if the app never ends it.
     timeoutAfter: Duration(hours: 2),
-    // Sound and vibrate for this post (normally only the first one alerts).
-    alert: true,
   ),
 );
 ```
@@ -875,9 +867,6 @@ LiveUpdateContent(
 - Below Android 16 segments, points and the tracker icon are ignored. On
   Android 17 `metrics` replace the progress bar.
 - `timeoutAfter` counts from the latest post.
-- Requested alerts are limited to one per update every 10 seconds. The iOS
-  equivalent of `alert` is `IosLiveUpdateOptions.alert`;
-  `LiveUpdateContent.alert` covers both (see [Alerts](#alerts)).
 
 ### Android 17 metrics and semantic colors
 
@@ -992,8 +981,7 @@ an App Group. `create ios` sets one up by default (`group.<app bundle id>`,
 or `--app-group <id>`): it adds the entitlement to both targets and writes the
 `LiveUpdatesAppGroup` Info.plist key the plugin and the widget read. With
 automatic signing Xcode registers the group; otherwise add it in your Apple
-Developer account. A customized widget loads an image with
-`LiveUpdatesImages.url(context.state.image)`.
+Developer account.
 
 ### Icons
 
@@ -1119,77 +1107,154 @@ Each place shows the first icon that is set:
 [ios-hig-best-practices]: https://developer.apple.com/design/human-interface-guidelines/live-activities#Best-practices
 [ios-hig-colors]: https://developer.apple.com/design/human-interface-guidelines/live-activities#Choosing-colors
 
-## Customizing the iOS widget
+## Custom layouts
 
-`create ios` writes two kinds of files to `ios/LiveUpdatesWidget/`:
+The built-in layouts cover common cases. For a design of your own, draw the
+iOS widget in SwiftUI and the Android notification with XML layouts. Both
+are filled from the same `LiveUpdateContent`, including two fields meant
+for custom layouts: `extra` (text by key, which the Dynamic Island can also
+show) and `extraImages` (pictures by key).
 
-- **Yours to edit**: `LiveUpdatesWidgetLiveActivity.swift` (the layout of the
-  Lock Screen and every Dynamic Island presentation), the widget bundle and
-  `Info.plist`. Running `create ios` again keeps them; `--force` replaces
-  them.
-- **Owned by the plugin**: `LiveUpdatesAttributes.swift`,
+```dart
+LiveUpdateContent(
+  title: 'Order #1234',
+  body: 'On the way',
+  progress: 0.6,
+  timer: LiveUpdateTimer.countdown(eta),
+  image: const LiveUpdateImage.asset('assets/parcel.png'),
+  extra: const {'distance': '1.2 km', 'stops': '2'},
+  extraImages: const {
+    'courier': LiveUpdateImage.asset('assets/courier.png', maxDimension: 96),
+  },
+  ios: const IosLiveUpdateOptions(layout: IosLiveUpdateLayout.custom('delivery')),
+  android: const AndroidLiveUpdateOptions(
+    mode: AndroidLiveUpdateMode.ongoing,
+    customLayout: AndroidCustomLayout(
+      'live_update_delivery',
+      expanded: 'live_update_delivery_expanded',
+    ),
+  ),
+);
+```
+
+The example app's "Custom layout" shows such a content (iOS 27 Lock Screen,
+Android 17 notification shade):
+
+| iOS | Android collapsed | Android expanded |
+| --- | --- | --- |
+| <img src="https://raw.githubusercontent.com/metal-president/live_updates/main/docs/screenshots/custom_layout/ios_lock_screen.png" alt="iOS Lock Screen with a custom delivery layout" width="260"> | <img src="https://raw.githubusercontent.com/metal-president/live_updates/main/docs/screenshots/custom_layout/android_collapsed.png" alt="Collapsed Android notification with a custom delivery layout" width="260"> | <img src="https://raw.githubusercontent.com/metal-president/live_updates/main/docs/screenshots/custom_layout/android_expanded.png" alt="Expanded Android notification with a custom delivery layout" width="260"> |
+
+The iOS layout is the `delivery` case in the example's
+[`LiveUpdatesWidgetLiveActivity.swift`](https://github.com/metal-president/live_updates/blob/main/packages/live_updates/example/ios/LiveUpdatesWidget/LiveUpdatesWidgetLiveActivity.swift),
+and the Android layouts are `live_update_delivery*.xml` in its
+[`res/layout`](https://github.com/metal-president/live_updates/tree/main/packages/live_updates/example/android/app/src/main/res/layout).
+
+- **Keys:** Android finds the views by key, so it shows only keys made of
+  lowercase letters, digits and underscores (up to 64 characters), and
+  leaves out `extra` keys that start with `image_`. Use such keys for
+  content that goes to both platforms.
+- **Size:** keep `extraImages` few and small. The iOS widget extension has
+  little memory and ActivityKit may refuse images larger than they are
+  shown; Android limits the size of a notification. On iOS they are stored
+  like `image`, through the App Group (see [Images](#images)).
+- **Remote updates:** a push replaces `extra` but cannot add `extraImages`,
+  so extra images suit updates that the app makes itself.
+
+### Customizing the iOS widget
+
+#### Generate the widget
+
+[Getting started](#ios) has already generated the widget with:
+
+```bash
+dart run live_updates:create ios
+```
+
+It writes two kinds of files to `ios/LiveUpdatesWidget/`:
+
+- **Yours to edit:** `LiveUpdatesWidgetLiveActivity.swift` (the layout of
+  the Lock Screen and every Dynamic Island presentation), the widget bundle
+  and `Info.plist`. Running `create ios` again keeps them; `--force`
+  replaces them.
+- **Owned by the plugin:** `LiveUpdatesAttributes.swift`,
   `LiveUpdatesViews.swift` (the building blocks the layout uses, such as
   `LiveUpdatesLockScreen` and `LiveUpdatesCompactTrailing`) and
   `LiveUpdatesActionIntent.swift`. Running `create ios` again replaces
   them. Do not edit them: copy a view into your layout file to change it.
 
-In the layout, `context.state` has every field of `LiveUpdateContent`, and
-`context.state.extra["driver"]` reads `LiveUpdateContent.extra`, for values
-the template does not show. For more pictures than `image`, pass
-`LiveUpdateContent.extraImages`: the plugin stores them like `image`
-(scaled, in the App Group, cleaned up when unused), and the layout loads one
-with `LiveUpdatesImages.url(context.state.extraImages["map"])`. The same
-values fill an [Android custom layout](#customizing-the-android-notification):
+#### Choose the iOS layout
+
+Name the layout in the content:
 
 ```dart
-LiveUpdateContent(
-  title: 'Courier on the way',
-  extra: const {'gate': 'B12'},
-  extraImages: const {
-    'map': LiveUpdateImage.asset('assets/map.png', maxDimension: 160),
-    'driver': LiveUpdateImage.asset('assets/driver.png'),
-  },
-  ios: const IosLiveUpdateOptions(layout: IosLiveUpdateLayout.custom('courier')),
-);
+ios: const IosLiveUpdateOptions(layout: IosLiveUpdateLayout.custom('delivery')),
 ```
 
-Keep them few and small: the widget extension has little memory, and
-ActivityKit may refuse images larger than they are shown. A push replaces the
-whole content state and cannot add pictures, so extra images suit activities
-that the app updates itself.
-
-### Custom layouts
-
-For a layout of your own, pass `IosLiveUpdateLayout.custom('name')` and add a
-case to the switch in `LiveUpdatesWidgetLiveActivity.swift`:
+and add a case for it to the switch in `LiveUpdatesWidgetLiveActivity.swift`:
 
 ```swift
-switch context.state.layout {
-case "name": MyLayout(state: context.state)
-default: LiveUpdatesLockScreen(state: context.state, activityID: context.activityID)
+switch state.layout {
+case "delivery": DeliveryLayout(state: state)
+default: LiveUpdatesLockScreen(state: state, activityID: context.activityID)
 }
 ```
 
-The built-in building blocks show `publicContent` while the system hides
-private data (see [Hiding content on the Lock Screen](#hiding-content-on-the-lock-screen)).
-A layout of your own should do the same:
+The case draws the Lock Screen view. The Dynamic Island keeps the building
+blocks, which you can replace in the same file.
 
-```swift
-struct MyLayout: View {
-  let state: LiveUpdatesAttributes.ContentState
-  @Environment(\.redactionReasons) private var redactionReasons
+#### Fill the iOS layout
 
-  var body: some View {
-    if state.liveUpdatesShowsPublic(redactionReasons) {
-      LiveUpdatesPublicLockScreen(state: state)
-    } else {
-      // Your layout.
+`state` is `context.state` as the generated file prepares it
+(`liveUpdatesShown(isStale:)`), with the fields of `LiveUpdateContent`:
+
+| Swift | Content |
+| --- | --- |
+| `state.title`, `state.body` | `title`, `body` |
+| `state.progress` | `progress` (0 to 1) |
+| `LiveUpdatesTimerText(state: state)` | `timer`, counting down or up |
+| `LiveUpdatesImages.url(state.image)` | `image` |
+| `state.extra["<key>"]` | `extra['<key>']` |
+| `LiveUpdatesImages.url(state.extraImages["<key>"])` | `extraImages['<key>']` |
+
+`metrics`, `steps` and `journey` are there too, and the building blocks in
+`LiveUpdatesViews.swift` can be part of your layout.
+
+#### iOS notes
+
+- **Lock screen:** the building blocks show `publicContent` while the
+  system hides private data (see
+  [Hiding content on the Lock Screen](#hiding-content-on-the-lock-screen)).
+  A layout of your own should do the same:
+
+  ```swift
+  struct DeliveryLayout: View {
+    let state: LiveUpdatesAttributes.ContentState
+    @Environment(\.redactionReasons) private var redactionReasons
+
+    var body: some View {
+      if state.liveUpdatesShowsPublic(redactionReasons) {
+        LiveUpdatesPublicLockScreen(state: state)
+      } else {
+        // Your layout.
+      }
     }
   }
-}
-```
+  ```
 
-## Customizing the Android notification
+- **Ended and stale:** after `end`, the layout shows the final content (or
+  the content shown last) without the timer and buttons. Final content uses
+  its own `ios` options: pass `layout` there too (`copyWith` keeps it).
+  Unlike on Android, from `endAt` (or `staleDate`) on, an `endedContent`
+  is shown with the built-in view, since it has no layout; without one,
+  your layout stays.
+- **Remote updates:** `layout` in `content-state` selects the case (such as
+  `"layout": "delivery"`), and `extra` fills it.
+- **Missing layouts:** a layout without a case shows the built-in view
+  (the `default` case).
+
+### Customizing the Android notification
+
+#### Generate the layouts
 
 Android shows live updates with the system's notification templates, which
 follow the content (see [Layouts](#layouts)). To draw the notification with
@@ -1199,49 +1264,34 @@ layouts of your own instead, generate a pair of XML layouts:
 dart run live_updates:create android
 ```
 
-This writes two layouts that are yours to edit:
-`android/app/src/main/res/layout/live_update_custom.xml` (collapsed) and
-`live_update_custom_expanded.xml` (expanded). It also writes
-`res/raw/live_updates_keep.xml` (see [Release builds](#release-builds)).
-`--layout <name>` picks another name. Running the command again keeps your
-files; `--force` replaces them (keeping a `.bak` copy of a changed file).
-Then pass the layout names:
+It writes these files to `android/app/src/main/res/`:
+
+- **Yours to edit:** `layout/live_update_custom.xml` (collapsed) and
+  `layout/live_update_custom_expanded.xml` (expanded). `--layout <name>`
+  picks another name. Running `create android` again keeps them; `--force`
+  replaces them (keeping a `.bak` copy of a changed file).
+- **Keep file:** `raw/live_updates_keep.xml`, which keeps the layouts in
+  release builds (see [Release builds](#release-builds)).
+
+#### Choose the Android layouts
+
+Name the generated layouts in the content:
 
 ```dart
-LiveUpdateContent(
-  title: 'Order #1234',
-  body: 'On the way',
-  progress: 0.6,
-  timer: LiveUpdateTimer.countdown(eta),
-  image: const LiveUpdateImage.asset('assets/courier.png'),
-  extra: const {'status': '1.2 km away'},
-  android: const AndroidLiveUpdateOptions(
-    mode: AndroidLiveUpdateMode.ongoing,
-    customLayout: AndroidCustomLayout(
-      'live_update_custom',
-      expanded: 'live_update_custom_expanded',
-    ),
+android: const AndroidLiveUpdateOptions(
+  mode: AndroidLiveUpdateMode.ongoing,
+  customLayout: AndroidCustomLayout(
+    'live_update_custom',
+    expanded: 'live_update_custom_expanded',
   ),
-);
+),
 ```
 
-Layouts can hold several rows and columns, pictures, a countdown and a
-progress bar. The example app's "Custom layout" shows one `LiveUpdateContent`
-(with `extra` values for the distance, stops and arrival time and the
-courier picture in `extraImages`) with a custom iOS layout and Android
-layouts of its own (iOS 27 Lock Screen, Android 17 notification shade):
+Without `expanded`, the collapsed layout is used for both.
 
-| iOS | Android collapsed | Android expanded |
-| --- | --- | --- |
-| <img src="https://raw.githubusercontent.com/metal-president/live_updates/main/docs/screenshots/custom_layout/ios_lock_screen.png" alt="iOS Lock Screen with a custom delivery layout" width="260"> | <img src="https://raw.githubusercontent.com/metal-president/live_updates/main/docs/screenshots/custom_layout/android_collapsed.png" alt="Collapsed Android notification with a custom delivery layout" width="260"> | <img src="https://raw.githubusercontent.com/metal-president/live_updates/main/docs/screenshots/custom_layout/android_expanded.png" alt="Expanded Android notification with a custom delivery layout" width="260"> |
+#### Fill the Android layouts
 
-The Android layouts are in the example's
-[`res/layout`](https://github.com/metal-president/live_updates/tree/main/packages/live_updates/example/android/app/src/main/res/layout)
-(`live_update_delivery*.xml`), and the iOS one is the `delivery` case in
-[`LiveUpdatesWidgetLiveActivity.swift`](https://github.com/metal-president/live_updates/blob/main/packages/live_updates/example/ios/LiveUpdatesWidget/LiveUpdatesWidgetLiveActivity.swift).
-
-Without `expanded`, the collapsed layout is used for both. The plugin fills
-the views by id; a layout can leave out any of them:
+The plugin fills the views by id; a layout can leave out any of them:
 
 | View id | View | Content |
 | --- | --- | --- |
@@ -1253,72 +1303,67 @@ the views by id; a layout can leave out any of them:
 | `live_update_extra_<key>` | `TextView` | `extra['<key>']`, made visible |
 | `live_update_extra_image_<key>` | `ImageView` | `extraImages['<key>']`, made visible |
 
-- **Extra values:** pass what the layout should show in `extra`. Keys use
-  lowercase letters, digits and underscores, and must not start with
-  `image_` (that names the views of `extraImages`). `metrics`, `steps` and
-  `journey` are not filled in. A `live_update_extra_*` view keeps its
-  layout text while the content has no value for it, so give it
-  `android:visibility="gone"`, as the generated layout does. The same
-  `extra` and `extraImages` also reach a [customized iOS
-  widget](#customizing-the-ios-widget).
-- **Views:** use only views that notifications support (such as
-  `LinearLayout`, `FrameLayout`, `TextView`, `ImageView`, `ProgressBar` and
-  `Chronometer`), and the view types in the table for the ids. Otherwise
-  the system rejects the notification and the app can crash.
+`metrics`, `steps` and `journey` are not filled in. A
+`live_update_extra_*` view keeps its layout text while the content has no
+value for it, so give it `android:visibility="gone"`, as the generated
+layouts do.
+
+#### Android notes
+
 - **Never promoted:** Android does not promote a notification with custom
-  views to a Live Update ([Platform limits](#platform-limits)). It is shown as an
-  ongoing notification in every mode, so use
+  views to a Live Update ([Platform limits](#platform-limits)). It is shown
+  as an ongoing notification in every mode, so use
   `AndroidLiveUpdateMode.ongoing`; with the default `liveUpdate` the plugin
   logs a warning. There is no status bar chip, and the progress styles,
   `metrics` (`MetricStyle`), `shortCriticalText` and the large icon are not
   used. The timer appears only in `live_update_timer`, not in the header.
   Buttons, the tap route, the small icon, `color`, the timeouts and
   everything else work as usual.
+- **Views:** use only views that notifications support (such as
+  `LinearLayout`, `FrameLayout`, `TextView`, `ImageView`, `ProgressBar` and
+  `Chronometer`), and the view types in the table for the ids. Otherwise
+  the system rejects the notification and the app can crash.
 - **Frame and size:** Android draws the layout inside its notification
   frame with the app icon, the app name and the buttons, and limits its
   height (see [Platform limits](#platform-limits)). Use the notification
   text appearances (such as
   `@android:style/TextAppearance.Material.Notification.Title`, as the
-  generated layouts do) and no background color.
+  generated layouts do) and no background color. Images are scaled down to
+  at most 512 pixels in the layouts.
+- **Lock screen:** the public version made from `publicContent` keeps the
+  system template.
 - **Ended and stale:** after `end`, and from `endAt` on, the layout shows
   the final or ended content without progress or timer. `endedContent`
   fills only the title, body and image, so the `live_update_extra_*` views
   fall back to the layout (hidden in the generated layouts). Final content
   uses its own `android` options: pass `customLayout` there too
   (`copyWith` keeps it).
-- **Lock screen:** the public version made from `publicContent` keeps the
-  system template.
 - **Remote updates:** `androidLayout` and `androidExpandedLayout` in
-  `live_updates_content` select the layouts, and `extra` fills them, so
-  remote messages (with or without `live_updates_fcm`) work the same way.
-  Remote messages can only use layouts whose name starts with
-  `live_update_` (other layouts of the app or its libraries may hold views a
-  notification cannot show). As on iOS, a remote message cannot add
-  `extraImages`.
-- **Pictures:** images are scaled down to at most 512 pixels in the
-  layouts; keep `maxDimension` small, as Android limits the size of a
-  notification.
+  `live_updates_content` select the layouts, and `extra` fills them. Remote
+  messages can only use layouts whose name starts with `live_update_`
+  (other layouts of the app or its libraries may hold views a notification
+  cannot show).
 - **Missing layouts:** a layout that cannot be found (a typo, or removed by
   the resource shrinker) shows the system template, with a warning in the
   log, since scheduled and remote updates have no caller to report an error
   to.
 
-### Release builds
+#### Release builds
 
-The resource shrinker removes resources that the code
-does not reference, and the plugin loads the layouts by name
-(`getIdentifier`), which the shrinker cannot follow. The generated
-`res/raw/live_updates_keep.xml` keeps every layout whose name starts with
-`live_update_`. For layouts with other names, add them to its `tools:keep`
-attribute (comma separated), for example
-`tools:keep="@layout/live_update_*,@layout/courier"`
+The resource shrinker removes resources that the code does not reference,
+and the plugin loads the layouts by name (`getIdentifier`), which the
+shrinker cannot follow. The generated `res/raw/live_updates_keep.xml` keeps
+every layout whose name starts with `live_update_`. For layouts with other
+names, add them to its `tools:keep` attribute (comma separated), for
+example `tools:keep="@layout/live_update_*,@layout/courier"`
 ([source][android-keep-resources]).
 
 ## Remote updates
 
 The content JSON is the same on both platforms; only the push envelope
 differs. To reach both through FCM from one server, see
-[docs/server-fcm.md](https://github.com/metal-president/live_updates/blob/main/docs/server-fcm.md). `LiveUpdate.key` is the id your server uses for an
+[docs/server-fcm.md](https://github.com/metal-president/live_updates/blob/main/docs/server-fcm.md),
+which also has complete payloads. `LiveUpdate.key` is the id your server uses for an
 update on both platforms.
 
 ### iOS (APNs)
@@ -1358,9 +1403,6 @@ Send pushes with `apns-push-type: liveactivity` and topic
   `compactLeading` / `compactTrailing` / `minimal`.
 - For push-to-start, set `"attributes-type": "LiveUpdatesAttributes"`,
   `"attributes": {"key": "<your id>"}` (or `{}` without a key) and an `alert`.
-
-[docs/server-fcm.md](https://github.com/metal-president/live_updates/blob/main/docs/server-fcm.md)
-has complete payloads.
 
 ### iOS broadcast (iOS 18+)
 
@@ -1413,8 +1455,13 @@ for a sender.
 
 ## Upgrading
 
-After updating live_updates, run `dart run live_updates:create ios` again.
-It replaces the plugin-owned Swift files (`LiveUpdatesAttributes.swift`,
+After updating live_updates, generate the widget again:
+
+```bash
+dart run live_updates:create ios
+```
+
+This replaces the plugin-owned Swift files (`LiveUpdatesAttributes.swift`,
 `LiveUpdatesViews.swift`, `LiveUpdatesActionIntent.swift`), which brings new
 built-in layouts and button handling, and keeps your layout file. Android
 layouts from `create android` are yours and stay as they are.
@@ -1423,7 +1470,7 @@ A layout file generated by an older version can miss newer features. Add
 these yourself, or copy your changes aside, run `create ios --force` and
 apply them again:
 
-- the layout switch for [custom layouts](#custom-layouts);
+- the layout switch for [custom layouts](#customizing-the-ios-widget);
 - `LiveUpdatesCompactLeading`, `LiveUpdatesCompactTrailing`,
   `LiveUpdatesMinimal` and `LiveUpdatesIslandIcon` (in the expanded leading
   region), for the Dynamic Island options;

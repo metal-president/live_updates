@@ -2,6 +2,11 @@
 
 - Lower minimum dependency versions so the package fits more apps:
   `crypto` 3.0.6 (was 3.0.8) and `ffi` 2.1.3 (was 2.2.0).
+- Docs: Upgrading in the README notes that without `LiveUpdatesWidget` =
+  YES in the widget's `Info.plist`, `isSupported()` can return `true` on
+  iOS 16.2 to 17.1 while the Live Activity extension still targets 17.2 (if
+  another widget extension of the app supports that iOS). Run
+  `create_widget` again to add the key.
 
 ## 0.4.0
 

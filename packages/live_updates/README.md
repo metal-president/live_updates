@@ -1298,10 +1298,14 @@ apply them again:
   builds for it (`create_widget` does not change an existing target, and
   says when it is higher; with `--no-xcode` check it yourself).
   `create_widget` also adds `LiveUpdatesWidget` = YES to the widget's
-  `Info.plist`, so the plugin checks that extension.
-  Until the extension supports the device's iOS, `isSupported()` stays
-  `false` there, so the app does not start activities that no widget can
-  show.
+  `Info.plist`, so the plugin checks that extension: until it supports the
+  device's iOS, `isSupported()` stays `false` there, so the app does not
+  start activities that no widget can show. Without the key, any widget
+  extension of the app that supports the device's iOS counts: on iOS 16.2
+  to 17.1, `isSupported()` can then return `true` while the Live Activity
+  extension still targets 17.2 (as in 0.3.x), and activities may start
+  without being shown. If you set up the extension by hand, add the key
+  yourself (see [Manual setup](#manual-setup)).
 - **What stays after `end` has no buttons or running timers** on either
   platform (the final content, or the content shown last).
 - **iOS `startOrUpdate` replaces an ended activity** with the key that is

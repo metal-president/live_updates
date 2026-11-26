@@ -164,6 +164,49 @@ void main() {
     await update.end(dismissAfter: Duration.zero);
   });
 
+  testWidgets('a custom Android layout is shown and never promoted', (
+    tester,
+  ) async {
+    if (!await LiveUpdates.isSupported()) return;
+    const android = AndroidLiveUpdateOptions(
+      mode: AndroidLiveUpdateMode.ongoing,
+      customLayout: AndroidCustomLayout(
+        'live_update_custom',
+        expanded: 'live_update_custom_expanded',
+      ),
+    );
+    final update = await LiveUpdates.start(
+      const LiveUpdateContent(
+        title: 'Custom',
+        body: 'Body',
+        progress: .4,
+        extra: {'status': 'Near you'},
+        image: LiveUpdateImage.asset('assets/parcel.png', maxDimension: 64),
+        android: android,
+      ),
+    );
+    await update.update(
+      const LiveUpdateContent(
+        title: 'Custom',
+        progress: .8,
+        extra: {'status': 'Here'},
+        android: android,
+      ),
+    );
+    expect(await update.isPromoted(), isFalse);
+    // A layout that does not exist falls back to the system template.
+    await update.update(
+      const LiveUpdateContent(
+        title: 'Custom',
+        android: AndroidLiveUpdateOptions(
+          mode: AndroidLiveUpdateMode.ongoing,
+          customLayout: AndroidCustomLayout('live_update_missing'),
+        ),
+      ),
+    );
+    await update.end(dismissAfter: Duration.zero);
+  });
+
   testWidgets('icons of every kind, including missing ones, are accepted', (
     tester,
   ) async {

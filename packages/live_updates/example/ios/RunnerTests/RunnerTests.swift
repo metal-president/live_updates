@@ -114,6 +114,12 @@ struct ContentStateDecodingTests {
     #expect(try decode(#"{"title":"T"}"#).extraImages.isEmpty)
   }
 
+  @Test func extraDecodesAndMayBeMissing() throws {
+    #expect(try decode(#"{"title":"T","extra":{"gate":"B12"}}"#).extra == ["gate": "B12"])
+    // Sent only when it has values (0.5.0).
+    #expect(try decode(#"{"title":"T"}"#).extra.isEmpty)
+  }
+
   @Test func endedContentDecodes() throws {
     let state = try decode(#"{"title":"T","endedContent":{"title":"Done","body":"Enjoy"}}"#)
     #expect(state.endedContent == LiveUpdatesEndedContent(title: "Done", body: "Enjoy"))

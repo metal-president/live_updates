@@ -1,10 +1,21 @@
+## 0.5.1
+
+- Docs: README reorganized. Screenshots come first, shared usage comes
+  before the platform-specific options, both custom layouts are described
+  under one "Custom layouts" section, and the upgrade notes for each version
+  moved to
+  [doc/upgrading.md](https://github.com/metal-president/live_updates/blob/main/packages/live_updates/doc/upgrading.md).
+  Corrected two details: Android removes a notification at a countdown's end
+  on Android 8.0 and later, and a push replaces the whole content, so
+  pictures from `extraImages` disappear.
+
 ## 0.5.0
 
 - **Breaking:** `dart run live_updates:create_widget` is replaced by
   `dart run live_updates:create ios`, with the same options and behavior
   (your edited files are kept). `dart run live_updates:create android`
   generates Android notification layouts, and `dart run live_updates:create`
-  without a platform generates both. See Upgrading in the README.
+  without a platform generates both. See [doc/upgrading.md](https://github.com/metal-president/live_updates/blob/main/packages/live_updates/doc/upgrading.md).
 - Android: custom notification layouts. `AndroidLiveUpdateOptions.customLayout`
   (`AndroidCustomLayout('live_update_custom', expanded: ...)`) shows the
   notification with XML layouts of the app, inside the system's notification
@@ -56,7 +67,7 @@
   hours. Pass `Duration.zero` to remove it at once. Running timers and
   timer or stopwatch metrics are left out of the ended notification, also
   from `finalContent`. `endAll()` removes ended notifications too. See
-  Upgrading in the README.
+  [doc/upgrading.md](https://github.com/metal-president/live_updates/blob/main/packages/live_updates/doc/upgrading.md).
 - iOS: `startOrUpdate` with the key of an activity that ended but is still
   on the Lock Screen now starts a new activity (and removes the ended one),
   as on Android. Before, it did nothing for up to four hours after `end`.
@@ -121,7 +132,7 @@
   started by default, like iOS ends Live Activities after at most 8 hours.
   `AndroidLiveUpdateOptions.maxDuration` sets the limit (`null` for none);
   later updates do not reset it. Remote payloads take `maxDurationMillis`
-  (missing: 8 hours, `0`: no limit). See Upgrading in the README.
+  (missing: 8 hours, `0`: no limit). See [doc/upgrading.md](https://github.com/metal-president/live_updates/blob/main/packages/live_updates/doc/upgrading.md).
 - Scheduled live updates: `LiveUpdates.schedule(key, content, at:)` shows the
   content at that time as `startOrUpdate` would, even if the app is not
   running, and returns a `ScheduledLiveUpdate` (`reschedule`, `cancel`).
@@ -150,7 +161,7 @@
     set. The building blocks switch with
     `context.state.liveUpdatesShown(isStale:)` in the layout file: run
     `create_widget` again, and update a layout file generated before (it is
-    not overwritten; see Upgrading in the README).
+    not overwritten; see [doc/upgrading.md](https://github.com/metal-president/live_updates/blob/main/packages/live_updates/doc/upgrading.md)).
   - Android: an alarm swaps the notification for the ended content (a regular
     notification, no longer ongoing or promoted) and reports `stale`, as on
     iOS.
@@ -190,7 +201,7 @@
     `LiveUpdatesExpandedCenter` (the expanded Dynamic Island title). Run
     `dart run live_updates:create_widget` again; a layout file generated
     before should use `LiveUpdatesExpandedCenter` in its expanded center
-    region (see Upgrading in the README).
+    region (see [doc/upgrading.md](https://github.com/metal-president/live_updates/blob/main/packages/live_updates/doc/upgrading.md)).
 - `AndroidLiveUpdateOptions.lockScreenVisibility`:
   `AndroidLockScreenVisibility.private` (default, now set explicitly) or
   `secret`, which hides the notification on a secure lock screen.

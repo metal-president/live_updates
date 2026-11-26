@@ -44,12 +44,12 @@ Screenshots of the example app in this repository. See also the
 - [Platform support](#platform-support)
 - [Getting started](#getting-started)
 - [Platform guidelines](#platform-guidelines)
-- [Platform limits](#platform-limits)
 - [Usage](#usage)
 - [Platform-specific options](#platform-specific-options)
 - [Custom layouts](#custom-layouts)
   - [Customizing the iOS widget](#customizing-the-ios-widget)
   - [Customizing the Android notification](#customizing-the-android-notification)
+- [Platform limits](#platform-limits)
 - [Remote updates](#remote-updates)
 - [Upgrading](#upgrading)
 - [How it works](#how-it-works)
@@ -198,150 +198,6 @@ Interface Guidelines for Live Activities and Android's
   it again: send one only for a new activity.
 - Keep `shortCriticalText` under 7 characters (see
   [Platform limits](#platform-limits)).
-
-## Platform limits
-
-Each limit links to the platform documentation it comes from. The systems
-change between OS versions, so check the source when something behaves
-differently.
-
-### iOS
-
-- **Duration:** a Live Activity can run for up to 8 hours. Then the system
-  ends it and removes it from the Dynamic Island; the Lock Screen keeps it
-  for up to 4 more hours (12 hours in total). For longer activities, end the
-  activity and start a new one, or use a regular notification.
-  ([source][ios-activitykit])
-- **After `end`:** the final content stays on the Lock Screen for up to
-  4 hours. `dismissAfter` longer than that is capped at 4 hours.
-  ([source][ios-activitykit]) As on Android, the plugin removes buttons, the
-  timer and timer or stopwatch metrics from it, since they would keep
-  running; an `end` sent by push shows what the server sends. Without
-  `finalContent` it starts from the content as the app last received it,
-  which can be older than a push update shown a moment ago: if you update
-  by push, pass `finalContent` to `end`.
-- **Size:** the attributes and the content together must stay under 4 KB,
-  for local updates and push payloads alike. Long texts, many buttons and
-  large `extra` maps count toward it. ([source][ios-activitykit])
-- **Height:** the Lock Screen view is 84 to 160 points high; content beyond
-  that is cut off. ([source][ios-hig-specs])
-- **User settings:** users can turn off Live Activities for your app in
-  Settings. `LiveUpdates.isSupported()` returns `false` then, and `start`
-  throws a `LiveUpdateException`. Check it before you offer a "Track on Lock
-  Screen" option. ([source][ios-activitykit])
-- **Number of activities:** the system limits how many Live Activities can
-  run at once (per app and per device; the exact number varies). Handle a
-  `LiveUpdateException` from `start`, and prefer one activity that you update
-  over several. ([source][ios-activitykit])
-- **Updates from the app:** `update` and `end` only run while your app runs.
-  To keep an activity current while the app is suspended or closed, update
-  it with [push notifications](#remote-updates). ([source][ios-push])
-- **Push budget:** iOS limits pushes with `apns-priority: 10` per hour and
-  throttles them beyond that budget. Send routine updates with
-  `apns-priority: 5` (not counted) and use `10` only for updates the user
-  must see at once. For many updates per hour (such as a live score), add
-  `NSSupportsLiveActivitiesFrequentUpdates` = YES to the Runner `Info.plist`;
-  users can still turn frequent updates off in Settings. ([source][ios-push])
-- **Where it appears:** the Lock Screen of iPhone and iPad, the Dynamic
-  Island on iPhone models that have one, StandBy, the Mac menu bar, the
-  Apple Watch Smart Stack and CarPlay. Devices without the Dynamic Island
-  show the Lock Screen view as a banner for updates with an alert. Buttons do
-  nothing in CarPlay, so make sure the content works without them.
-  ([source][ios-hig])
-
-### Android
-
-- **Promotion:** besides the requirements in
-  [Getting started](#android), Android only promotes notifications on a
-  channel whose importance is above "min". If you pass your own
-  `channelId`, do not create that channel with `IMPORTANCE_MIN`. Device
-  makers can apply additional criteria. ([source][android-live-update])
-- **User settings:** users can demote or dismiss a Live Update and turn off
-  Live Updates for your app in Settings. Updates then appear as regular
-  ongoing notifications. `LiveUpdates.canPostPromotedNotifications()` tells
-  you whether Live Updates are allowed for your app (the permission), and
-  `LiveUpdate.isPromoted()` whether the system promoted one shown update. To send
-  users to the setting, open the
-  `Settings.ACTION_APP_NOTIFICATION_PROMOTION_SETTINGS` intent (the Live
-  Update guide names it `ACTION_MANAGE_APP_PROMOTED_NOTIFICATIONS`, which is
-  not in the SDK) with `Settings.EXTRA_APP_PACKAGE`; some devices have no
-  matching screen, so handle that case. ([source][android-live-update],
-  [source][android-promotion-settings])
-- **Status bar chip:** the chip is at most 96 dp wide. `shortCriticalText`
-  is shown in full only if it is shorter than 7 characters; longer text is
-  cut, or only the icon is shown when less than half of it fits. Without
-  `shortCriticalText`, a countdown timer at least 2 minutes in the future is
-  shown as the remaining time. ([source][android-live-update])
-- **Permissions:** on Android 13 and later nothing is shown until the user
-  grants the notification permission, including updates started by a
-  remote message. ([source][android-permission]) While notifications are
-  turned off for the app or for its channel, `start`, `startOrUpdate` and
-  `update` throw a `LiveUpdateException`, as on iOS with Live Activities
-  turned off. `schedule` and `reschedule` with a past time throw too, and a
-  schedule that comes due meanwhile shows nothing. `isSupported()` tells
-  you beforehand whether notifications are on for the app; a turned-off
-  channel shows only in the exception.
-- **After `end`:** the final content (or the content shown last)
-  stays as a regular notification for up to 4 hours, as on iOS, and the
-  user can swipe it away. Running timers (and timer or stopwatch metrics)
-  are left out of it, so a countdown does not run past zero. This applies to
-  `end` and remote `end` payloads; an update removed by `maxDuration`,
-  `timeoutAfter`, `removeAtEnd` or at the end of a countdown is removed at
-  once. Unlike iOS, Android
-  does not report `dismissed` when the ended notification goes away.
-  `dismissAfter` longer than 4 hours is capped at 4 hours; `Duration.zero`
-  removes it at once. Below Android 8.0 the system cannot remove a
-  notification later, so only `finalContent` stays there, until the user
-  dismisses it ([source][android-timeout-after]).
-- **Sound:** the first post of a live update plays the sound of its
-  channel, while iOS starts a Live Activity silently. The plugin creates its
-  channels with the default importance; to start silently, create your own
-  channel with `IMPORTANCE_LOW` before the first post and pass its
-  `channelId` (`alert: true` then plays no sound either). Users can change
-  a channel's sound in Settings. ([source][android-channels])
-- **Duration:** a live update is removed 8 hours after it started by
-  default, as on iOS, even if the app is not running; later updates do not
-  reset it (`AndroidLiveUpdateOptions.maxDuration`; `null` for no limit).
-- **Exact alarms:** scheduled updates and `endedContent` are on time only
-  while the app may set exact alarms (`SCHEDULE_EXACT_ALARM`, from Android
-  14 denied by default for most newly installed apps that target Android 13
-  or higher). If the user takes
-  the permission away, Android cancels the exact alarms without telling the
-  app; the plugin sets them again (inexact) the next time the app starts.
-  Otherwise Android delivers alarms within a window of at least 10 minutes.
-  ([source][android-alarms], [source][android-14-exact-alarms])
-- **Custom layouts:** a notification with custom views (`RemoteViews`) is
-  never promoted to a Live Update: Android requires that a Live Update has
-  no custom content view and advises against custom notifications, so
-  [`customLayout`](#customizing-the-android-notification) shows a regular
-  ongoing notification. ([source][android-live-update])
-- **Custom layout size:** for apps that target Android 12 or higher, the
-  system draws custom content inside its standard notification frame (like
-  `DecoratedCustomViewStyle`) with the app icon and name, keeps the collapsed
-  view to 48 dp in height (106 dp before) and leaves less horizontal space.
-  Depending on the Android version, the expanded view can be limited to as
-  little as 252 dp. ([source][android-12-custom],
-  [source][android-custom-notification]) Test the layouts on several screen
-  sizes and in light and dark themes: the background differs between devices
-  and versions.
-
-[ios-activitykit]: https://developer.apple.com/documentation/activitykit/displaying-live-data-with-live-activities
-[ios-button-intent]: https://developer.apple.com/documentation/swiftui/button/init(intent:label:)
-[ios-request-start]: https://developer.apple.com/documentation/activitykit/activity/request(attributes:content:pushtype:style:alertconfiguration:start:)
-[ios-stale-date]: https://developer.apple.com/documentation/activitykit/activitycontent/staledate
-[android-alarms]: https://developer.android.com/develop/background-work/services/alarms
-[android-14-exact-alarms]: https://developer.android.com/about/versions/14/changes/schedule-exact-alarms
-[android-channels]: https://developer.android.com/develop/ui/views/notifications/channels
-[android-timeout-after]: https://developer.android.com/reference/android/app/Notification.Builder#setTimeoutAfter(long)
-[ios-push]: https://developer.apple.com/documentation/activitykit/starting-and-updating-live-activities-with-activitykit-push-notifications
-[ios-hig]: https://developer.apple.com/design/human-interface-guidelines/live-activities
-[ios-hig-specs]: https://developer.apple.com/design/human-interface-guidelines/live-activities#Specifications
-[android-live-update]: https://developer.android.com/develop/ui/views/notifications/live-update
-[android-permission]: https://developer.android.com/develop/ui/views/notifications/notification-permission
-[android-promoted-permission]: https://developer.android.com/reference/android/Manifest.permission#POST_PROMOTED_NOTIFICATIONS
-[android-promotion-settings]: https://developer.android.com/reference/android/provider/Settings#ACTION_APP_NOTIFICATION_PROMOTION_SETTINGS
-[android-12-custom]: https://developer.android.com/about/versions/12/behavior-changes-12#custom-notifications
-[android-custom-notification]: https://developer.android.com/develop/ui/views/notifications/custom-notification
 
 ## Usage
 
@@ -1354,6 +1210,150 @@ every layout whose name starts with `live_update_`. For layouts with other
 names, add them to its `tools:keep` attribute (comma separated), for
 example `tools:keep="@layout/live_update_*,@layout/courier"`
 ([source][android-keep-resources]).
+
+## Platform limits
+
+Each limit links to the platform documentation it comes from. The systems
+change between OS versions, so check the source when something behaves
+differently.
+
+### iOS
+
+- **Duration:** a Live Activity can run for up to 8 hours. Then the system
+  ends it and removes it from the Dynamic Island; the Lock Screen keeps it
+  for up to 4 more hours (12 hours in total). For longer activities, end the
+  activity and start a new one, or use a regular notification.
+  ([source][ios-activitykit])
+- **After `end`:** the final content stays on the Lock Screen for up to
+  4 hours. `dismissAfter` longer than that is capped at 4 hours.
+  ([source][ios-activitykit]) As on Android, the plugin removes buttons, the
+  timer and timer or stopwatch metrics from it, since they would keep
+  running; an `end` sent by push shows what the server sends. Without
+  `finalContent` it starts from the content as the app last received it,
+  which can be older than a push update shown a moment ago: if you update
+  by push, pass `finalContent` to `end`.
+- **Size:** the attributes and the content together must stay under 4 KB,
+  for local updates and push payloads alike. Long texts, many buttons and
+  large `extra` maps count toward it. ([source][ios-activitykit])
+- **Height:** the Lock Screen view is 84 to 160 points high; content beyond
+  that is cut off. ([source][ios-hig-specs])
+- **User settings:** users can turn off Live Activities for your app in
+  Settings. `LiveUpdates.isSupported()` returns `false` then, and `start`
+  throws a `LiveUpdateException`. Check it before you offer a "Track on Lock
+  Screen" option. ([source][ios-activitykit])
+- **Number of activities:** the system limits how many Live Activities can
+  run at once (per app and per device; the exact number varies). Handle a
+  `LiveUpdateException` from `start`, and prefer one activity that you update
+  over several. ([source][ios-activitykit])
+- **Updates from the app:** `update` and `end` only run while your app runs.
+  To keep an activity current while the app is suspended or closed, update
+  it with [push notifications](#remote-updates). ([source][ios-push])
+- **Push budget:** iOS limits pushes with `apns-priority: 10` per hour and
+  throttles them beyond that budget. Send routine updates with
+  `apns-priority: 5` (not counted) and use `10` only for updates the user
+  must see at once. For many updates per hour (such as a live score), add
+  `NSSupportsLiveActivitiesFrequentUpdates` = YES to the Runner `Info.plist`;
+  users can still turn frequent updates off in Settings. ([source][ios-push])
+- **Where it appears:** the Lock Screen of iPhone and iPad, the Dynamic
+  Island on iPhone models that have one, StandBy, the Mac menu bar, the
+  Apple Watch Smart Stack and CarPlay. Devices without the Dynamic Island
+  show the Lock Screen view as a banner for updates with an alert. Buttons do
+  nothing in CarPlay, so make sure the content works without them.
+  ([source][ios-hig])
+
+### Android
+
+- **Promotion:** besides the requirements in
+  [Getting started](#android), Android only promotes notifications on a
+  channel whose importance is above "min". If you pass your own
+  `channelId`, do not create that channel with `IMPORTANCE_MIN`. Device
+  makers can apply additional criteria. ([source][android-live-update])
+- **User settings:** users can demote or dismiss a Live Update and turn off
+  Live Updates for your app in Settings. Updates then appear as regular
+  ongoing notifications. `LiveUpdates.canPostPromotedNotifications()` tells
+  you whether Live Updates are allowed for your app (the permission), and
+  `LiveUpdate.isPromoted()` whether the system promoted one shown update. To send
+  users to the setting, open the
+  `Settings.ACTION_APP_NOTIFICATION_PROMOTION_SETTINGS` intent (the Live
+  Update guide names it `ACTION_MANAGE_APP_PROMOTED_NOTIFICATIONS`, which is
+  not in the SDK) with `Settings.EXTRA_APP_PACKAGE`; some devices have no
+  matching screen, so handle that case. ([source][android-live-update],
+  [source][android-promotion-settings])
+- **Status bar chip:** the chip is at most 96 dp wide. `shortCriticalText`
+  is shown in full only if it is shorter than 7 characters; longer text is
+  cut, or only the icon is shown when less than half of it fits. Without
+  `shortCriticalText`, a countdown timer at least 2 minutes in the future is
+  shown as the remaining time. ([source][android-live-update])
+- **Permissions:** on Android 13 and later nothing is shown until the user
+  grants the notification permission, including updates started by a
+  remote message. ([source][android-permission]) While notifications are
+  turned off for the app or for its channel, `start`, `startOrUpdate` and
+  `update` throw a `LiveUpdateException`, as on iOS with Live Activities
+  turned off. `schedule` and `reschedule` with a past time throw too, and a
+  schedule that comes due meanwhile shows nothing. `isSupported()` tells
+  you beforehand whether notifications are on for the app; a turned-off
+  channel shows only in the exception.
+- **After `end`:** the final content (or the content shown last)
+  stays as a regular notification for up to 4 hours, as on iOS, and the
+  user can swipe it away. Running timers (and timer or stopwatch metrics)
+  are left out of it, so a countdown does not run past zero. This applies to
+  `end` and remote `end` payloads; an update removed by `maxDuration`,
+  `timeoutAfter`, `removeAtEnd` or at the end of a countdown is removed at
+  once. Unlike iOS, Android
+  does not report `dismissed` when the ended notification goes away.
+  `dismissAfter` longer than 4 hours is capped at 4 hours; `Duration.zero`
+  removes it at once. Below Android 8.0 the system cannot remove a
+  notification later, so only `finalContent` stays there, until the user
+  dismisses it ([source][android-timeout-after]).
+- **Sound:** the first post of a live update plays the sound of its
+  channel, while iOS starts a Live Activity silently. The plugin creates its
+  channels with the default importance; to start silently, create your own
+  channel with `IMPORTANCE_LOW` before the first post and pass its
+  `channelId` (`alert: true` then plays no sound either). Users can change
+  a channel's sound in Settings. ([source][android-channels])
+- **Duration:** a live update is removed 8 hours after it started by
+  default, as on iOS, even if the app is not running; later updates do not
+  reset it (`AndroidLiveUpdateOptions.maxDuration`; `null` for no limit).
+- **Exact alarms:** scheduled updates and `endedContent` are on time only
+  while the app may set exact alarms (`SCHEDULE_EXACT_ALARM`, from Android
+  14 denied by default for most newly installed apps that target Android 13
+  or higher). If the user takes
+  the permission away, Android cancels the exact alarms without telling the
+  app; the plugin sets them again (inexact) the next time the app starts.
+  Otherwise Android delivers alarms within a window of at least 10 minutes.
+  ([source][android-alarms], [source][android-14-exact-alarms])
+- **Custom layouts:** a notification with custom views (`RemoteViews`) is
+  never promoted to a Live Update: Android requires that a Live Update has
+  no custom content view and advises against custom notifications, so
+  [`customLayout`](#customizing-the-android-notification) shows a regular
+  ongoing notification. ([source][android-live-update])
+- **Custom layout size:** for apps that target Android 12 or higher, the
+  system draws custom content inside its standard notification frame (like
+  `DecoratedCustomViewStyle`) with the app icon and name, keeps the collapsed
+  view to 48 dp in height (106 dp before) and leaves less horizontal space.
+  Depending on the Android version, the expanded view can be limited to as
+  little as 252 dp. ([source][android-12-custom],
+  [source][android-custom-notification]) Test the layouts on several screen
+  sizes and in light and dark themes: the background differs between devices
+  and versions.
+
+[ios-activitykit]: https://developer.apple.com/documentation/activitykit/displaying-live-data-with-live-activities
+[ios-button-intent]: https://developer.apple.com/documentation/swiftui/button/init(intent:label:)
+[ios-request-start]: https://developer.apple.com/documentation/activitykit/activity/request(attributes:content:pushtype:style:alertconfiguration:start:)
+[ios-stale-date]: https://developer.apple.com/documentation/activitykit/activitycontent/staledate
+[android-alarms]: https://developer.android.com/develop/background-work/services/alarms
+[android-14-exact-alarms]: https://developer.android.com/about/versions/14/changes/schedule-exact-alarms
+[android-channels]: https://developer.android.com/develop/ui/views/notifications/channels
+[android-timeout-after]: https://developer.android.com/reference/android/app/Notification.Builder#setTimeoutAfter(long)
+[ios-push]: https://developer.apple.com/documentation/activitykit/starting-and-updating-live-activities-with-activitykit-push-notifications
+[ios-hig]: https://developer.apple.com/design/human-interface-guidelines/live-activities
+[ios-hig-specs]: https://developer.apple.com/design/human-interface-guidelines/live-activities#Specifications
+[android-live-update]: https://developer.android.com/develop/ui/views/notifications/live-update
+[android-permission]: https://developer.android.com/develop/ui/views/notifications/notification-permission
+[android-promoted-permission]: https://developer.android.com/reference/android/Manifest.permission#POST_PROMOTED_NOTIFICATIONS
+[android-promotion-settings]: https://developer.android.com/reference/android/provider/Settings#ACTION_APP_NOTIFICATION_PROMOTION_SETTINGS
+[android-12-custom]: https://developer.android.com/about/versions/12/behavior-changes-12#custom-notifications
+[android-custom-notification]: https://developer.android.com/develop/ui/views/notifications/custom-notification
 
 ## Remote updates
 

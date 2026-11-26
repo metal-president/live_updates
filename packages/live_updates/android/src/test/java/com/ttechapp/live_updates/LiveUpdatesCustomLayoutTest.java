@@ -413,13 +413,80 @@ public class LiveUpdatesCustomLayoutTest {
                 + "\","
                 + LAYOUT
                 + ",\"androidExpandedLayout\":\"live_update_test_expanded\"}");
-    RemoteViews[] views = LiveUpdatesCustomLayout.views(app, content, false);
+    RemoteViews[] views = LiveUpdatesCustomLayout.views(app, content, false, false);
     assertNotNull(views);
     assertEquals(2, views.length);
     // Same layout for both without an expanded one: one RemoteViews.
     RemoteViews[] same =
         LiveUpdatesCustomLayout.views(
-            app, new JSONObject("{\"title\":\"Order\"," + LAYOUT + "}"), false);
+            app, new JSONObject("{\"title\":\"Order\"," + LAYOUT + "}"), false, false);
     assertSame(same[0], same[1]);
+  }
+
+  @Test
+  public void anExtraKeyNamingAnImageViewIsNotBound() throws Exception {
+    // live_update_extra_image_map is an ImageView: text there would make the
+    // system reject the notification.
+    String id =
+        LiveUpdatesBridge.start(
+            "{\"title\":\"Order\",\"extra\":{\"image_map\":\"x\"}," + LAYOUT + "}");
+    View root = inflate(shown(id).contentView);
+    assertEquals(View.GONE, visibility(root, "live_update_extra_image_map"));
+  }
+
+  @Test
+  public void remotePayloadsOnlyUseLayoutsWithThePrefix() throws Exception {
+    LiveUpdatesBridge.handleRemotePayload(
+        new JSONObject()
+            .put("live_updates_event", "start")
+            .put("live_updates_id", "order-2")
+            .put(
+                "live_updates_content",
+                "{\"title\":\"Order\",\"androidMode\":\"ongoing\","
+                    + "\"androidLayout\":\"test_other_layout\"}")
+            .toString());
+    assertNull(shown("order-2").contentView);
+    // A local post may use it.
+    String id =
+        LiveUpdatesBridge.start(
+            "{\"title\":\"Order\",\"androidLayout\":\"test_other_layout\"}");
+    assertNotNull(shown(id).contentView);
+  }
+
+  @Test
+  public void theTimerIsNotRepeatedInTheHeader() throws Exception {
+    long end = System.currentTimeMillis() + 10 * 60_000;
+    String id =
+        LiveUpdatesBridge.start(
+            "{\"title\":\"Order\",\"timerEnd\":" + (end / 1000.0) + "," + LAYOUT + "}");
+    Notification n = shown(id);
+    assertFalse(n.extras.getBoolean(Notification.EXTRA_SHOW_CHRONOMETER));
+    assertEquals(View.VISIBLE, visibility(inflate(n.contentView), "live_update_timer"));
+  }
+
+  @Test
+  public void largePicturesAreScaledDown() throws Exception {
+    File dir = LiveUpdatesBridge.imageDirectory(app);
+    dir.mkdirs();
+    Bitmap big = Bitmap.createBitmap(2048, 1024, Bitmap.Config.ARGB_8888);
+    try (FileOutputStream out = new FileOutputStream(new File(dir, "lu_test_big.png"))) {
+      big.compress(Bitmap.CompressFormat.PNG, 100, out);
+    }
+    String id =
+        LiveUpdatesBridge.start(
+            "{\"title\":\"Order\",\"image\":\"lu_test_big.png\"," + LAYOUT + "}");
+    ImageView picture = view(inflate(shown(id).contentView), "live_update_image");
+    assertTrue(picture.getDrawable().getIntrinsicWidth() <= 512);
+  }
+
+  @Test
+  @Config(sdk = 33)
+  public void olderVersionsUseTheLayoutToo() throws Exception {
+    String id = LiveUpdatesBridge.start("{\"title\":\"Order\",\"progress\":0.5," + LAYOUT + "}");
+    Notification n = shown(id);
+    assertEquals(DECORATED, n.extras.getString(Notification.EXTRA_TEMPLATE));
+    assertEquals(0, n.extras.getInt(Notification.EXTRA_PROGRESS_MAX));
+    ProgressBar progress = view(inflate(n.contentView), "live_update_progress");
+    assertEquals(500, progress.getProgress());
   }
 }

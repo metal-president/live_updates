@@ -23,7 +23,8 @@ Future<int> createAndroid({
 }) async {
   // Resource names: lowercase letters, digits and underscores; the expanded
   // layout adds "_expanded".
-  if (!RegExp(r'^[a-z][a-z0-9_]{0,89}$').hasMatch(layout)) {
+  if (!RegExp(r'^[a-z][a-z0-9_]{0,89}$').hasMatch(layout) ||
+      _javaKeywords.contains(layout)) {
     stderr.writeln(
       '--layout must be a resource name (lowercase letters, digits and '
       'underscores, starting with a letter), got "$layout".',
@@ -83,6 +84,63 @@ Future<int> createAndroid({
   );
   return 0;
 }
+
+/// Names that resource files cannot have (they become Java fields of R).
+const _javaKeywords = {
+  'abstract',
+  'assert',
+  'boolean',
+  'break',
+  'byte',
+  'case',
+  'catch',
+  'char',
+  'class',
+  'const',
+  'continue',
+  'default',
+  'do',
+  'double',
+  'else',
+  'enum',
+  'extends',
+  'false',
+  'final',
+  'finally',
+  'float',
+  'for',
+  'goto',
+  'if',
+  'implements',
+  'import',
+  'instanceof',
+  'int',
+  'interface',
+  'long',
+  'native',
+  'new',
+  'null',
+  'package',
+  'private',
+  'protected',
+  'public',
+  'return',
+  'short',
+  'static',
+  'strictfp',
+  'super',
+  'switch',
+  'synchronized',
+  'this',
+  'throw',
+  'throws',
+  'transient',
+  'true',
+  'try',
+  'void',
+  'volatile',
+  'while',
+};
 
 Future<Directory> _templatesDir() async {
   final uri = await Isolate.resolvePackageUri(

@@ -17,12 +17,16 @@
   notification with custom views to a Live Update, so it is shown as an
   ongoing notification. A layout that cannot be found shows the system
   template with a warning in the log. Remote payloads select layouts with
-  `androidLayout` and `androidExpandedLayout`.
+  `androidLayout` and `androidExpandedLayout` (only layouts whose name
+  starts with `live_update_`). `dart run live_updates:create android`
+  writes a pair of layouts to start from and a keep file for release
+  builds.
 - `LiveUpdateContent.extra` and `LiveUpdateContent.extraImages`: values and
   pictures for layouts of your own on both platforms (a customized iOS
   widget and Android custom layouts). `IosLiveUpdateOptions.extra` and
-  `extraImages` are deprecated but still honored (merged in; the iOS values
-  win for the same key). The keys in the iOS content state and push
+  `extraImages` are deprecated but still honored on iOS (merged in; the iOS
+  values win for the same key). Android stores `extraImages` only for
+  content with a custom layout. The keys in the iOS content state and push
   payloads are unchanged; `extra` is now sent only when it has values.
 - The empty-title warning is not shown for custom layouts, which are never
   promoted.

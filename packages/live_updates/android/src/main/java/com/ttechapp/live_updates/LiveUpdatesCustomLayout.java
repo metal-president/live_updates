@@ -45,6 +45,15 @@ final class LiveUpdatesCustomLayout {
   static final String ID_EXTRA_PREFIX = "live_update_extra_";
   static final String ID_EXTRA_IMAGE_PREFIX = "live_update_extra_image_";
 
+  /** Prefix of the layouts that remote payloads may use (and that the keep file keeps). */
+  static final String REMOTE_PREFIX = "live_update_";
+
+  /** Largest side of a picture in the views: notifications have a size limit. */
+  private static final int MAX_IMAGE_PX = 512;
+
+  /** Entries kept in the caches below, which payloads can fill with names. */
+  private static final int MAX_CACHED = 200;
+
   /** Resolution of {@code live_update_progress}, whose maximum is set to this. */
   static final int PROGRESS_MAX = 1000;
 
@@ -64,9 +73,10 @@ final class LiveUpdatesCustomLayout {
 
   private LiveUpdatesCustomLayout() {}
 
-  /** Whether {@code content} asks for a custom layout (found or not). */
-  static boolean requested(JSONObject content) {
-    return LiveUpdatesBridge.optString(content, "androidLayout") != null;
+  /** Whether the custom layout of {@code content} can be shown (logs why not, once). */
+  static boolean found(Context c, JSONObject content, boolean remote) {
+    String name = LiveUpdatesBridge.optString(content, "androidLayout");
+    return name != null && layout(c, name, remote) != 0;
   }
 
   /**
@@ -75,13 +85,13 @@ final class LiveUpdatesCustomLayout {
    * the ended or stale look, without progress and timer.
    */
   @Nullable
-  static RemoteViews[] views(Context c, JSONObject content, boolean ended) {
+  static RemoteViews[] views(Context c, JSONObject content, boolean ended, boolean remote) {
     String name = LiveUpdatesBridge.optString(content, "androidLayout");
     if (name == null) return null;
-    int collapsed = layout(c, name);
+    int collapsed = layout(c, name, remote);
     if (collapsed == 0) return null;
     String expandedName = LiveUpdatesBridge.optString(content, "androidExpandedLayout");
-    int expanded = expandedName == null ? collapsed : layout(c, expandedName);
+    int expanded = expandedName == null ? collapsed : layout(c, expandedName, remote);
     // A missing expanded layout: the collapsed one there too.
     if (expanded == 0) expanded = collapsed;
     if (!ended && "liveUpdate".equals(LiveUpdatesBridge.androidMode(content))) {
@@ -125,7 +135,21 @@ final class LiveUpdatesCustomLayout {
     }
   }
 
-  private static int layout(Context c, String name) {
+  /**
+   * The app's layout {@code name}, or 0 (with a warning). Remote payloads may only name layouts
+   * starting with {@code live_update_}: other layouts of the app (or of its libraries) can hold
+   * views a notification cannot show, which would make the system reject it.
+   */
+  private static int layout(Context c, String name, boolean remote) {
+    if (remote && !name.startsWith(REMOTE_PREFIX)) {
+      warnOnce(
+          "Custom layout \""
+              + name
+              + "\": remote payloads can only use layouts whose name starts with "
+              + REMOTE_PREFIX
+              + "; showing the system template.");
+      return 0;
+    }
     int res =
         NAME.matcher(name).matches()
             ? c.getResources().getIdentifier(name, "layout", c.getPackageName())
@@ -201,7 +225,13 @@ final class LiveUpdatesCustomLayout {
       Object value = extra.opt(key);
       if (!(value instanceof String)) continue;
       if (!KEY.matcher(key).matches()) {
-        Log.d(LOG_TAG, "extra \"" + key + "\": only a-z, 0-9 and _ can name a view; skipped.");
+        warnOnce("extra \"" + key + "\": only a-z, 0-9 and _ can name a view; not shown.");
+        continue;
+      }
+      // live_update_extra_image_<key> is the ImageView of extraImages: text
+      // there would make the system reject the notification.
+      if (key.startsWith("image_")) {
+        warnOnce("extra \"" + key + "\": keys starting with image_ are not shown.");
         continue;
       }
       int id = id(c, ID_EXTRA_PREFIX + key);
@@ -215,8 +245,7 @@ final class LiveUpdatesCustomLayout {
         it != null && it.hasNext(); ) {
       String key = it.next();
       if (!KEY.matcher(key).matches()) {
-        Log.d(
-            LOG_TAG, "extraImages \"" + key + "\": only a-z, 0-9 and _ can name a view; skipped.");
+        warnOnce("extraImages \"" + key + "\": only a-z, 0-9 and _ can name a view; not shown.");
         continue;
       }
       int id = id(c, ID_EXTRA_IMAGE_PREFIX + key);
@@ -253,6 +282,7 @@ final class LiveUpdatesCustomLayout {
       Integer cached = ids.get(name);
       if (cached != null) return cached;
       int id = c.getResources().getIdentifier(name, "id", c.getPackageName());
+      if (ids.size() >= MAX_CACHED) ids.clear();
       ids.put(name, id);
       return id;
     }
@@ -260,7 +290,9 @@ final class LiveUpdatesCustomLayout {
 
   private static void warnOnce(String message) {
     synchronized (warned) {
-      if (!warned.add(message)) return;
+      if (warned.contains(message)) return;
+      if (warned.size() >= MAX_CACHED) warned.clear();
+      warned.add(message);
     }
     Log.w(LOG_TAG, message);
   }
@@ -273,6 +305,20 @@ final class LiveUpdatesCustomLayout {
     synchronized (warned) {
       warned.clear();
     }
+  }
+
+  /** The picture at {@code path}, scaled down to at most {@link #MAX_IMAGE_PX}, or null. */
+  @Nullable
+  private static Bitmap decode(String path) {
+    BitmapFactory.Options bounds = new BitmapFactory.Options();
+    bounds.inJustDecodeBounds = true;
+    BitmapFactory.decodeFile(path, bounds);
+    int longest = Math.max(bounds.outWidth, bounds.outHeight);
+    if (longest <= 0) return null;
+    BitmapFactory.Options options = new BitmapFactory.Options();
+    options.inSampleSize = 1;
+    while (longest / options.inSampleSize > MAX_IMAGE_PX) options.inSampleSize *= 2;
+    return BitmapFactory.decodeFile(path, options);
   }
 
   /** Stored pictures by file name, decoded once for both layouts. */
@@ -295,7 +341,7 @@ final class LiveUpdatesCustomLayout {
       Bitmap bitmap = null;
       try {
         // Such as a file removed since: nothing to show.
-        if (file.isFile()) bitmap = BitmapFactory.decodeFile(file.getPath());
+        if (file.isFile()) bitmap = decode(file.getPath());
       } catch (OutOfMemoryError e) {
         // Too large to show.
       }

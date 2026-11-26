@@ -1617,7 +1617,8 @@ public final class LiveUpdatesBridge {
     }
     // Custom layouts (androidLayout) replace the system template: no progress
     // style, metrics, promotion or large icon (the layout shows the image).
-    android.widget.RemoteViews[] custom = LiveUpdatesCustomLayout.views(c, content, ended);
+    android.widget.RemoteViews[] custom =
+        LiveUpdatesCustomLayout.views(c, content, ended, remote);
     String image = optString(content, "image");
     if (custom == null && image != null && !image.contains("/")) {
       android.graphics.Bitmap bitmap =
@@ -1635,7 +1636,9 @@ public final class LiveUpdatesBridge {
     boolean countdown = isTime(timerEnd);
     // A countdown that is over would show below zero: no timer then.
     boolean over = countdown && timerEnd * 1000 <= System.currentTimeMillis();
-    if (!over && (countdown || isTime(timerStart))) {
+    // A custom layout shows the timer in its own view (live_update_timer),
+    // not a second time in the header.
+    if (custom == null && !over && (countdown || isTime(timerStart))) {
       b.setWhen((long) ((countdown ? timerEnd : timerStart) * 1000))
           .setShowWhen(true)
           .setUsesChronometer(true)
@@ -1862,9 +1865,10 @@ public final class LiveUpdatesBridge {
    * content}.
    */
   private static JSONObject warnIfUntitled(JSONObject content) {
-    // A custom layout is never promoted.
+    // A custom layout is never promoted (one that cannot be found falls back
+    // to the system template, which can be).
     if ("liveUpdate".equals(androidMode(content))
-        && !LiveUpdatesCustomLayout.requested(content)
+        && !LiveUpdatesCustomLayout.found(requireContext(), content, true)
         && content.optString("title").isEmpty()) {
       Log.w(
           LOG_TAG,

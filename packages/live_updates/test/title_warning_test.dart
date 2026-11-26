@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:live_updates/live_updates.dart';
+import 'package:live_updates/src/icon_checks.dart';
 import 'package:live_updates/src/platform/content_encoder.dart';
 
 class _Encoder with ContentEncoder {
@@ -38,6 +39,35 @@ void main() {
         ),
       ),
       isNull,
+    );
+  });
+
+  test('custom layout mistakes are reported', () {
+    expect(
+      customLayoutWarnings(
+        const LiveUpdateContent(
+          title: 'T',
+          extra: {'ok_key': 'x', 'Bad-Key': 'x', 'image_map': 'x'},
+          android: AndroidLiveUpdateOptions(
+            customLayout: AndroidCustomLayout(
+              'live_update_ok',
+              expanded: 'Bad.xml',
+            ),
+          ),
+        ),
+      ),
+      [
+        contains('"Bad.xml" is not a layout resource name'),
+        contains('"Bad-Key" cannot name an Android view'),
+        contains('"image_map" starts with image_'),
+      ],
+    );
+    // Not without a custom layout.
+    expect(
+      customLayoutWarnings(
+        const LiveUpdateContent(title: 'T', extra: {'Bad-Key': 'x'}),
+      ),
+      isEmpty,
     );
   });
 

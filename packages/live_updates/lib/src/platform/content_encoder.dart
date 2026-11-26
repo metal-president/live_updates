@@ -45,6 +45,11 @@ mixin ContentEncoder {
       for (final w in iconWarnings(content, android: !storesIconAssets)) {
         debugPrint('live_updates: $w');
       }
+      if (!storesIconAssets) {
+        for (final w in customLayoutWarnings(content)) {
+          debugPrint('live_updates: $w');
+        }
+      }
       return true;
     }());
     if (content.image case final image?) {
@@ -55,7 +60,20 @@ mixin ContentEncoder {
     // the same directory; Android from the image directory).
     // A picture that cannot be stored is left out (with a warning), not the
     // whole content.
-    final images = content.mergedExtraImages;
+    // The deprecated iOS fields stay iOS only; Android stores pictures only
+    // for a custom layout, the only one that shows them.
+    if (!storesIconAssets) {
+      if (content.extra.isEmpty) {
+        json.remove('extra');
+      } else {
+        json['extra'] = content.extra;
+      }
+    }
+    final images = storesIconAssets
+        ? content.mergedExtraImages
+        : content.android?.customLayout == null
+        ? const <String, LiveUpdateImage>{}
+        : content.extraImages;
     if (images.isNotEmpty) {
       // A wrong size is a mistake in the code, as for the main image.
       for (final MapEntry(:key, :value) in images.entries) {

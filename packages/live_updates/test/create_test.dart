@@ -62,6 +62,37 @@ void main() {
     expect(await run(dirs()), 66);
   });
 
+  test(
+    'without a platform, a name for a missing platform is an error',
+    () async {
+      makeIos();
+      expect(await run([...dirs(), '--layout', 'live_update_x']), 66);
+      expect(
+        Directory('${root.path}/ios/LiveUpdatesWidget').existsSync(),
+        isFalse,
+      );
+    },
+  );
+
+  test('an android folder without an app project is skipped', () async {
+    makeIos();
+    Directory('${root.path}/android').createSync();
+    expect(await run(dirs()), 0);
+  });
+
+  test('the platform may come after the options', () async {
+    makeAndroid();
+    expect(
+      await run([
+        '--android-dir',
+        '${root.path}/android',
+        '--force',
+        'android',
+      ]),
+      0,
+    );
+  });
+
   test('usage errors', () async {
     expect(await run(['windows']), 64);
     expect(await run(['--unknown']), 64);
@@ -70,6 +101,9 @@ void main() {
     expect(await run(['ios', '--layout', 'live_update_x']), 64);
     expect(await run(['android', '--name', 'Widget']), 64);
     expect(await run(['android', '--no-xcode']), 64);
+    expect(await run(['ios', 'android']), 64);
+    // A flag is not a value.
+    expect(await run(['android', '--layout', '--force']), 64);
     expect(await run(['--help']), 0);
   });
 }

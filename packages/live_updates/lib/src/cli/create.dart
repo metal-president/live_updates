@@ -56,27 +56,27 @@ Future<int> create(
   Directory? androidTemplates,
 }) async {
   String? platform;
-  var rest = args;
-  if (args.isNotEmpty && !args.first.startsWith('-')) {
-    platform = args.first;
-    rest = args.sublist(1);
-    if (platform != 'ios' && platform != 'android') {
-      stderr.write('Unknown platform "$platform"\n\n$_usage');
-      return 64;
-    }
-  }
   final values = <String, String>{};
   var force = false;
   var noAppGroup = false;
   var noXcode = false;
-  for (var i = 0; i < rest.length; i++) {
-    final arg = rest[i];
+  for (var i = 0; i < args.length; i++) {
+    final arg = args[i];
     if (_valueOptions.containsKey(arg)) {
-      if (i + 1 >= rest.length) {
+      if (i + 1 >= args.length || args[i + 1].startsWith('--')) {
         stderr.write('$arg needs a value\n\n$_usage');
         return 64;
       }
-      values[arg] = rest[++i];
+      values[arg] = args[++i];
+      continue;
+    }
+    // The platform, anywhere among the options.
+    if (!arg.startsWith('-')) {
+      if (platform != null || (arg != 'ios' && arg != 'android')) {
+        stderr.write('Unknown platform "$arg"\n\n$_usage');
+        return 64;
+      }
+      platform = arg;
       continue;
     }
     switch (arg) {
@@ -115,16 +115,33 @@ Future<int> create(
   var android = platform == null || platform == 'android';
   if (platform == null) {
     // Both: only the platforms the app has.
-    ios = Directory(iosDir).existsSync();
-    android = Directory(androidDir).existsSync();
+    ios = Directory('$iosDir/Runner.xcodeproj').existsSync();
+    android = Directory('$androidDir/app/src/main').existsSync();
     if (!ios && !android) {
       stderr.writeln(
-        'Neither $iosDir nor $androidDir found. Run from your app root.',
+        'Neither $iosDir nor $androidDir has an app project. Run from your '
+        'app root.',
       );
       return 66;
     }
-    if (!ios) stdout.writeln('skip   iOS ($iosDir not found)');
-    if (!android) stdout.writeln('skip   Android ($androidDir not found)');
+    // A name given for a platform the app lacks is a mistake in the command.
+    for (final (has, option) in [
+      (ios, '--name'),
+      (ios, '--app-group'),
+      (android, '--layout'),
+    ]) {
+      if (!has && values.containsKey(option)) {
+        stderr.writeln(
+          '$option was given, but ${_valueOptions[option] == 'ios' ? iosDir : androidDir} '
+          'has no app project.',
+        );
+        return 66;
+      }
+    }
+    if (!ios) stdout.writeln('skip   iOS (no $iosDir/Runner.xcodeproj)');
+    if (!android) {
+      stdout.writeln('skip   Android (no $androidDir/app/src/main)');
+    }
   }
   if (ios) {
     final result = await createIos(

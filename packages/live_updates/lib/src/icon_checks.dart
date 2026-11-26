@@ -62,3 +62,28 @@ List<String> iconWarnings(LiveUpdateContent content, {required bool android}) {
   }
   return warnings;
 }
+
+/// Mistakes in an Android custom layout of [content]
+/// ([AndroidLiveUpdateOptions.customLayout]) that Android would only log,
+/// as messages for debug builds.
+List<String> customLayoutWarnings(LiveUpdateContent content) {
+  final layout = content.android?.customLayout;
+  if (layout == null) return const [];
+  final name = RegExp(r'^[a-z][a-z0-9_]{0,99}$');
+  final key = RegExp(r'^[a-z0-9_]{1,64}$');
+  return [
+    for (final n in [layout.collapsed, ?layout.expanded])
+      if (!name.hasMatch(n))
+        'AndroidCustomLayout: "$n" is not a layout resource name. Give the '
+            'file name in res/layout without ".xml" (lowercase letters, '
+            'digits and underscores).',
+    for (final k in [...content.extra.keys, ...content.extraImages.keys])
+      if (!key.hasMatch(k))
+        'extra key "$k" cannot name an Android view (use lowercase letters, '
+            'digits and underscores); the custom layout does not show it.',
+    for (final k in content.extra.keys)
+      if (k.startsWith('image_'))
+        'extra key "$k" starts with image_, which names the views of '
+            'extraImages; the custom layout does not show it.',
+  ];
+}

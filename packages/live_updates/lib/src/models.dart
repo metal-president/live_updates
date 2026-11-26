@@ -109,9 +109,9 @@ final class LiveUpdateContent {
   final LiveUpdateJourney? journey;
 
   /// Additional text values for layouts of your own, by key, such as
-  /// `{'driver': 'Alex'}`.
+  /// `{'eta': '5 min'}`.
   ///
-  /// A customized iOS widget reads them as `context.state.extra["driver"]`
+  /// A customized iOS widget reads them as `context.state.extra["eta"]`
   /// (and [IosIslandContent.extra] shows one in the Dynamic Island). An
   /// Android custom layout ([AndroidLiveUpdateOptions.customLayout]) shows
   /// each in the `TextView` with the id `live_update_extra_<key>`; Android
@@ -128,7 +128,8 @@ final class LiveUpdateContent {
   /// `LiveUpdatesImages.url(context.state.extraImages["map"])` (they are
   /// saved in the App Group). An Android custom layout
   /// ([AndroidLiveUpdateOptions.customLayout]) shows each in the
-  /// `ImageView` with the id `live_update_extra_image_<key>`. Keep them few
+  /// `ImageView` with the id `live_update_extra_image_<key>` (Android stores
+  /// them only for content with a custom layout). Keep them few
   /// and small: the iOS widget extension has little memory and Android
   /// limits the size of a notification. A picture that cannot be stored
   /// (such as a missing asset) is left out with a warning. A push or remote
@@ -271,12 +272,8 @@ final class LiveUpdateContent {
 
   @override
   int get hashCode => Object.hash(
-    title,
-    body,
-    progress,
-    icon,
-    route,
-    image,
+    // Nested: Object.hash takes at most 20 values.
+    Object.hash(title, body, progress, icon, route, image),
     Object.hashAll(actions),
     timer,
     Object.hashAll(metrics),
@@ -1234,11 +1231,8 @@ final class AndroidLiveUpdateOptions {
 
   @override
   int get hashCode => Object.hash(
-    channelId,
-    channelName,
-    smallIcon,
-    shortCriticalText,
-    color,
+    // Nested: Object.hash takes at most 20 values.
+    Object.hash(channelId, channelName, smallIcon, shortCriticalText, color),
     when,
     showChronometer,
     mode,
@@ -1269,11 +1263,12 @@ final class AndroidLiveUpdateOptions {
 /// * `live_update_progress` (`ProgressBar`): [LiveUpdateContent.progress];
 ///   hidden without one.
 /// * `live_update_timer` (`Chronometer`): [LiveUpdateContent.timer];
-///   hidden without one.
+///   hidden without one or once a countdown is over.
 /// * `live_update_image` (`ImageView`): [LiveUpdateContent.image]; hidden
 ///   without one.
 /// * `live_update_extra_<key>` (`TextView`): the value of
-///   [LiveUpdateContent.extra] for `<key>`, made visible.
+///   [LiveUpdateContent.extra] for `<key>`, made visible (keys starting
+///   with `image_` are left out).
 /// * `live_update_extra_image_<key>` (`ImageView`): the picture of
 ///   [LiveUpdateContent.extraImages] for `<key>`, made visible.
 ///
@@ -1282,7 +1277,10 @@ final class AndroidLiveUpdateOptions {
 /// what the layout defines while the content has no value for them, so
 /// give them `android:visibility="gone"`.
 ///
-/// `dart run live_updates:create_android_layout` writes a pair of layouts
+/// Remote payloads can only use layouts whose name starts with
+/// `live_update_`.
+///
+/// `dart run live_updates:create android` writes a pair of layouts
 /// to start from. The release build's resource shrinker removes layouts
 /// that are only used by name; see the README to keep them.
 @immutable
@@ -1290,7 +1288,8 @@ final class AndroidCustomLayout {
   /// Uses the layout named [collapsed], and [expanded] (if given) when the
   /// notification is expanded.
   const AndroidCustomLayout(this.collapsed, {this.expanded})
-    : assert(collapsed != '', 'collapsed must name a layout');
+    : assert(collapsed != '', 'collapsed must name a layout'),
+      assert(expanded != '', 'expanded must name a layout or be null');
 
   /// Resource name of the layout of the collapsed notification, such as
   /// `'live_update_courier'` for `res/layout/live_update_courier.xml`.

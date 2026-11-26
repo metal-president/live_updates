@@ -81,7 +81,7 @@ void main() {
   });
 
   test('rejects names that are not resource names', () async {
-    for (final name in ['Courier', '1courier', 'my-layout', '']) {
+    for (final name in ['Courier', '1courier', 'my-layout', '', 'class']) {
       expect(await run(['--layout', name]), 64, reason: name);
     }
   });

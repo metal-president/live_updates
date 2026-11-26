@@ -318,8 +318,10 @@ differently.
   `DecoratedCustomViewStyle`) with the app icon and name, keeps the collapsed
   view to 48 dp in height (106 dp before) and leaves less horizontal space.
   Depending on the Android version, the expanded view can be limited to as
-  little as 252 dp. Test the layouts in light and dark themes and with large
-  fonts. ([source][android-12-custom], [source][android-custom-notification])
+  little as 252 dp. ([source][android-12-custom],
+  [source][android-custom-notification]) Test the layouts on several screen
+  sizes and in light and dark themes: the background differs between devices
+  and versions.
 
 [ios-activitykit]: https://developer.apple.com/documentation/activitykit/displaying-live-data-with-live-activities
 [ios-button-intent]: https://developer.apple.com/documentation/swiftui/button/init(intent:label:)
@@ -1237,14 +1239,15 @@ the views by id; a layout can leave out any of them:
 | `live_update_title` | `TextView` | `title` |
 | `live_update_body` | `TextView` | `body` (hidden without one) |
 | `live_update_progress` | `ProgressBar` | `progress` (hidden without one) |
-| `live_update_timer` | `Chronometer` | `timer`, counting down or up (hidden without one) |
+| `live_update_timer` | `Chronometer` | `timer`, counting down or up (hidden without one or once a countdown is over) |
 | `live_update_image` | `ImageView` | `image` (hidden without one) |
 | `live_update_extra_<key>` | `TextView` | `extra['<key>']`, made visible |
 | `live_update_extra_image_<key>` | `ImageView` | `extraImages['<key>']`, made visible |
 
 - **Extra values:** `metrics`, `steps` and `journey` are not filled in; pass
   what the layout should show in `extra` (keys of lowercase letters, digits
-  and underscores). A `live_update_extra_*` view keeps what the layout
+  and underscores, not starting with `image_`, which names the views of
+  `extraImages`). A `live_update_extra_*` view keeps what the layout
   defines while the content has no value for it, so give it
   `android:visibility="gone"`, as the generated layout does. The same
   `extra` and `extraImages` also reach a [customized iOS
@@ -1255,7 +1258,8 @@ the views by id; a layout can leave out any of them:
   `AndroidLiveUpdateMode.ongoing`; with the default `liveUpdate` the plugin
   logs a warning. There is no status bar chip, and the progress styles,
   `metrics` (`MetricStyle`), `shortCriticalText` and the large icon are not
-  used. Buttons, the tap route, the small icon, `color`, the timeouts and
+  used. The timer appears only in `live_update_timer`, not in the header.
+  Buttons, the tap route, the small icon, `color`, the timeouts and
   everything else work as usual.
 - **Frame and size:** Android draws the layout inside its notification
   frame with the app icon, the app name and the buttons. On Android 12 and
@@ -1266,7 +1270,11 @@ the views by id; a layout can leave out any of them:
   light and dark themes.
 - **Ended and stale:** after `end` and from `endAt` on, the layout shows the
   final or ended content (`endedContent` fills the title, body and image)
-  without the progress and the timer. Final content uses the layout of its
+  without the progress and the timer. `endedContent` has no `extra`: from
+  `endAt` on, the `live_update_extra_*` views show what the layout defines
+  (hidden in the generated layouts). After a process restart, `end` without
+  final content keeps the views as shown, without progress and timer. Final
+  content uses the layout of its
   own `android` options: pass `customLayout` there too (`copyWith` keeps
   it).
 - **Lock screen:** the public version made from `publicContent` keeps the
@@ -1274,7 +1282,13 @@ the views by id; a layout can leave out any of them:
 - **Remote updates:** `androidLayout` and `androidExpandedLayout` in
   `live_updates_content` select the layouts, and `extra` fills them, so
   remote messages (with or without `live_updates_fcm`) work the same way.
-  As on iOS, a remote message cannot add `extraImages`.
+  Remote messages can only use layouts whose name starts with
+  `live_update_` (other layouts of the app or its libraries may hold views a
+  notification cannot show). As on iOS, a remote message cannot add
+  `extraImages`.
+- **Pictures:** images are scaled down to at most 512 pixels in the
+  layouts; keep `maxDimension` small, as Android limits the size of a
+  notification.
 - **Missing layouts:** a layout that cannot be found (a typo, or removed by
   the resource shrinker) shows the system template, with a warning in the
   log, since scheduled and remote updates have no caller to report an error
@@ -1332,9 +1346,7 @@ Send pushes with `apns-push-type: liveactivity` and topic
   [Hiding content on the Lock Screen](#hiding-content-on-the-lock-screen)),
   the icons (`icon`, `iosIcon`, `islandIcon`, each an object such as
   `{"symbol": "shippingbox.fill"}`) and the island options
-  `compactLeading` / `compactTrailing` / `minimal`. Android reads
-  `androidLayout` / `androidExpandedLayout` for
-  [custom layouts](#customizing-the-android-notification).
+  `compactLeading` / `compactTrailing` / `minimal`.
 - For push-to-start, set `"attributes-type": "LiveUpdatesAttributes"`,
   `"attributes": {"key": "<your id>"}` (or `{}` without a key) and an `alert`.
 
@@ -1378,6 +1390,10 @@ Deliver a data message and pass it to `LiveUpdates.handleRemotePayload`:
 | `live_updates_content` | Content as a JSON string, same keys as above |
 | `live_updates_dismiss_after` | Optional, seconds to keep final content on `end` (at most and by default 4 hours, like `dismissAfter` of `LiveUpdate.end`) |
 
+In the content, `androidLayout` and `androidExpandedLayout` select
+[custom layouts](#customizing-the-android-notification), and `extra` fills
+them.
+
 With Firebase, [`live_updates_fcm`](https://pub.dev/packages/live_updates_fcm)
 does this for you.
 
@@ -1419,7 +1435,8 @@ apply them again:
   [Android custom layouts](#customizing-the-android-notification).
 - **`extra` and `extraImages` moved to `LiveUpdateContent`:**
   `IosLiveUpdateOptions.extra` and `extraImages` are deprecated but still
-  work (merged with the new fields; the iOS values win for the same key).
+  work on iOS (merged with the new fields; the iOS values win for the same
+  key); Android custom layouts read only the new fields.
   Move them to `LiveUpdateContent(extra: ..., extraImages: ...)`, which
   Android custom layouts read too. The keys in the iOS content state and in
   push payloads are unchanged.

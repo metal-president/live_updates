@@ -1,3 +1,9 @@
+## Unreleased
+
+- Docs: "Scheduling" explains how to schedule several live updates (one
+  key each). On iOS, scheduled activities count toward the limit on running
+  activities; `schedule` documents that it can throw with `limitReached`.
+
 ## 0.5.2
 
 - `LiveUpdates.openSettings()`: opens the screen where the user turns live

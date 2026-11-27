@@ -845,6 +845,10 @@ final pending = await LiveUpdates.scheduled();
 
 - Scheduling again with the same key replaces the schedule. A time that is
   not in the future shows the update now.
+- Each key has its own schedule, so give each update its own key to
+  schedule several (for example `order-1234-pickup` and
+  `order-1234-delivery`). `scheduled()` lists them in the order they are
+  due.
 - A scheduled update is not part of `active()` or `find` until it is shown;
   then it appears on `onStarted` while the app runs. `startOrUpdate` does
   not cancel a schedule; use `cancelScheduled`, `ScheduledLiveUpdate.cancel`
@@ -865,7 +869,10 @@ final pending = await LiveUpdates.scheduled();
   and `reschedule` while the app is in the foreground; they throw a
   `LiveUpdateException` in the background and before iOS 26 (check
   `canSchedule`). ActivityKit drops content updates made before the start,
-  so `reschedule` replaces the scheduled activity. With `pushUpdates`, the
+  so `reschedule` replaces the scheduled activity. A scheduled activity
+  counts toward the limit on running Live Activities until it starts, so
+  `schedule` can also throw with `limitReached` (see
+  [Platform limits](#platform-limits)). With `pushUpdates`, the
   activity's push token is issued only once it starts. If an update with the
   key is running at that time, the system shows both until the app runs; the
   plugin then ends the older one. In tests the activity started 3 to 4
@@ -1336,7 +1343,9 @@ differently.
 - **Number of activities:** the system limits how many Live Activities can
   run at once (per app and per device; the exact number varies). Handle a
   `LiveUpdateException` from `start` (its `reason` is `limitReached`), and
-  prefer one activity that you update over several. ([source][ios-activitykit])
+  prefer one activity that you update over several. Scheduled activities
+  count toward the limit before they start, and `schedule` can throw the
+  same way. ([source][ios-activitykit])
 - **Updates from the app:** `update` and `end` only run while your app runs.
   To keep an activity current while the app is suspended or closed, update
   it with [push notifications](#remote-updates). ([source][ios-push])

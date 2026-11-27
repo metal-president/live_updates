@@ -178,9 +178,11 @@ abstract final class LiveUpdates {
   /// (for example in a background handler), and when the user has denied
   /// the permission more than once: the system then no longer shows the
   /// prompt, and the user can only allow notifications in Settings
-  /// ([openSettings]). It also
-  /// returns `false` when the permission is granted but notifications are
-  /// turned off for the app.
+  /// ([openSettings]).
+  ///
+  /// On every Android version it also returns `false` when no prompt is
+  /// needed but notifications are turned off for the app; below Android 13
+  /// there is no prompt and it returns [isSupported].
   static Future<bool> requestPermission() => _platform.requestPermission();
 
   /// Whether Android shows this app's live updates as promoted Live Updates
@@ -490,7 +492,9 @@ abstract final class LiveUpdates {
   /// details below Android 8.0.
   /// Offer it when a call fails with [LiveUpdateFailure.disabled], or on
   /// Android when [isSupported] or [requestPermission] returns `false`, and
-  /// check again when the app returns to the foreground. `false` on other
+  /// check again when the app returns to the foreground. Call it while the
+  /// app is in the foreground; from the background Android may not open the
+  /// screen even when this returns `true`. Returns `false` on other
   /// platforms and on iOS versions where the plugin does nothing (below
   /// iOS 16.2, or when the widget extension does not support the running
   /// iOS).

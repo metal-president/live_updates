@@ -74,9 +74,9 @@ Screenshots of the example app in this repository. See also the
 
 ## Platform support
 
-**Requirements:** Flutter 3.50+, Xcode 26+ (the plugin uses iOS 26 APIs),
-iOS 15.0+, Android 7.0 (API 24)+. Live
-Activities need iOS 16.2: on iOS 15.0 to 16.1 every call does nothing and
+**Requirements:** Flutter 3.50+, iOS 15.0+, Android 7.0 (API 24)+, and
+Xcode 26+ to build (the plugin builds against iOS 26 APIs). Live Activities
+need iOS 16.2: on iOS 15.0 to 16.1 every call does nothing and
 `isSupported()` returns `false`, as it does on iOS 16 when the app's widget
 extension targets a newer iOS. Some features need a newer iOS: buttons need
 iOS 17.0 (before that none are shown; a tap on the activity still opens the
@@ -153,13 +153,15 @@ With `--no-xcode` only the widget sources are written. Then, in Xcode:
    files.
 5. In the widget's `Info.plist`, add `LiveUpdatesWidget` as a Boolean set to
    YES, so the plugin checks that this extension supports the running iOS.
-6. In the Runner target's Build Phases, drag *Embed Foundation Extensions*
+6. In the Runner target, move the *Embed Foundation Extensions* build phase
    above *Thin Binary*; otherwise Flutter builds fail with a build cycle.
-7. Give each build configuration of the widget target the same base
-   configuration file (`.xcconfig`) as Runner, then set `MARKETING_VERSION`
-   to `$(FLUTTER_BUILD_NAME)` and `CURRENT_PROJECT_VERSION` to
-   `$(FLUTTER_BUILD_NUMBER)`. App extensions must have the same version and
-   build number as their app ([source][ios-version-numbers]).
+7. In the project's Info tab, under Configurations, give each build
+   configuration of the widget target the same base configuration file
+   (`.xcconfig`) as Runner. Then, in the widget target's Build Settings, set
+   `MARKETING_VERSION` to `$(FLUTTER_BUILD_NAME)` and
+   `CURRENT_PROJECT_VERSION` to `$(FLUTTER_BUILD_NUMBER)`. App extensions
+   must have the same version and build number as their app
+   ([source][ios-version-numbers]).
 
 ### Android
 
@@ -176,17 +178,15 @@ The plugin declares these permissions:
   notification to a Live Update when it meets the system's criteria (see
   [Platform limits](#platform-limits)). It is granted at install time without
   a prompt ([source][android-promoted-permission]).
-- `RECEIVE_BOOT_COMPLETED`: sets the alarms of
+- `RECEIVE_BOOT_COMPLETED`: lets the plugin set the alarms of
   [scheduled](#scheduling) live updates again after a reboot, which cancels
   all alarms ([source][android-alarms]).
 
 You can remove the last two in `android/app/src/main/AndroidManifest.xml`:
 `POST_PROMOTED_NOTIFICATIONS` if your app only uses
 `AndroidLiveUpdateMode.ongoing` or `AndroidLiveUpdateMode.classic`, which never
-ask for promotion, and `RECEIVE_BOOT_COMPLETED` if it never calls `schedule`.
-Without `RECEIVE_BOOT_COMPLETED`, an update scheduled before a reboot does not
-appear until the app (or a background handler of the plugin) runs again or the
-app is updated; it then appears at once if its time has passed.
+ask for promotion, and `RECEIVE_BOOT_COMPLETED` if it never calls `schedule`
+(see [Scheduling](#scheduling) for what changes without it).
 
 ```xml
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
@@ -231,18 +231,21 @@ Interface Guidelines for Live Activities and Android's
 
 ## Permissions and settings
 
-What the user can allow or turn off, and how the app finds out:
+The table lists what the user can allow or turn off, and how the app finds
+out. Most apps
+need only the first two rows: call `requestPermission()` before you start,
+and offer `openSettings()` when a call fails with `disabled`.
 
 | Setting | Platforms | Check | Ask or open | When it is off |
 | --- | --- | --- | --- | --- |
-| Notifications for the app (the `POST_NOTIFICATIONS` permission on Android 13+) | Android | `isSupported()` | `requestPermission()` (prompt on Android 13+), `openSettings()` | `start`, `startOrUpdate` and `update` throw a `LiveUpdateException` (`disabled`); remote starts show nothing ([source][android-permission]) |
-| Live Activities for the app | iOS 16.2+ | `isSupported()` | `openSettings()`; `requestPermission()` only returns `isSupported()` | `start` and `startOrUpdate` throw a `LiveUpdateException` (`disabled`) ([source][ios-activitykit]) |
-| The notification channel | Android 8.0+ | none | `openSettings()` | `start`, `startOrUpdate` and `update` throw a `LiveUpdateException` (`disabled`) ([source][android-channels]) |
+| Notifications for the app (the `POST_NOTIFICATIONS` permission on Android 13+) | Android | `isSupported()` | `requestPermission()` (prompt on Android 13+), `openSettings()` | `start`, `startOrUpdate` and `update` throw a `LiveUpdateException` (`disabled`), as do `schedule` and `reschedule` with a past time; remote starts and schedules that come due show nothing ([source][android-permission]) |
+| Live Activities for the app | iOS 16.2+ | `isSupported()` | `openSettings()`; `requestPermission()` only returns `isSupported()` | `start`, `startOrUpdate` and `schedule` throw a `LiveUpdateException` (`disabled`) ([source][ios-activitykit]); a schedule made before still starts (see [Scheduling](#scheduling)) |
+| The notification channel | Android 8.0+ | none | `openSettings()` | `start`, `startOrUpdate` and `update` throw a `LiveUpdateException` (`disabled`), as do `schedule` and `reschedule` with a past time; schedules that come due show nothing ([source][android-channels]) |
 | Live Update promotion (`POST_PROMOTED_NOTIFICATIONS`, granted at install) | Android 16 QPR1+ | `canPostPromotedNotifications()`, `LiveUpdate.isPromoted()` | none (see the promotion settings in [Platform limits](#platform-limits)) | a regular ongoing notification ([source][android-live-update]) |
 | Exact alarms (`SCHEDULE_EXACT_ALARM`, declared by your app) | Android 12+ | `canScheduleExactly()` | `openExactAlarmSettings()` | scheduled updates appear within `AndroidScheduleOptions.window`, `endedContent` within 10 minutes ([source][android-alarms]) |
 | Frequent updates (`NSSupportsLiveActivitiesFrequentUpdates` in the Runner `Info.plist`) | iOS | none | none | pushes with `apns-priority: 10` are limited to the hourly budget ([source][ios-push]) |
 
-"None" means this plugin offers no call for it; the user changes the
+"none" means this plugin offers no call for it; the user changes the
 setting in the system Settings app. `openSettings()` opens the app's page in
 Settings on iOS ([source][ios-open-settings]), the app's notification
 settings on Android 8.0 and later ([source][android-app-notification-settings]),
@@ -252,13 +255,13 @@ and the app's details below Android 8.0. `disabled` is the
 - **Settings change at any time,** and the plugin reports no event for it.
   Check again when the app returns to the foreground, for example with an
   `AppLifecycleListener`, before you show a "Track on Lock Screen" option.
-- **Android prompt:** after the user denies the notification permission more
-  than once, the system no longer shows the prompt
-  ([source][android-permission-denial]), and `requestPermission()` returns
-  `false` at once; only Settings can turn notifications on then
-  (`openSettings()`). Until the
-  permission is granted, it also returns `false` without a prompt while no
-  activity is attached, for example in a background handler.
+- **Android prompt:** `requestPermission()` returns `false` without a prompt
+  while no activity is attached (for example in a background handler; call
+  it again from the foreground), when the user has denied the permission
+  more than once ([source][android-permission-denial]), and when the
+  permission is granted but notifications are turned off for the app. In
+  the last two cases only Settings can turn notifications on
+  (`openSettings()`).
 
 ## Usage
 
@@ -296,16 +299,19 @@ Future<void> trackOrder() async {
 
 `LiveUpdates.start`, `startOrUpdate` and `schedule`, `LiveUpdate.update` and
 `ScheduledLiveUpdate.reschedule` throw a `LiveUpdateException` when the
-system refuses. Its `reason` says why: `disabled` (the user turned live
-updates off, see [Permissions and settings](#permissions-and-settings)), on
-iOS also `limitReached`, `notInForeground` and
-`unsupported` (the device or iOS version does not support the call)
-([source][ios-authorization-error]), else `other`. For `disabled`, offer
-`LiveUpdates.openSettings()`:
+system refuses. Its `reason` (a `LiveUpdateFailure`) says why:
+
+- `disabled`: the user turned live updates off (see
+  [Permissions and settings](#permissions-and-settings)). Offer
+  `LiveUpdates.openSettings()`.
+- `limitReached`, `notInForeground`, `unsupported` (iOS only): too many
+  activities, the app is in the background, or the device or iOS version
+  does not support the call ([source][ios-authorization-error]).
+- `other`: anything else; see `message`.
 
 ```dart
 try {
-  await LiveUpdates.start(content); // content as above
+  await LiveUpdates.start(const LiveUpdateContent(title: 'Order #1234'));
 } on LiveUpdateException catch (e) {
   if (e.reason != LiveUpdateFailure.disabled) rethrow;
   await LiveUpdates.openSettings(); // check again when the app resumes
@@ -877,7 +883,11 @@ final pending = await LiveUpdates.scheduled();
   within `AndroidScheduleOptions.window` (10 minutes by
   default, which is also the shortest window Android allows from Android 12;
   [source][android-alarms]).
-  Schedules survive reboots, app updates and clock changes. A force-stopped
+  Schedules survive reboots (through `RECEIVE_BOOT_COMPLETED`, see
+  [Android](#android)), app updates and clock changes. Without that
+  permission, an update scheduled before a reboot does not appear until the
+  app (or a background handler of the plugin) runs again or the app is
+  updated; it then appears at once if its time has passed. A force-stopped
   app gets no alarms; the plugin sets them again the next time the app
   starts and then shows overdue updates.
 
@@ -1320,9 +1330,8 @@ differently.
   large `extra` maps count toward it. ([source][ios-activitykit])
 - **Height:** the Lock Screen view is 84 to 160 points high; content beyond
   that is cut off. ([source][ios-hig-specs])
-- **User settings:** users can turn off Live Activities and frequent
-  updates for your app in Settings (see
-  [Permissions and settings](#permissions-and-settings)).
+- **User settings:** users can turn off Live Activities for your app in
+  Settings (see [Permissions and settings](#permissions-and-settings)).
   ([source][ios-activitykit])
 - **Number of activities:** the system limits how many Live Activities can
   run at once (per app and per device; the exact number varies). Handle a
@@ -1366,11 +1375,9 @@ differently.
   cut, or only the icon is shown when less than half of it fits. Without
   `shortCriticalText`, a countdown timer at least 2 minutes in the future is
   shown as the remaining time. ([source][android-live-update])
-- **Permissions:** on Android 13 and later nothing is shown until the user
-  grants the notification permission, including updates started by a
-  remote message. ([source][android-permission]) While notifications are
+- **Scheduling while notifications are off:** while notifications are
   turned off for the app or for its channel, `schedule` and `reschedule`
-  with a past time throw a `LiveUpdateException`, as `start` does (see
+  with a past time throw a `LiveUpdateException` (see
   [Permissions and settings](#permissions-and-settings)), and a schedule
   that comes due meanwhile shows nothing.
 - **After `end`:** the final content (or the content shown last)

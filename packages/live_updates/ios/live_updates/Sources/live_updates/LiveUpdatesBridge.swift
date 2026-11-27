@@ -66,19 +66,74 @@ public final class LiveUpdatesBridge: NSObject {
     return widgets.isEmpty || widgets.contains(where: \.runs)
   }()
 
-  /// Error for calls below iOS 16.2.
-  private static var unavailableError: NSError {
-    NSError(
-      domain: "live_updates", code: 3,
-      userInfo: [NSLocalizedDescriptionKey: unavailableMessage])
+  // MARK: - Errors
+
+  /// Domain of the errors reported to Dart; their code is a `Failure`.
+  static let errorDomain = "live_updates"
+
+  /// Why a call failed, sent to Dart as the error code and read there as
+  /// `LiveUpdateFailure` (keep both in sync).
+  enum Failure: Int {
+    case other = 0
+    /// Live Activities are turned off for the app.
+    case disabled = 1
+    /// Too many Live Activities are running.
+    case limitReached = 2
+    /// The app is not in the foreground.
+    case notInForeground = 3
+    /// The device or this iOS version does not support the call.
+    case unsupported = 4
   }
 
-  private static let unavailableMessage = "Live Activities require iOS 16.2 or later."
+  static func failure(_ reason: Failure, _ message: String) -> NSError {
+    NSError(
+      domain: errorDomain, code: reason.rawValue,
+      userInfo: [NSLocalizedDescriptionKey: message])
+  }
+
+  /// `error` as reported to Dart: errors of this plugin as they are, others
+  /// with the reason `reason(of:)` finds and their description.
+  static func bridged(_ error: Error) -> NSError {
+    let ns = error as NSError
+    return ns.domain == errorDomain ? ns : failure(reason(of: error), error.localizedDescription)
+  }
+
+  /// The reason of a plugin error or of an ActivityKit authorization error.
+  static func reason(of error: Error) -> Failure {
+    let ns = error as NSError
+    if ns.domain == errorDomain { return Failure(rawValue: ns.code) ?? .other }
+    guard #available(iOS 16.1, *), let auth = error as? ActivityAuthorizationError else {
+      return .other
+    }
+    switch auth {
+    case .denied: return .disabled
+    case .globalMaximumExceeded, .targetMaximumExceeded: return .limitReached
+    case .visibility: return .notInForeground
+    case .unsupported: return .unsupported
+    default: return .other
+    }
+  }
+
+  /// Error for calls below iOS 16.2.
+  private static var unavailableError: NSError {
+    failure(.unsupported, "Live Activities require iOS 16.2 or later.")
+  }
 
   /// Whether Live Activities are enabled for this app.
   @objc public static func isSupported() -> Bool {
     guard #available(iOS 16.2, *), widgetExtensionRuns else { return false }
     return ActivityAuthorizationInfo().areActivitiesEnabled
+  }
+
+  /// Opens the app's page in the Settings app, where the user turns Live
+  /// Activities back on. `completion` receives whether it was opened.
+  @objc public static func openSettings(_ completion: @escaping (Bool) -> Void) {
+    DispatchQueue.main.async {
+      guard let url = URL(string: UIApplication.openSettingsURLString) else {
+        return completion(false)
+      }
+      UIApplication.shared.open(url, options: [:]) { completion($0) }
+    }
   }
 
   /// Requests a new activity and returns its id.
@@ -97,9 +152,7 @@ public final class LiveUpdatesBridge: NSObject {
     var pushType: PushType? = wantsPush ? .token : nil
     if let channel = payload.broadcastChannelId {
       guard #available(iOS 18.0, *) else {
-        throw NSError(
-          domain: "live_updates", code: 2,
-          userInfo: [NSLocalizedDescriptionKey: "Broadcast channels require iOS 18 or later."])
+        throw failure(.unsupported, "Broadcast channels require iOS 18 or later.")
       }
       pushType = .channel(channel)
     }
@@ -115,12 +168,9 @@ public final class LiveUpdatesBridge: NSObject {
             start: start
           )
         } catch let error as ActivityAuthorizationError where error == .visibility {
-          throw NSError(
-            domain: "live_updates", code: 5,
-            userInfo: [
-              NSLocalizedDescriptionKey:
-                "Live updates can only be scheduled while the app is in the foreground."
-            ])
+          throw failure(
+            .notInForeground,
+            "Live updates can only be scheduled while the app is in the foreground.")
         }
       }
       return try Activity<LiveUpdatesAttributes>.request(
@@ -128,18 +178,17 @@ public final class LiveUpdatesBridge: NSObject {
         content: payload.content,
         pushType: pushType
       )
-    } catch let error as NSError where error.domain == "live_updates" {
+    } catch let error as NSError where error.domain == errorDomain {
       throw error
     } catch where pushType != nil {
-      throw NSError(
-        domain: "live_updates", code: 1,
-        userInfo: [
-          NSLocalizedDescriptionKey:
-            "\(error.localizedDescription) (If the error is about push or entitlements: push "
-            + "updates and broadcast channels require the Push Notifications capability "
-            + "(aps-environment entitlement) on the Runner target; channels also need Broadcast "
-            + "Capability for the App ID.)"
-        ])
+      throw failure(
+        reason(of: error),
+        "\(error.localizedDescription) (If the error is about push or entitlements: push "
+          + "updates and broadcast channels require the Push Notifications capability "
+          + "(aps-environment entitlement) on the Runner target; channels also need Broadcast "
+          + "Capability for the App ID.)")
+    } catch {
+      throw bridged(error)
     }
   }
 
@@ -152,14 +201,14 @@ public final class LiveUpdatesBridge: NSObject {
   /// Runs on the main actor so that concurrent calls for one key cannot both
   /// request an activity (the lookup and `request` happen without suspending).
   @objc public static func startOrUpdate(
-    _ key: String, json: String, completion: @escaping (String?, String?) -> Void
+    _ key: String, json: String, completion: @escaping (String?, NSError?) -> Void
   ) {
-    guard #available(iOS 16.2, *) else { return completion(nil, unavailableMessage) }
+    guard #available(iOS 16.2, *) else { return completion(nil, unavailableError) }
     Task { @MainActor in
       do {
         completion(try await startOrUpdateNow(key, payload: try Payload.decode(json)), nil)
       } catch {
-        completion(nil, error.localizedDescription)
+        completion(nil, bridged(error))
       }
     }
   }
@@ -242,16 +291,16 @@ public final class LiveUpdatesBridge: NSObject {
 
   /// Schedules `json` to start with `key` at `at` (epoch seconds), replacing
   /// the schedule with that key. A time that is not in the future starts or
-  /// updates it now. `completion` receives an error message or `nil`.
+  /// updates it now. `completion` receives an error or `nil`.
   @objc public static func schedule(
-    _ key: String, json: String, at: Double, completion: @escaping (String?) -> Void
+    _ key: String, json: String, at: Double, completion: @escaping (NSError?) -> Void
   ) { scheduleFromDart(key, json: json, at: at, completion: completion) }
 
   /// Moves the schedule with `key` to `at`, with `json` as its content when
   /// given (the push setting of the schedule is kept). `completion` receives
-  /// an error message or `nil`.
+  /// an error or `nil`.
   @objc public static func reschedule(
-    _ key: String, json: String?, at: Double, completion: @escaping (String?) -> Void
+    _ key: String, json: String?, at: Double, completion: @escaping (NSError?) -> Void
   ) { rescheduleFromDart(key, json: json, at: at, completion: completion) }
 
   /// Scheduled live updates that have not started, as a JSON array of
@@ -313,23 +362,25 @@ public final class LiveUpdatesBridge: NSObject {
     }
   }
 
-  /// Updates the activity with `id`. `completion` receives an error message
-  /// or `nil` on success.
+  /// Updates the activity with `id`. `completion` receives an error or
+  /// `nil` on success.
   @objc public static func update(
-    _ id: String, json: String, completion: @escaping (String?) -> Void
+    _ id: String, json: String, completion: @escaping (NSError?) -> Void
   ) {
-    guard #available(iOS 16.2, *) else { return completion(unavailableMessage) }
+    guard #available(iOS 16.2, *) else { return completion(unavailableError) }
     Task {
       do {
         let payload = try Payload.decode(json)
-        guard let activity = find(id) else { return completion("Unknown activity \(id)") }
+        guard let activity = find(id) else {
+          return completion(failure(.other, "Unknown activity \(id)"))
+        }
         guard activity.activityState == .active || activity.activityState == .stale else {
-          return completion("The live update \(id) has ended")
+          return completion(failure(.other, "The live update \(id) has ended"))
         }
         await activity.update(payload.content, alertConfiguration: payload.alertConfiguration)
         completion(nil)
       } catch {
-        completion(error.localizedDescription)
+        completion(bridged(error))
       }
     }
   }
@@ -338,7 +389,7 @@ public final class LiveUpdatesBridge: NSObject {
   /// policy, 0 dismisses immediately, otherwise seconds from now.
   @objc public static func end(
     _ id: String, json: String?, dismissAfter: Double,
-    completion: @escaping (String?) -> Void
+    completion: @escaping (NSError?) -> Void
   ) {
     guard #available(iOS 16.2, *) else { return completion(nil) }
     Task {
@@ -361,7 +412,7 @@ public final class LiveUpdatesBridge: NSObject {
         await MainActor.run { tokenTasks.removeValue(forKey: id)?.cancel() }
         completion(nil)
       } catch {
-        completion(error.localizedDescription)
+        completion(bridged(error))
       }
     }
   }

@@ -393,9 +393,39 @@ struct ScheduleTests {
   }
 
   @Test func rescheduleWithoutAScheduleReportsAnError() async {
-    let message = await withCheckedContinuation { done in
+    let error = await withCheckedContinuation { done in
       LiveUpdatesBridge.reschedule("no-such-key", json: nil, at: 0) { done.resume(returning: $0) }
     }
-    #expect(message != nil)
+    #expect(error?.domain == LiveUpdatesBridge.errorDomain)
+    if #available(iOS 26.0, *) {
+      #expect(error?.code == LiveUpdatesBridge.Failure.other.rawValue)
+    } else {
+      #expect(error?.code == LiveUpdatesBridge.Failure.unsupported.rawValue)
+    }
+  }
+}
+
+struct FailureReasonTests {
+  @Test func authorizationErrorsMapToReasons() {
+    #expect(LiveUpdatesBridge.reason(of: ActivityAuthorizationError.denied) == .disabled)
+    #expect(
+      LiveUpdatesBridge.reason(of: ActivityAuthorizationError.globalMaximumExceeded)
+        == .limitReached)
+    #expect(
+      LiveUpdatesBridge.reason(of: ActivityAuthorizationError.targetMaximumExceeded)
+        == .limitReached)
+    #expect(LiveUpdatesBridge.reason(of: ActivityAuthorizationError.visibility) == .notInForeground)
+    #expect(LiveUpdatesBridge.reason(of: ActivityAuthorizationError.unsupported) == .unsupported)
+    #expect(LiveUpdatesBridge.reason(of: ActivityAuthorizationError.attributesTooLarge) == .other)
+  }
+
+  @Test func bridgedErrorsCarryTheReasonAsTheirCode() {
+    let denied = LiveUpdatesBridge.bridged(ActivityAuthorizationError.denied)
+    #expect(denied.domain == LiveUpdatesBridge.errorDomain)
+    #expect(denied.code == LiveUpdatesBridge.Failure.disabled.rawValue)
+    let own = LiveUpdatesBridge.failure(.notInForeground, "x")
+    #expect(LiveUpdatesBridge.bridged(own) === own)
+    let other = LiveUpdatesBridge.bridged(CocoaError(.fileNoSuchFile))
+    #expect(other.code == LiveUpdatesBridge.Failure.other.rawValue)
   }
 }

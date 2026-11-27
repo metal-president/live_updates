@@ -3,6 +3,8 @@ library;
 
 import 'dart:convert';
 
+import '../models.dart' show LiveUpdateFailure;
+
 /// `"<update id>\n<action id>"`: a button press.
 String encodePress(String updateId, String actionId) => '$updateId\n$actionId';
 
@@ -42,3 +44,23 @@ List<(String, DateTime)> parseSchedules(String json) {
         (key, DateTime.fromMillisecondsSinceEpoch((at * 1000).round())),
   ];
 }
+
+/// The reason of an iOS bridge error from its code
+/// (`LiveUpdatesBridge.Failure` in Swift; keep both in sync).
+LiveUpdateFailure failureFromCode(int code) => switch (code) {
+  1 => LiveUpdateFailure.disabled,
+  2 => LiveUpdateFailure.limitReached,
+  3 => LiveUpdateFailure.notInForeground,
+  4 => LiveUpdateFailure.unsupported,
+  _ => LiveUpdateFailure.other,
+};
+
+/// The reason of an Android bridge exception from its name
+/// (`LiveUpdatesBridge.failureReason` in Java).
+LiveUpdateFailure failureFromName(String name) => switch (name) {
+  'disabled' => LiveUpdateFailure.disabled,
+  'limitReached' => LiveUpdateFailure.limitReached,
+  'notInForeground' => LiveUpdateFailure.notInForeground,
+  'unsupported' => LiveUpdateFailure.unsupported,
+  _ => LiveUpdateFailure.other,
+};

@@ -32,12 +32,18 @@ class OldIosLiveUpdatesPlatform extends NoopLiveUpdatesPlatform {
     required DateTime at,
     bool pushUpdates = false,
     AndroidScheduleOptions android = const AndroidScheduleOptions(),
-  }) async => throw const LiveUpdateException(_message);
+  }) async => throw const LiveUpdateException(
+    _message,
+    reason: LiveUpdateFailure.unsupported,
+  );
 
   @override
   Future<void> reschedule(
     String key, {
     required DateTime at,
     LiveUpdateContent? content,
-  }) async => throw const LiveUpdateException(_message);
+  }) async => throw const LiveUpdateException(
+    _message,
+    reason: LiveUpdateFailure.unsupported,
+  );
 }

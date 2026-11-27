@@ -94,19 +94,27 @@ class IosLiveUpdatesPlatform extends LiveUpdatesPlatform with ContentEncoder {
       if (id == null) throw StateError('ActivityKit returned no activity');
       return id.toDartString();
     } on objc.NSErrorException catch (e) {
-      throw LiveUpdateException(e.error.localizedDescription.toDartString());
+      throw _exception(e.error);
     }
   }
 
+  /// The exception for an error of the Swift bridge, whose code in its
+  /// domain is the reason (`LiveUpdatesBridge.Failure`).
+  static LiveUpdateException _exception(objc.NSError error) =>
+      LiveUpdateException(
+        error.localizedDescription.toDartString(),
+        reason: error.domain.toDartString() == 'live_updates'
+            ? failureFromCode(error.code)
+            : LiveUpdateFailure.other,
+      );
+
   Future<void> _await(
-    void Function(objc.ObjCBlock<Void Function(objc.NSString?)>) call,
+    void Function(objc.ObjCBlock<Void Function(objc.NSError?)>) call,
   ) {
     final done = Completer<void>();
     call(
-      ObjCBlock_ffiVoid_NSString$1.listener((error) {
-        error == null
-            ? done.complete()
-            : done.completeError(LiveUpdateException(error.toDartString()));
+      ObjCBlock_ffiVoid_NSError.listener((error) {
+        error == null ? done.complete() : done.completeError(_exception(error));
       }),
     );
     return done.future;
@@ -127,14 +135,14 @@ class IosLiveUpdatesPlatform extends LiveUpdatesPlatform with ContentEncoder {
     LiveUpdatesBridge.startOrUpdate(
       _ns(key),
       json: _ns(json),
-      completion: ObjCBlock_ffiVoid_NSString_NSString.listener((id, error) {
+      completion: ObjCBlock_ffiVoid_NSString_NSError.listener((id, error) {
         if (id != null) {
           result.complete(id.toDartString());
         } else {
           result.completeError(
-            LiveUpdateException(
-              error?.toDartString() ?? 'startOrUpdate failed',
-            ),
+            error == null
+                ? const LiveUpdateException('startOrUpdate failed')
+                : _exception(error),
           );
         }
       }),
@@ -319,6 +327,15 @@ class IosLiveUpdatesPlatform extends LiveUpdatesPlatform with ContentEncoder {
         completion: cb,
       ),
     );
+  }
+
+  @override
+  Future<bool> openSettings() {
+    final done = Completer<bool>();
+    LiveUpdatesBridge.openSettings(
+      ObjCBlock_ffiVoid_bool.listener(done.complete),
+    );
+    return done.future;
   }
 
   @override

@@ -116,6 +116,9 @@ abstract class LiveUpdatesPlatform {
   /// See [LiveUpdates.openExactAlarmSettings].
   Future<bool> openExactAlarmSettings() async => false;
 
+  /// See [LiveUpdates.openSettings].
+  Future<bool> openSettings() async => false;
+
   /// Schedules [content] to be shown with [key] at [at], replacing a
   /// schedule with that key. Shows it now when [at] is not in the future.
   Future<void> schedule(

@@ -1,5 +1,19 @@
 ## Unreleased
 
+- `LiveUpdates.openSettings()`: opens the screen where the user turns live
+  updates back on (the app's page in Settings on iOS, the app's
+  notification settings on Android 8.0+, its app details below) and
+  returns whether it was opened.
+- `LiveUpdateException.reason` (`LiveUpdateFailure`): why a call failed.
+  `disabled`: Live Activities turned off on iOS, notifications for the app
+  or its channel turned off on Android. iOS also reports `limitReached`,
+  `notInForeground` and `unsupported` (the device or iOS version does not
+  support the call). Anything else is `other`. Existing code is
+  unaffected: the constructor keeps its positional message, the reason
+  defaults to `other`, and messages are unchanged.
+- `dart run live_updates:create ios` now sets `NSSupportsLiveActivities`
+  to YES when the Runner `Info.plist` has it set to NO (it was left as it
+  was).
 - Docs: a "Permissions and settings" section lists what the user can allow
   or turn off (notifications, Live Activities, the notification channel,
   Live Update promotion, exact alarms, frequent updates), how to check and
@@ -8,8 +22,8 @@
   requirement, two more manual iOS setup steps (build phase order, widget
   version numbers) and the `RECEIVE_BOOT_COMPLETED` permission the plugin
   declares, with how to remove it.
-- Example: asks for the permission before starting and logs
-  `canPostPromotedNotifications()`.
+- Example: asks for the permission before starting, logs
+  `canPostPromotedNotifications()`, and has an "Open settings" button.
 
 ## 0.5.1
 

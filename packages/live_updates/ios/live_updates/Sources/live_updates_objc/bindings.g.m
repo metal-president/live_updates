@@ -196,6 +196,52 @@ _ListenerTrampoline_2 _1j14om6_wrapBlockingBlock_pfv6jd(int64_t port, DOBJC_Cont
     }
   });
 }
+
+__attribute__((visibility("default")))
+@interface _1j14om6_BlockArgs_1s56lr9 : NSObject
+@property (copy) id block;
+@property BOOL arg0;
+@end
+@implementation _1j14om6_BlockArgs_1s56lr9
+@end
+
+typedef void  (^_ListenerTrampoline_3)(BOOL arg0);
+__attribute__((visibility("default"))) __attribute__((used))
+_ListenerTrampoline_3 _1j14om6_wrapListenerBlock_1s56lr9(
+    int64_t port, DOBJC_Context* ctx) NS_RETURNS_RETAINED {
+  __block __weak _ListenerTrampoline_3 weakSelfBlock = nil;
+  _ListenerTrampoline_3 strongSelfBlock = [^void(BOOL arg0) {
+    @autoreleasepool {
+      _1j14om6_BlockArgs_1s56lr9* args = [[_1j14om6_BlockArgs_1s56lr9 alloc] init];
+      args.block = weakSelfBlock;
+      args.arg0 = arg0;
+      ctx->invokeListenerPortBlock(port, (__bridge_retained void*)args);
+    }
+  } copy];
+  weakSelfBlock = strongSelfBlock;
+  return strongSelfBlock;
+}
+
+typedef void  (^_BlockingTrampoline_3)(void * waiter, BOOL arg0);
+__attribute__((visibility("default"))) __attribute__((used))
+_ListenerTrampoline_3 _1j14om6_wrapBlockingBlock_1s56lr9(int64_t port, DOBJC_Context* ctx,
+    void (*directInvoke)(void*)) NS_RETURNS_RETAINED {
+  BLOCKING_BLOCK_IMPL(ctx, _ListenerTrampoline_3, ^void(BOOL arg0), {
+    @autoreleasepool {
+      _1j14om6_BlockArgs_1s56lr9* args = [[_1j14om6_BlockArgs_1s56lr9 alloc] init];
+      args.block = weakSelfBlock;
+      args.arg0 = arg0;
+      directInvoke((__bridge_retained void*)args);
+    }
+  }, {
+    @autoreleasepool {
+      _1j14om6_BlockArgs_1s56lr9* args = [[_1j14om6_BlockArgs_1s56lr9 alloc] init];
+      args.block = weakSelfBlock;
+      args.arg0 = arg0;
+      ctx->invokeBlockingPortBlock(port, (__bridge_retained void*)args, waiter);
+    }
+  });
+}
 #undef BLOCKING_BLOCK_IMPL
 
 #pragma clang diagnostic pop

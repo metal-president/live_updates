@@ -1646,13 +1646,48 @@ final class LiveUpdatePushToken {
   String toString() => 'LiveUpdatePushToken(<redacted>)';
 }
 
+/// Why a [LiveUpdateException] was thrown, in terms shared by both
+/// platforms.
+enum LiveUpdateFailure {
+  /// The user turned live updates off: Live Activities for the app on iOS,
+  /// notifications for the app or for its channel on Android. See
+  /// [LiveUpdates.openSettings]. Android reports only this reason and
+  /// [other].
+  disabled,
+
+  /// iOS: too many Live Activities are running, for the app or on the
+  /// device.
+  limitReached,
+
+  /// iOS: the app must be in the foreground, for example to start a Live
+  /// Activity or to schedule one.
+  notInForeground,
+
+  /// iOS: the device or this iOS version does not support the call, for
+  /// example [LiveUpdates.schedule] before iOS 26 or a broadcast channel
+  /// before iOS 18.
+  unsupported,
+
+  /// Any other failure; see [LiveUpdateException.message].
+  other,
+}
+
 /// Thrown when the platform rejects a live update operation.
 final class LiveUpdateException implements Exception {
-  /// Creates an exception with a platform [message].
-  const LiveUpdateException(this.message);
+  /// Creates an exception with a platform [message] and, when known, the
+  /// [reason].
+  const LiveUpdateException(
+    this.message, {
+    this.reason = LiveUpdateFailure.other,
+  });
 
   /// Platform-provided description.
   final String message;
+
+  /// Why the operation failed, to decide what to tell the user, such as
+  /// offering [LiveUpdates.openSettings] for [LiveUpdateFailure.disabled].
+  /// [LiveUpdateFailure.other] when the platform gives no specific reason.
+  final LiveUpdateFailure reason;
 
   @override
   String toString() => 'LiveUpdateException: $message';

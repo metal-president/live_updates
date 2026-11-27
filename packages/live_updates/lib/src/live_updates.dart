@@ -22,7 +22,8 @@ final class LiveUpdate {
 
   /// Replaces the shown content. Throws a [LiveUpdateException] when the
   /// update has ended, and on Android also when the user dismissed it or
-  /// while notifications are turned off for the app or for its channel.
+  /// while notifications are turned off for the app or for its channel
+  /// ([LiveUpdateFailure.disabled]).
   Future<void> update(LiveUpdateContent content) =>
       _platform.update(id, content);
 
@@ -176,7 +177,8 @@ abstract final class LiveUpdates {
   /// without a prompt when no activity is attached to the Flutter engine
   /// (for example in a background handler), and when the user has denied
   /// the permission more than once: the system then no longer shows the
-  /// prompt, and the user can only allow notifications in Settings. It also
+  /// prompt, and the user can only allow notifications in Settings
+  /// ([openSettings]). It also
   /// returns `false` when the permission is granted but notifications are
   /// turned off for the app.
   static Future<bool> requestPermission() => _platform.requestPermission();
@@ -194,10 +196,15 @@ abstract final class LiveUpdates {
   ///
   /// Throws a [LiveUpdateException] when it cannot be shown: on iOS when Live
   /// Activities are turned off for the app, the system limit of running
-  /// activities is reached or the app is in the background; on Android when
+  /// activities is reached, the app is in the background or the device or
+  /// iOS version does not support the call; on Android when
   /// notifications are turned off for the app or for its channel. Check
   /// [isSupported] before you offer to track something on the Lock Screen
   /// (it does not cover a turned-off Android channel).
+  /// [LiveUpdateException.reason] tells these cases apart:
+  /// [LiveUpdateFailure.disabled] (offer [openSettings]),
+  /// [LiveUpdateFailure.limitReached], [LiveUpdateFailure.notInForeground]
+  /// and [LiveUpdateFailure.unsupported].
   ///
   /// [pushUpdates] requests a per-activity APNs token on iOS (see
   /// [LiveUpdate.pushTokens]); it needs the Push Notifications capability.
@@ -257,7 +264,7 @@ abstract final class LiveUpdates {
   /// Throws a [LiveUpdateException] when a new live update cannot be shown,
   /// as [start] does; on Android also when updating a running one while
   /// notifications are turned off for the app or for its channel (as
-  /// [LiveUpdate.update]).
+  /// [LiveUpdate.update]). See [LiveUpdateException.reason].
   ///
   /// [pushUpdates] and [iosChannelId] only apply when a new activity is
   /// started: an existing activity keeps the push setting it was started
@@ -391,8 +398,10 @@ abstract final class LiveUpdates {
   /// else the public text ([LiveUpdateContent.publicContent]) or the title
   /// and body.
   /// Call this while the app is in the foreground; it throws
-  /// [LiveUpdateException] in the background and before iOS 26 (check
-  /// [canSchedule]). [pushUpdates] requests a per-activity APNs token, which
+  /// [LiveUpdateException] in the background
+  /// ([LiveUpdateFailure.notInForeground]) and before iOS 26
+  /// ([LiveUpdateFailure.unsupported]; check [canSchedule]).
+  /// [pushUpdates] requests a per-activity APNs token, which
   /// is issued only once the activity starts ([LiveUpdate.pushTokens] of the
   /// update from [onStarted] or [find]). If a live update with [key] is
   /// running at that time, the system shows both until the app runs; the
@@ -474,6 +483,18 @@ abstract final class LiveUpdates {
   /// [canScheduleExactly] again when the app returns to the foreground.
   static Future<bool> openExactAlarmSettings() =>
       _platform.openExactAlarmSettings();
+
+  /// Opens the system screen where the user turns live updates back on, and
+  /// returns whether it was opened: the app's page in Settings on iOS, the
+  /// app's notification settings on Android 8.0 and later, and the app's
+  /// details below Android 8.0.
+  /// Offer it when a call fails with [LiveUpdateFailure.disabled], or on
+  /// Android when [isSupported] or [requestPermission] returns `false`, and
+  /// check again when the app returns to the foreground. `false` on other
+  /// platforms and on iOS versions where the plugin does nothing (below
+  /// iOS 16.2, or when the widget extension does not support the running
+  /// iOS).
+  static Future<bool> openSettings() => _platform.openSettings();
 
   /// Copies Flutter assets used as [LiveUpdateIcon.asset] icons into the
   /// App Group shared with the iOS widget extension, so that content sent by

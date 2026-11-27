@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:live_updates/src/cli/create.dart';
+import 'package:live_updates/src/cli/create_ios.dart' show enableLiveActivities;
 
 void main() {
   for (final option in ['--name', '--ios-dir', '--app-group']) {
@@ -10,6 +11,13 @@ void main() {
     });
   }
   group('files', fileRules);
+  group(
+    'Info.plist',
+    infoPlistRules,
+    skip: File('/usr/libexec/PlistBuddy').existsSync()
+        ? false
+        : 'needs PlistBuddy (macOS)',
+  );
 }
 
 void fileRules() {
@@ -142,5 +150,49 @@ void fileRules() {
       await create(['ios', '--ios-dir', '${root.path}/none', '--no-xcode']),
       66,
     );
+  });
+}
+
+void infoPlistRules() {
+  late Directory root;
+  late File plist;
+  setUp(() {
+    root = Directory.systemTemp.createTempSync('lu_plist_');
+    plist = File('${root.path}/Info.plist');
+  });
+  tearDown(() => root.deleteSync(recursive: true));
+
+  String value(String key) =>
+      (Process.runSync('/usr/libexec/PlistBuddy', [
+                '-c',
+                'Print :$key',
+                plist.path,
+              ]).stdout
+              as String)
+          .trim();
+
+  void write(String body) => plist.writeAsStringSync(
+    '<?xml version="1.0" encoding="UTF-8"?>\n'
+    '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" '
+    '"http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n'
+    '<plist version="1.0"><dict>$body</dict></plist>\n',
+  );
+
+  test('adds NSSupportsLiveActivities when it is missing', () {
+    write('');
+    expect(enableLiveActivities(plist.path), isTrue);
+    expect(value('NSSupportsLiveActivities'), 'true');
+  });
+
+  test('turns NSSupportsLiveActivities on when it is set to NO', () {
+    write('<key>NSSupportsLiveActivities</key><false/>');
+    expect(enableLiveActivities(plist.path), isTrue);
+    expect(value('NSSupportsLiveActivities'), 'true');
+  });
+
+  test('keeps NSSupportsLiveActivities set to YES', () {
+    write('<key>NSSupportsLiveActivities</key><true/>');
+    expect(enableLiveActivities(plist.path), isTrue);
+    expect(value('NSSupportsLiveActivities'), 'true');
   });
 }

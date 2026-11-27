@@ -17,6 +17,7 @@ import android.graphics.BitmapFactory;
 import android.graphics.drawable.Icon;
 import android.os.Build;
 import android.os.SystemClock;
+import android.provider.Settings;
 import android.service.notification.StatusBarNotification;
 import android.util.Log;
 import androidx.annotation.Keep;
@@ -267,7 +268,30 @@ public final class LiveUpdatesBridge {
    */
   private static void requireShowable(Context c, String json) {
     String reason = notShowableReason(c, json);
-    if (reason != null) throw new IllegalStateException(reason);
+    if (reason != null) throw new NotShowableException(reason);
+  }
+
+  /** Thrown when notifications are turned off for the app or for the channel. */
+  static final class NotShowableException extends IllegalStateException {
+    NotShowableException(String message) {
+      super(message);
+    }
+
+    // The message Dart shows, as before this class existed.
+    @Override
+    public String toString() {
+      return "java.lang.IllegalStateException: " + getMessage();
+    }
+  }
+
+  /**
+   * Why {@code t}, thrown by a call of this class, failed: {@code "disabled"} when notifications
+   * are turned off for the app or for the channel, else {@code "other"}. Dart maps it to
+   * LiveUpdateFailure.
+   */
+  @NonNull
+  public static String failureReason(@NonNull Throwable t) {
+    return t instanceof NotShowableException ? "disabled" : "other";
   }
 
   /** Why nothing posted with {@code json} could be shown, or {@code null}. */
@@ -1130,6 +1154,38 @@ public final class LiveUpdatesBridge {
   public static boolean openExactAlarmSettings() {
     Context c = context;
     return c != null && LiveUpdatesScheduler.openExactAlarmSettings(c, activity);
+  }
+
+  /**
+   * Opens the system screen where the user turns notifications for this app back on: the app's
+   * notification settings (Android 8.0+), else its app details. Returns whether it was opened.
+   */
+  public static boolean openSettings() {
+    Context c = context;
+    if (c == null) return false;
+    Intent intent;
+    if (Build.VERSION.SDK_INT >= 26) {
+      intent =
+          new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+              .putExtra(Settings.EXTRA_APP_PACKAGE, c.getPackageName());
+    } else {
+      intent =
+          new Intent(
+              Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+              Uri.parse("package:" + c.getPackageName()));
+    }
+    Activity a = activity;
+    try {
+      if (a != null) {
+        a.startActivity(intent);
+      } else {
+        c.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+      }
+      return true;
+    } catch (RuntimeException e) {
+      // No matching screen, or an activity that is going away.
+      return false;
+    }
   }
 
   /**

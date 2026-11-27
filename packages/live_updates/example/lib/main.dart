@@ -225,6 +225,9 @@ class _ExamplePageState extends State<ExamplePage> {
     try {
       await action();
       _add('$label: ok');
+    } on LiveUpdateException catch (e) {
+      // disabled: the user turned live updates off; tap Open settings.
+      _add('$label: ${e.reason.name}: ${e.message}');
     } on Object catch (e) {
       _add('$label: $e');
     }
@@ -302,6 +305,12 @@ class _ExamplePageState extends State<ExamplePage> {
     await LiveUpdates.cancelScheduled('order-1234');
   });
 
+  /// Where the user turns live updates back on (Live Activities on iOS,
+  /// notifications on Android).
+  Future<void> _openSettings() => _run('settings', () async {
+    _add('settings opened: ${await LiveUpdates.openSettings()}');
+  });
+
   Future<void> _openExactAlarmSettings() => _run('exact alarms', () async {
     _add('settings opened: ${await LiveUpdates.openExactAlarmSettings()}');
   });
@@ -325,6 +334,10 @@ class _ExamplePageState extends State<ExamplePage> {
             OutlinedButton(
               onPressed: _cancelSchedule,
               child: const Text('Cancel schedule'),
+            ),
+            OutlinedButton(
+              onPressed: _openSettings,
+              child: const Text('Open settings'),
             ),
             if (defaultTargetPlatform == TargetPlatform.android)
               OutlinedButton(

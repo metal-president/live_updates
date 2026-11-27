@@ -235,15 +235,19 @@ What the user can allow or turn off, and how the app finds out:
 
 | Setting | Platforms | Check | Ask or open | When it is off |
 | --- | --- | --- | --- | --- |
-| Notifications for the app (the `POST_NOTIFICATIONS` permission on Android 13+) | Android | `isSupported()` | `requestPermission()` (prompt on Android 13+) | `start`, `startOrUpdate` and `update` throw a `LiveUpdateException`; remote starts show nothing ([source][android-permission]) |
-| Live Activities for the app | iOS 16.2+ | `isSupported()` | none (`requestPermission()` returns `isSupported()`) | `start` and `startOrUpdate` throw a `LiveUpdateException` ([source][ios-activitykit]) |
-| The notification channel | Android 8.0+ | none | none | `start`, `startOrUpdate` and `update` throw a `LiveUpdateException` ([source][android-channels]) |
+| Notifications for the app (the `POST_NOTIFICATIONS` permission on Android 13+) | Android | `isSupported()` | `requestPermission()` (prompt on Android 13+), `openSettings()` | `start`, `startOrUpdate` and `update` throw a `LiveUpdateException` (`disabled`); remote starts show nothing ([source][android-permission]) |
+| Live Activities for the app | iOS 16.2+ | `isSupported()` | `openSettings()`; `requestPermission()` only returns `isSupported()` | `start` and `startOrUpdate` throw a `LiveUpdateException` (`disabled`) ([source][ios-activitykit]) |
+| The notification channel | Android 8.0+ | none | `openSettings()` | `start`, `startOrUpdate` and `update` throw a `LiveUpdateException` (`disabled`) ([source][android-channels]) |
 | Live Update promotion (`POST_PROMOTED_NOTIFICATIONS`, granted at install) | Android 16 QPR1+ | `canPostPromotedNotifications()`, `LiveUpdate.isPromoted()` | none (see the promotion settings in [Platform limits](#platform-limits)) | a regular ongoing notification ([source][android-live-update]) |
 | Exact alarms (`SCHEDULE_EXACT_ALARM`, declared by your app) | Android 12+ | `canScheduleExactly()` | `openExactAlarmSettings()` | scheduled updates appear within `AndroidScheduleOptions.window`, `endedContent` within 10 minutes ([source][android-alarms]) |
 | Frequent updates (`NSSupportsLiveActivitiesFrequentUpdates` in the Runner `Info.plist`) | iOS | none | none | pushes with `apns-priority: 10` are limited to the hourly budget ([source][ios-push]) |
 
 "None" means this plugin offers no call for it; the user changes the
-setting in the system Settings app.
+setting in the system Settings app. `openSettings()` opens the app's page in
+Settings on iOS ([source][ios-open-settings]), the app's notification
+settings on Android 8.0 and later ([source][android-app-notification-settings]),
+and the app's details below Android 8.0. `disabled` is the
+[`reason`](#start-update-and-end) of the `LiveUpdateException`.
 
 - **Settings change at any time,** and the plugin reports no event for it.
   Check again when the app returns to the foreground, for example with an
@@ -251,7 +255,8 @@ setting in the system Settings app.
 - **Android prompt:** after the user denies the notification permission more
   than once, the system no longer shows the prompt
   ([source][android-permission-denial]), and `requestPermission()` returns
-  `false` at once; only Settings can turn notifications on then. Until the
+  `false` at once; only Settings can turn notifications on then
+  (`openSettings()`). Until the
   permission is granted, it also returns `false` without a prompt while no
   activity is attached, for example in a background handler.
 
@@ -286,6 +291,24 @@ Future<void> trackOrder() async {
   // Android as a regular notification the user can swipe away. Without
   // dismissAfter it stays up to 4 hours; Duration.zero removes it now.
   await update.end(dismissAfter: const Duration(minutes: 5));
+}
+```
+
+`LiveUpdates.start`, `startOrUpdate` and `schedule`, `LiveUpdate.update` and
+`ScheduledLiveUpdate.reschedule` throw a `LiveUpdateException` when the
+system refuses. Its `reason` says why: `disabled` (the user turned live
+updates off, see [Permissions and settings](#permissions-and-settings)), on
+iOS also `limitReached`, `notInForeground` and
+`unsupported` (the device or iOS version does not support the call)
+([source][ios-authorization-error]), else `other`. For `disabled`, offer
+`LiveUpdates.openSettings()`:
+
+```dart
+try {
+  await LiveUpdates.start(content); // content as above
+} on LiveUpdateException catch (e) {
+  if (e.reason != LiveUpdateFailure.disabled) rethrow;
+  await LiveUpdates.openSettings(); // check again when the app resumes
 }
 ```
 
@@ -1303,8 +1326,8 @@ differently.
   ([source][ios-activitykit])
 - **Number of activities:** the system limits how many Live Activities can
   run at once (per app and per device; the exact number varies). Handle a
-  `LiveUpdateException` from `start`, and prefer one activity that you update
-  over several. ([source][ios-activitykit])
+  `LiveUpdateException` from `start` (its `reason` is `limitReached`), and
+  prefer one activity that you update over several. ([source][ios-activitykit])
 - **Updates from the app:** `update` and `end` only run while your app runs.
   To keep an activity current while the app is suspended or closed, update
   it with [push notifications](#remote-updates). ([source][ios-push])
@@ -1395,6 +1418,9 @@ differently.
   and versions.
 
 [ios-activitykit]: https://developer.apple.com/documentation/activitykit/displaying-live-data-with-live-activities
+[ios-open-settings]: https://developer.apple.com/documentation/uikit/uiapplication/opensettingsurlstring
+[android-app-notification-settings]: https://developer.android.com/reference/android/provider/Settings#ACTION_APP_NOTIFICATION_SETTINGS
+[ios-authorization-error]: https://developer.apple.com/documentation/activitykit/activityauthorizationerror
 [ios-button-intent]: https://developer.apple.com/documentation/swiftui/button/init(intent:label:)
 [ios-request-start]: https://developer.apple.com/documentation/activitykit/activity/request(attributes:content:pushtype:style:alertconfiguration:start:)
 [ios-stale-date]: https://developer.apple.com/documentation/activitykit/activitycontent/staledate

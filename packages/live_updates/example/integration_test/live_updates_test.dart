@@ -128,6 +128,31 @@ void main() {
     await expectLater(moved.reschedule(), throwsA(isA<LiveUpdateException>()));
   });
 
+  testWidgets('several keys are scheduled independently', (tester) async {
+    if (!await LiveUpdates.canSchedule()) return;
+    final now = DateTime.now();
+    // Scheduled out of order: scheduled() sorts by time.
+    await LiveUpdates.schedule(
+      'multi-late',
+      const LiveUpdateContent(title: 'Late'),
+      at: now.add(const Duration(hours: 2)),
+    );
+    await LiveUpdates.schedule(
+      'multi-early',
+      const LiveUpdateContent(title: 'Early'),
+      at: now.add(const Duration(hours: 1)),
+    );
+    expect((await LiveUpdates.scheduled()).map((s) => s.key), [
+      'multi-early',
+      'multi-late',
+    ]);
+    // Cancelling one leaves the other.
+    await LiveUpdates.cancelScheduled('multi-early');
+    expect((await LiveUpdates.scheduled()).map((s) => s.key), ['multi-late']);
+    await LiveUpdates.cancelAllScheduled();
+    expect(await LiveUpdates.scheduled(), isEmpty);
+  });
+
   testWidgets('a schedule that is due shows the update now', (tester) async {
     if (!await LiveUpdates.canSchedule()) return;
     const key = 'due-order';

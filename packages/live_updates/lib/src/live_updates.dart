@@ -401,8 +401,11 @@ abstract final class LiveUpdates {
   /// and body.
   /// Call this while the app is in the foreground; it throws
   /// [LiveUpdateException] in the background
-  /// ([LiveUpdateFailure.notInForeground]) and before iOS 26
-  /// ([LiveUpdateFailure.unsupported]; check [canSchedule]).
+  /// ([LiveUpdateFailure.notInForeground]), before iOS 26
+  /// ([LiveUpdateFailure.unsupported]; check [canSchedule]) and when too
+  /// many activities are running or scheduled
+  /// ([LiveUpdateFailure.limitReached]); a scheduled activity counts toward
+  /// that limit until it starts.
   /// [pushUpdates] requests a per-activity APNs token, which
   /// is issued only once the activity starts ([LiveUpdate.pushTokens] of the
   /// update from [onStarted] or [find]). If a live update with [key] is

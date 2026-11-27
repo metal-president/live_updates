@@ -108,12 +108,16 @@ final class LiveUpdate {
 /// shown yet. It is identified by its [key]: scheduling again with that key
 /// replaces it.
 final class ScheduledLiveUpdate {
-  ScheduledLiveUpdate._(this.key, this.at);
+  // The platforms keep the time in milliseconds: local time with that
+  // precision makes a handle equal to the one [LiveUpdates.findScheduled]
+  // and [LiveUpdates.scheduled] return.
+  ScheduledLiveUpdate._(this.key, DateTime at)
+    : at = DateTime.fromMillisecondsSinceEpoch(at.millisecondsSinceEpoch);
 
   /// The key the update is shown with ([LiveUpdate.key] once it is shown).
   final String key;
 
-  /// When the update is shown.
+  /// When the update is shown, in local time to the millisecond.
   final DateTime at;
 
   LiveUpdatesPlatform get _platform => LiveUpdatesPlatform.instance;
@@ -405,7 +409,10 @@ abstract final class LiveUpdates {
   /// ([LiveUpdateFailure.unsupported]; check [canSchedule]) and when too
   /// many activities are running or scheduled
   /// ([LiveUpdateFailure.limitReached]); a scheduled activity counts toward
-  /// that limit until it starts.
+  /// that limit until it starts. When the limit is reached while replacing
+  /// the schedule with [key] for a time in the future, the earlier schedule
+  /// is cancelled and the request tried again; if that fails too, the error
+  /// is thrown and the earlier schedule restored if the limit allows.
   /// [pushUpdates] requests a per-activity APNs token, which
   /// is issued only once the activity starts ([LiveUpdate.pushTokens] of the
   /// update from [onStarted] or [find]). If a live update with [key] is
@@ -447,8 +454,12 @@ abstract final class LiveUpdates {
   /// Live updates scheduled with [schedule] that have not been shown yet,
   /// in the order they are due.
   static Future<List<ScheduledLiveUpdate>> scheduled() async {
+    // Same time: by key, so the order does not depend on the platform.
     final list = [...await _platform.scheduled()]
-      ..sort((a, b) => a.$2.compareTo(b.$2));
+      ..sort((a, b) {
+        final byTime = a.$2.compareTo(b.$2);
+        return byTime != 0 ? byTime : a.$1.compareTo(b.$1);
+      });
     return [for (final (key, at) in list) ScheduledLiveUpdate._(key, at)];
   }
 

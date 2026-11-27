@@ -238,7 +238,8 @@ public class LiveUpdatesSchedulerTest {
     dir.mkdirs();
     java.io.File image = new java.io.File(dir, "lu_a.png");
     java.io.File ended = new java.io.File(dir, "lu_b.png");
-    for (java.io.File f : new java.io.File[] {image, ended}) {
+    java.io.File extra = new java.io.File(dir, "lu_c.png");
+    for (java.io.File f : new java.io.File[] {image, ended, extra}) {
       java.nio.file.Files.write(f.toPath(), new byte[] {1});
       f.setLastModified(System.currentTimeMillis() - 2 * 86_400_000L);
     }
@@ -246,7 +247,7 @@ public class LiveUpdatesSchedulerTest {
     LiveUpdatesBridge.schedule(
         "order",
         "{\"title\":\"A\",\"image\":\"lu_a.png\",\"endedContent\":{\"title\":\"B\","
-            + "\"image\":\"lu_b.png\"}}",
+            + "\"image\":\"lu_b.png\"},\"extraImages\":{\"map\":\"lu_c.png\"}}",
         now + MINUTE,
         true,
         0);
@@ -255,6 +256,7 @@ public class LiveUpdatesSchedulerTest {
     // The clean-up of unused images goes by the modification time.
     assertEquals(later, image.lastModified(), 1000);
     assertEquals(later, ended.lastModified(), 1000);
+    assertEquals(later, extra.lastModified(), 1000);
   }
 
   @Test(expected = IllegalStateException.class)

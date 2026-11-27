@@ -3,6 +3,20 @@
 - Docs: "Scheduling" explains how to schedule several live updates (one
   key each). On iOS, scheduled activities count toward the limit on running
   activities; `schedule` documents that it can throw with `limitReached`.
+- iOS: when `schedule` or `reschedule` replaces a schedule with the same key
+  for a time in the future and the limit on Live Activities is reached, the
+  earlier schedule is cancelled and the request tried again. If that also
+  fails, the error is thrown and the earlier schedule restored if the limit
+  allows.
+- Android: `reschedule` without new content also keeps the `extraImages`
+  files of the scheduled content, so they are not cleaned up before it is
+  shown.
+- Android: `cancelAllScheduled` saves the change once instead of once per
+  schedule.
+- `ScheduledLiveUpdate.at` is in local time with millisecond precision, so
+  the handle from `schedule` or `reschedule` equals the one from
+  `findScheduled` and `scheduled()`.
+- `scheduled()` lists updates due at the same time by key.
 
 ## 0.5.2
 

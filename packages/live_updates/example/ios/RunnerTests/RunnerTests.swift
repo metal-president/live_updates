@@ -429,3 +429,69 @@ struct FailureReasonTests {
     #expect(other.code == LiveUpdatesBridge.Failure.other.rawValue)
   }
 }
+
+/// The retry of `schedule` when the limit on Live Activities is reached.
+@MainActor
+struct ScheduleLimitTests {
+  private let limit = ActivityAuthorizationError.globalMaximumExceeded
+
+  @Test func theEarlierScheduleIsEndedAndTheRequestRetried() async throws {
+    var calls: [String] = []
+    var attempts = 0
+    let result = try await LiveUpdatesBridge.requestReplacingOnLimit(
+      {
+        attempts += 1
+        calls.append("request")
+        if attempts == 1 { throw limit }
+        return 42
+      },
+      hasEarlier: true, endEarlier: { calls.append("end") },
+      restoreEarlier: { calls.append("restore") })
+    #expect(result == 42)
+    #expect(calls == ["request", "end", "request"])
+  }
+
+  @Test func aFailedRetryRestoresTheEarlierScheduleAndThrows() async {
+    var calls: [String] = []
+    await #expect(throws: ActivityAuthorizationError.self) {
+      _ = try await LiveUpdatesBridge.requestReplacingOnLimit(
+        { () throws -> Int in
+          calls.append("request")
+          throw limit
+        },
+        hasEarlier: true, endEarlier: { calls.append("end") },
+        restoreEarlier: { calls.append("restore") })
+    }
+    #expect(calls == ["request", "end", "request", "restore"])
+  }
+
+  @Test func withoutAnEarlierScheduleOrForOtherErrorsNothingIsEnded() async {
+    for (hasEarlier, error) in [
+      (false, limit), (true, ActivityAuthorizationError.denied),
+    ] {
+      var calls: [String] = []
+      await #expect(throws: ActivityAuthorizationError.self) {
+        _ = try await LiveUpdatesBridge.requestReplacingOnLimit(
+          { () throws -> Int in
+            calls.append("request")
+            throw error
+          },
+          hasEarlier: hasEarlier, endEarlier: { calls.append("end") },
+          restoreEarlier: { calls.append("restore") })
+      }
+      #expect(calls == ["request"])
+    }
+  }
+
+  @Test func theLimitAsAPluginErrorAlsoRetries() async throws {
+    var attempts = 0
+    let result = try await LiveUpdatesBridge.requestReplacingOnLimit(
+      {
+        attempts += 1
+        if attempts == 1 { throw LiveUpdatesBridge.failure(.limitReached, "x") }
+        return 1
+      },
+      hasEarlier: true, endEarlier: {}, restoreEarlier: {})
+    #expect(result == 1)
+  }
+}

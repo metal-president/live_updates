@@ -870,7 +870,7 @@ final pending = await LiveUpdates.scheduled();
   `LiveUpdateException` in the background and before iOS 26 (check
   `canSchedule`). ActivityKit drops content updates made before the start,
   so `reschedule` replaces the scheduled activity. A scheduled activity
-  counts toward the limit on running Live Activities until it starts, so
+  counts toward the limit on Live Activities until it starts, so
   `schedule` can also throw with `limitReached` (see
   [Platform limits](#platform-limits)). When the limit is reached while
   replacing a schedule with the same key for a time in the future, the

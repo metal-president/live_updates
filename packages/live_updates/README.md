@@ -872,7 +872,11 @@ final pending = await LiveUpdates.scheduled();
   so `reschedule` replaces the scheduled activity. A scheduled activity
   counts toward the limit on running Live Activities until it starts, so
   `schedule` can also throw with `limitReached` (see
-  [Platform limits](#platform-limits)). With `pushUpdates`, the
+  [Platform limits](#platform-limits)). When the limit is reached while
+  replacing a schedule with the same key for a time in the future, the
+  plugin cancels the earlier schedule and tries again; if that fails too,
+  it throws and tries to restore the earlier schedule, which fails if the
+  limit is still reached. With `pushUpdates`, the
   activity's push token is issued only once it starts. If an update with the
   key is running at that time, the system shows both until the app runs; the
   plugin then ends the older one. In tests the activity started 3 to 4

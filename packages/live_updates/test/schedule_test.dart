@@ -46,9 +46,20 @@ class SchedulePlatform extends NoopLiveUpdatesPlatform {
     schedules[key] = (at, content?.title ?? old.$2);
   }
 
+  /// Returns times as the native bridges do: local, in milliseconds.
+  var roundsTimes = false;
+
   @override
   Future<List<(String, DateTime)>> scheduled() async => [
-    for (final MapEntry(:key, :value) in schedules.entries) (key, value.$1),
+    for (final MapEntry(:key, :value) in schedules.entries)
+      (
+        key,
+        roundsTimes
+            ? DateTime.fromMillisecondsSinceEpoch(
+                value.$1.millisecondsSinceEpoch,
+              )
+            : value.$1,
+      ),
   ];
 
   @override
@@ -128,6 +139,30 @@ void main() {
     final a = await LiveUpdates.findScheduled('a');
     expect(a?.at, t1);
     expect(await LiveUpdates.findScheduled('c'), isNull);
+  });
+
+  test('scheduled lists updates due at the same time by key', () async {
+    for (final key in ['c', 'a', 'b']) {
+      await LiveUpdates.schedule(key, LiveUpdateContent(title: key), at: t1);
+    }
+    expect((await LiveUpdates.scheduled()).map((s) => s.key), ['a', 'b', 'c']);
+  });
+
+  test('handles equal the listed schedule for UTC and microseconds', () async {
+    // The platforms keep milliseconds, as local time.
+    p.roundsTimes = true;
+    final at = DateTime.utc(2030, 1, 1, 9, 0, 0, 123, 456);
+    final s = await LiveUpdates.schedule(
+      'a',
+      const LiveUpdateContent(title: 'A'),
+      at: at,
+    );
+    expect(s, await LiveUpdates.findScheduled('a'));
+    expect(s, (await LiveUpdates.scheduled()).single);
+    expect(s.at.isUtc, isFalse);
+    expect(s.at.millisecondsSinceEpoch, at.millisecondsSinceEpoch);
+    final moved = await s.reschedule(at: at.add(const Duration(hours: 1)));
+    expect(moved, await LiveUpdates.findScheduled('a'));
   });
 
   test(

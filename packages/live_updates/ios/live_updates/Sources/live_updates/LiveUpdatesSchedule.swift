@@ -101,9 +101,7 @@ extension LiveUpdatesBridge {
     guard #available(iOS 26.0, *) else { return completion() }
     Task { @MainActor in
       for activity in Activity<LiveUpdatesAttributes>.activities where isPending(activity) {
-        scheduleTasks.removeValue(forKey: activity.id)?.cancel()
-        await endNow(activity)
-        storedSchedules.removeValue(forKey: activity.id)
+        await endPending(activity)
       }
       completion()
     }
@@ -139,11 +137,56 @@ extension LiveUpdatesBridge {
       await cancelPending(key)
       return
     }
-    let activity = try request(payload, key: key, start: at)
+    let earlier = pendingActivity(key).flatMap { storedSchedules[$0.id] }
+    let activity = try await requestReplacingOnLimit(
+      { try request(payload, key: key, start: at) },
+      // Only one the plugin can request again if the retry fails.
+      hasEarlier: earlier != nil,
+      endEarlier: { await cancelPending(key) },
+      restoreEarlier: { restoreSchedule(key, earlier) })
     var all = storedSchedules
     all[activity.id] = ["key": key, "at": at.timeIntervalSince1970, "json": json]
     storedSchedules = all
     await cancelPending(key, except: activity.id)
+    watchScheduled(activity)
+  }
+
+  /// Runs `request`. A scheduled activity counts toward the limit on Live
+  /// Activities until it starts, so when the limit is reached and an earlier
+  /// schedule with the key exists (`hasEarlier`), that one is ended
+  /// (`endEarlier`) and `request` runs again. If that fails too, the earlier
+  /// schedule is requested again (`restoreEarlier`, best effort: it fails
+  /// too when no slot is free) and the error is thrown.
+  @MainActor
+  static func requestReplacingOnLimit<T>(
+    _ request: () throws -> T, hasEarlier: Bool, endEarlier: () async -> Void,
+    restoreEarlier: () -> Void
+  ) async throws -> T {
+    do {
+      return try request()
+    } catch {
+      guard hasEarlier, reason(of: error) == .limitReached else { throw error }
+      await endEarlier()
+      do {
+        return try request()
+      } catch {
+        restoreEarlier()
+        throw error
+      }
+    }
+  }
+
+  /// Requests the schedule `stored` (an entry of `storedSchedules`) for `key`
+  /// again, if its time is still in the future. Best effort.
+  @available(iOS 26.0, *)
+  @MainActor
+  private static func restoreSchedule(_ key: String, _ stored: [String: Any]?) {
+    guard let json = stored?["json"] as? String, let seconds = stored?["at"] as? Double,
+      case let at = Date(timeIntervalSince1970: seconds), at > Date(),
+      let payload = try? Payload.decode(json),
+      let activity = try? request(payload, key: key, start: at)
+    else { return }
+    storedSchedules[activity.id] = ["key": key, "at": seconds, "json": json]
     watchScheduled(activity)
   }
 
@@ -160,10 +203,17 @@ extension LiveUpdatesBridge {
   private static func cancelPending(_ key: String, except kept: String? = nil) async {
     for activity in Activity<LiveUpdatesAttributes>.activities
     where activity.attributes.key == key && isPending(activity) && activity.id != kept {
-      scheduleTasks.removeValue(forKey: activity.id)?.cancel()
-      await endNow(activity)
-      storedSchedules.removeValue(forKey: activity.id)
+      await endPending(activity)
     }
+  }
+
+  /// Ends the scheduled `activity` and forgets its schedule.
+  @available(iOS 26.0, *)
+  @MainActor
+  private static func endPending(_ activity: Activity<LiveUpdatesAttributes>) async {
+    scheduleTasks.removeValue(forKey: activity.id)?.cancel()
+    await endNow(activity)
+    storedSchedules.removeValue(forKey: activity.id)
   }
 
   @MainActor private static var scheduleTasks: [String: Task<Void, Never>] = [:]

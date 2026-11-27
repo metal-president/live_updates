@@ -147,17 +147,22 @@ final class LiveUpdatesScheduler {
   }
 
   /**
-   * Protects the images that {@code content} names ({@code image}, {@code endedContent.image})
-   * from the clean-up of unused images (Dart's ImageStore deletes files a day after their
-   * modification time) until {@code untilMillis}.
+   * Protects the images that {@code content} names ({@code image}, {@code endedContent.image},
+   * {@code extraImages}) from the clean-up of unused images (Dart's ImageStore deletes files a day
+   * after their modification time) until {@code untilMillis}.
    */
   static void keepImages(Context c, JSONObject content, long untilMillis) {
     JSONObject ended = content.optJSONObject("endedContent");
-    for (String name :
-        new String[] {
-          LiveUpdatesBridge.optString(content, "image"),
-          ended == null ? null : LiveUpdatesBridge.optString(ended, "image")
-        }) {
+    List<String> names = new ArrayList<>();
+    names.add(LiveUpdatesBridge.optString(content, "image"));
+    names.add(ended == null ? null : LiveUpdatesBridge.optString(ended, "image"));
+    JSONObject extra = content.optJSONObject("extraImages");
+    if (extra != null) {
+      for (Iterator<String> it = extra.keys(); it.hasNext(); ) {
+        names.add(LiveUpdatesBridge.optString(extra, it.next()));
+      }
+    }
+    for (String name : names) {
       if (name == null || name.contains("/") || name.startsWith(".")) continue;
       java.io.File file = new java.io.File(LiveUpdatesBridge.imageDirectory(c), name);
       if (file.exists() && file.lastModified() < untilMillis) file.setLastModified(untilMillis);
@@ -181,13 +186,18 @@ final class LiveUpdatesScheduler {
     }
   }
 
-  /** Cancels every schedule. */
+  /**
+   * Cancels every schedule: one write for all of them, then their alarms, under the lock so that
+   * a schedule made meanwhile does not lose its new alarm.
+   */
   static void cancelAll(Context c) {
-    List<String> keys = new ArrayList<>();
     synchronized (lock) {
+      List<String> keys = new ArrayList<>();
       for (Iterator<String> it = read(c).keys(); it.hasNext(); ) keys.add(it.next());
+      if (keys.isEmpty()) return;
+      write(c, new JSONObject());
+      for (String key : keys) cancelAlarm(c, key);
     }
-    for (String key : keys) cancel(c, key);
   }
 
   /** Schedules as a JSON array of {@code {"key", "at"}} (epoch seconds). */

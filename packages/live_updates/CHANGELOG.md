@@ -1,4 +1,4 @@
-## Unreleased
+## 0.5.2
 
 - `LiveUpdates.openSettings()`: opens the screen where the user turns live
   updates back on (the app's page in Settings on iOS, the app's

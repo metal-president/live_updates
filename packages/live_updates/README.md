@@ -870,21 +870,20 @@ final pending = await LiveUpdates.scheduled();
   `LiveUpdateException` in the background and before iOS 26 (check
   `canSchedule`). ActivityKit drops content updates made before the start,
   so `reschedule` replaces the scheduled activity. A scheduled activity
-  counts toward the limit on running Live Activities until it starts, so
+  counts toward the limit on Live Activities until it starts, so
   `schedule` can also throw with `limitReached` (see
-  [Platform limits](#platform-limits)). When the limit is reached while
-  replacing a schedule with the same key for a time in the future, the
-  plugin cancels the earlier schedule and tries again; if that fails too,
-  it throws and tries to restore the earlier schedule, which fails if the
-  limit is still reached. With `pushUpdates`, the
-  activity's push token is issued only once it starts. If an update with the
-  key is running at that time, the system shows both until the app runs; the
-  plugin then ends the older one. In tests the activity started 3 to 4
-  seconds after the requested time. Turning off Live Activities for the app
-  in Settings blocks new requests but does not cancel a schedule made
-  before: in tests (iOS 27.2) it still started at its time, with its alert
-  and sound. Call `cancelAllScheduled()` when the user opts out in your
-  app.
+  [Platform limits](#platform-limits)). If the limit is reached when a new
+  time in the future replaces a pending schedule with the same key, the
+  plugin cancels the old schedule and retries; if the retry fails, it throws
+  and restores the old schedule if the limit allows (check with
+  `findScheduled`). With `pushUpdates`, the activity's push token is issued
+  only once it starts. If an update with the key is running at that time,
+  the system shows both until the app runs; the plugin then ends the older
+  one. In tests the activity started 3 to 4 seconds after the requested
+  time. Turning off Live Activities for the app in Settings blocks new
+  requests but does not cancel a schedule made before: in tests (iOS 27.2)
+  it still started at its time, with its alert and sound. Call
+  `cancelAllScheduled()` when the user opts out in your app.
 - **Android:** an alarm posts the notification. It is on time only with
   exact alarms: add `SCHEDULE_EXACT_ALARM` to your app's manifest (this
   package does not declare it), ask the user with

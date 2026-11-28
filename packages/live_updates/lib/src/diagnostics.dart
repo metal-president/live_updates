@@ -22,12 +22,13 @@ enum LiveUpdateDiagnosticStatus {
 /// unknown values with a default branch, as checks may be added in minor
 /// releases.
 enum LiveUpdateDiagnosticCheck {
-  /// Whether this platform shows live updates at all (iOS and Android).
+  /// Reported only where live updates do nothing (platforms other than iOS
+  /// and Android).
   platform,
 
   /// The OS version and what it shows: iOS 16.2 for Live Activities;
-  /// Android 16 for Live Updates (older versions show an ongoing
-  /// notification).
+  /// Android 16 for `ProgressStyle` and, from Android 16 QPR1, promotion to
+  /// Live Updates (older versions show an ongoing notification).
   osVersion,
 
   /// iOS: the widget extension made by `create ios` is in the app and
@@ -234,7 +235,10 @@ bool _atLeast(List<int> v, int major, [int minor = 0]) =>
 /// Diagnostics from the facts the iOS bridge reports
 /// (`LiveUpdatesBridge.diagnosticsJson`).
 LiveUpdateDiagnostics iosDiagnostics(Map<String, Object?> facts) {
-  final os = facts['os'] as String? ?? '0';
+  final os = switch (facts['os']) {
+    final String s => s,
+    _ => '0',
+  };
   final v = _version(os);
   final live = _atLeast(v, 16, 2);
   final items = <LiveUpdateDiagnosticItem>[];
@@ -258,14 +262,23 @@ LiveUpdateDiagnostics iosDiagnostics(Map<String, Object?> facts) {
         );
 
   final widgets = [
-    for (final w in (facts['widgets'] as List<Object?>?) ?? const [])
+    for (final w in switch (facts['widgets']) {
+      final List<Object?> l => l,
+      _ => const <Object?>[],
+    })
       if (w is Map) w,
   ];
   final marked = [
     for (final w in widgets)
       if (w['marked'] == true) w,
   ];
-  if (widgets.isEmpty) {
+  if (!live) {
+    add(
+      LiveUpdateDiagnosticCheck.widgetExtension,
+      _na,
+      'Not used before iOS 16.2.',
+    );
+  } else if (widgets.isEmpty) {
     add(
       LiveUpdateDiagnosticCheck.widgetExtension,
       _problem,
@@ -344,8 +357,7 @@ LiveUpdateDiagnostics iosDiagnostics(Map<String, Object?> facts) {
       );
   }
 
-  final group = facts['appGroup'] as String?;
-  if (group == null) {
+  if (facts['appGroup'] is! String) {
     add(
       LiveUpdateDiagnosticCheck.appGroup,
       _na,
@@ -356,15 +368,15 @@ LiveUpdateDiagnostics iosDiagnostics(Map<String, Object?> facts) {
     add(
       LiveUpdateDiagnosticCheck.appGroup,
       _ok,
-      'The App Group $group is reachable.',
+      'The App Group in LiveUpdatesAppGroup is reachable.',
     );
   } else {
     add(
       LiveUpdateDiagnosticCheck.appGroup,
       _problem,
-      'The App Group $group is not reachable, so images and asset icons are '
-          'not shown.',
-      'Enable the App Group capability with this group for Runner and the '
+      'The App Group in LiveUpdatesAppGroup is not reachable, so images and '
+          'asset icons are not shown.',
+      'Enable the App Group capability with that group for Runner and the '
           'widget extension.',
     );
   }
@@ -421,8 +433,14 @@ LiveUpdateDiagnostics androidDiagnostics(
   Map<String, Object?> facts, {
   required String channelId,
 }) {
-  final sdk = (facts['sdk'] as num?)?.toInt() ?? 0;
-  final release = facts['release'] as String? ?? '$sdk';
+  final sdk = switch (facts['sdk']) {
+    final num n => n.toInt(),
+    _ => 0,
+  };
+  final release = switch (facts['release']) {
+    final String s => s,
+    _ => '$sdk',
+  };
   final items = <LiveUpdateDiagnosticItem>[];
   void add(
     LiveUpdateDiagnosticCheck check,
@@ -450,14 +468,15 @@ LiveUpdateDiagnostics androidDiagnostics(
       ? add(
           LiveUpdateDiagnosticCheck.osVersion,
           _ok,
-          'Android $release (API $sdk): live updates can be promoted to Live '
-          'Updates when the system allows it.',
+          'Android $release (API $sdk): live updates use the Android 16 styles '
+          'and can be promoted to Live Updates when the system allows it '
+          '(Android 16 QPR1 and later).',
         )
       : add(
           LiveUpdateDiagnosticCheck.osVersion,
           _warning,
           'Android $release (API $sdk): live updates are regular ongoing '
-          'notifications; Live Updates need Android 16.',
+          'notifications; Live Updates need Android 16 QPR1 or later.',
         );
 
   if (facts['notificationsEnabled'] == true) {
@@ -532,7 +551,7 @@ LiveUpdateDiagnostics androidDiagnostics(
     add(
       LiveUpdateDiagnosticCheck.promotedNotifications,
       _na,
-      'Promoted notifications (Live Updates) need Android 16.',
+      'Promoted notifications (Live Updates) need Android 16 QPR1 or later.',
     );
   } else if (facts['promotedDeclared'] != true) {
     add(
@@ -595,7 +614,7 @@ LiveUpdateDiagnostics androidDiagnostics(
       add(
         LiveUpdateDiagnosticCheck.defaultIcon,
         _ok,
-        'The default icon meta-data names a drawable.',
+        'The default icon meta-data names a drawable or mipmap.',
       );
     case 'invalid':
       add(

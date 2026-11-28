@@ -8,7 +8,7 @@ class Sample {
   final String name;
   final String description;
 
-  /// Built on every Show, so text edited here appears after a Hot Reload.
+  /// Built on every Show, so text edited here appears after a hot reload.
   final LiveUpdateContent Function() content;
 
   /// Each sample has a key of its own: Show again updates it in place.
@@ -25,7 +25,7 @@ DateTime _inMinutes(int minutes) =>
 
 /// One sample per built-in layout, a custom layout, content hidden on the
 /// Lock Screen and content that switches to its ended version. Edit the
-/// texts, Hot Reload and tap Show to check them on the device.
+/// texts, hot reload and tap Show to check them on the device.
 final samples = <Sample>[
   Sample(
     'standard',
@@ -193,16 +193,20 @@ class _SamplesPageState extends State<SamplesPage> {
   Future<void> _diagnose() async {
     final d = await LiveUpdates.diagnose();
     debugPrint('$d');
+    if (!mounted) return;
     setState(() => _diagnostics = '$d');
   }
 
   Future<void> _run(String label, Future<void> Function() action) async {
     try {
       await action();
+      if (!mounted) return;
       setState(() => _status = '$label: ok');
     } on LiveUpdateException catch (e) {
+      if (!mounted) return;
       setState(() => _status = '$label: ${e.reason.name}: ${e.message}');
     } on Object catch (e) {
+      if (!mounted) return;
       setState(() => _status = '$label: $e');
     }
   }
@@ -258,7 +262,7 @@ class _SampleTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Checked on every build, so it follows edits after a Hot Reload.
+    // Checked on every build, so it follows edits after a hot reload.
     final issues = sample.content().check();
     return ListTile(
       title: Text(sample.name),

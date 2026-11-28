@@ -370,7 +370,9 @@ class IosLiveUpdatesPlatform extends LiveUpdatesPlatform with ContentEncoder {
 }
 
 /// [LiveUpdates.diagnose] on iOS, also below iOS 16.2.
-LiveUpdateDiagnostics diagnoseIos() => iosDiagnostics(
-  (jsonDecode(LiveUpdatesBridge.diagnosticsJson().toDartString()) as Map)
-      .cast<String, Object?>(),
-);
+LiveUpdateDiagnostics diagnoseIos() => iosDiagnostics(switch (jsonDecode(
+  LiveUpdatesBridge.diagnosticsJson().toDartString(),
+)) {
+  final Map<String, Object?> facts => facts,
+  _ => const {},
+});

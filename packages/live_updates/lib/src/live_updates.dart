@@ -525,8 +525,8 @@ abstract final class LiveUpdates {
   /// `create ios`, `NSSupportsLiveActivities`, whether the user allows Live
   /// Activities, the App Group and the tap URL scheme.
   ///
-  /// Android: the Android version (Live Updates on 16 and later, else an
-  /// ongoing notification), notifications and the permission, the
+  /// Android: the Android version (Live Updates from Android 16 QPR1, else
+  /// an ongoing notification), notifications and the permission, the
   /// notification channel [androidChannelId] (use the
   /// [AndroidLiveUpdateOptions.channelId] you pass), promoted notifications
   /// ([canPostPromotedNotifications]), exact alarms ([canScheduleExactly])

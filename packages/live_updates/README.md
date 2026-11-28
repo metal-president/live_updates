@@ -1331,7 +1331,7 @@ for each platform, and use the tools below to get there faster.
 ### Check on a simulator or emulator
 
 Run the app with `flutter run` and show the content with `startOrUpdate`
-and a fixed key. Edit the content in your code, press Hot Reload and call
+and a fixed key. Edit the content in your code, use hot reload and call
 `startOrUpdate` again: the live update changes in place, without a
 rebuild. On iOS, lock the simulator to see the Lock Screen; on Android, pull
 down the notification shade.
@@ -1363,7 +1363,9 @@ and `endedContent` (`endAt`) on a device.
 
 A layout file made by an earlier version is kept when you run `create ios`
 again, while `LiveUpdatesViews.swift` (with the samples) is refreshed. Add
-the previews you want to the end of your layout file by hand:
+the previews you want to the end of your layout file by hand (or run
+`create ios --force`, which replaces the layout file and discards your
+edits):
 
 ```swift
 #if DEBUG
@@ -1409,7 +1411,8 @@ attributes (`tools:text`, `tools:progress`, `tools:src` and
 notification instead of empty, hidden views. The build removes `tools:`
 attributes from the app ([source][android-tools-attributes]), so they
 change nothing at runtime. For layouts made by an earlier version, add them
-by hand, for example:
+by hand (`create android --force` replaces them, keeping a `.bak` copy),
+for example:
 
 ```xml
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
@@ -1462,12 +1465,17 @@ limits, for example:
   Dynamic Island choice whose data is missing;
 - more than three metrics or buttons, a `criticalMetric` that is not one of
   the shown metrics, a `steps.current` outside the labels, empty stage
-  names, and more stages than Android 16 draws as segments;
+  names, and more than 21 stages (live_updates then draws a plain progress
+  bar instead of segments on Android 16+);
 - Android: an empty title (no promotion), a custom layout with
   `AndroidLiveUpdateMode.liveUpdate` (never promoted), `extra` keys a custom
-  layout cannot show, icon names the platform cannot find and a
-  `shortCriticalText` the status bar chip may cut;
-- `endedContent` that is never shown (no `endAt`, or `removeAtEnd`);
+  layout cannot show and a `shortCriticalText` the status bar chip may cut
+  (see [Platform limits](#platform-limits));
+- icon names that are not valid Android resource names or iOS asset
+  catalog names (the default icon is shown);
+- `endedContent` that is never shown (no `endAt`, `removeAtEnd`, or on
+  Android an `endAt` after the end of the countdown or beyond
+  `maxDuration`);
 - content that likely exceeds ActivityKit's 4 KB limit (an estimate; see
   [Platform limits](#platform-limits)).
 
@@ -1483,19 +1491,23 @@ setup in one call and returns one item per check, each with a status (`ok`,
 
 ```dart
 final diagnostics = await LiveUpdates.diagnose();
-debugPrint('$diagnostics'); // one line per check
-if (diagnostics.problems.isNotEmpty) {
-  // For example offer LiveUpdates.openSettings().
+debugPrint('$diagnostics'); // a summary line, then one line per check
+for (final problem in diagnostics.problems) {
+  // Show problem.hint; for a settings problem offer
+  // LiveUpdates.openSettings().
 }
 ```
 
 - **iOS:** the iOS version (Live Activities need 16.2; buttons 17.0,
-  push-to-start 17.2, scheduling 26), the widget extension made by
+  push-to-start 17.2, scheduling 26; see
+  [Platform support](#platform-support)), the widget extension made by
   `create ios` and whether it supports the running iOS,
   `NSSupportsLiveActivities`, whether the user allows Live Activities for
   the app, the App Group and the tap URL scheme.
-- **Android:** the Android version (Live Updates from Android 16, an ongoing
-  notification before), whether notifications are enabled, the
+- **Android:** whether the plugin is attached (before `runApp` it reports
+  only that), the Android version (`ProgressStyle` from Android 16,
+  promotion to a Live Update from Android 16 QPR1, an ongoing notification
+  before), whether notifications are enabled, the
   notification channel (pass `androidChannelId` if you use your own),
   `POST_PROMOTED_NOTIFICATIONS` and whether the app may post promoted
   notifications, exact alarms and the default icon meta-data.

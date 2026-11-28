@@ -1186,8 +1186,10 @@ public final class LiveUpdatesBridge {
               || LiveUpdatesScheduler.declares(c, "android.permission.USE_EXACT_ALARM"));
       facts.put("canScheduleExactly", LiveUpdatesScheduler.canScheduleExactly(c));
       facts.put("defaultIcon", defaultIconState(c));
-    } catch (JSONException e) {
-      // Only for non-finite numbers, which are not written here.
+    } catch (JSONException | RuntimeException | LinkageError e) {
+      // JSONException only for non-finite numbers, which are not written here. A system call
+      // that fails leaves the remaining facts out; Dart reports them as not found.
+      Log.w(LOG_TAG, "Diagnostics incomplete", e);
     }
     return facts.toString();
   }

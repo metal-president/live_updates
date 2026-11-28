@@ -72,9 +72,10 @@ struct LiveUpdatesWidgetLiveActivity: Widget {
 }
 
 // Xcode previews of the Lock Screen and the Dynamic Island, drawn by this
-// file with sample content (in LiveUpdatesViews.swift). Each preview has a
-// sample per built-in layout: pick one at the bottom of the canvas. Add a
-// sample of your own content to check a layout you add above.
+// file with sample content (in LiveUpdatesViews.swift). The Lock Screen and
+// expanded previews have a sample per built-in layout, the compact and
+// minimal ones the standard and timer samples: pick one at the bottom of the
+// canvas. Add a sample of your own content to check a layout you add above.
 #if DEBUG
   @available(iOS 17.0, *)
   #Preview("Lock Screen", as: .content, using: LiveUpdatesAttributes.preview) {

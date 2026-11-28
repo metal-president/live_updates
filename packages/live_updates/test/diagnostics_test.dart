@@ -115,8 +115,19 @@ void main() {
     });
 
     test('below 16.2 nothing is shown', () {
-      final d = iosDiagnostics(_ios(os: '16.1.0', enabled: null));
+      final d = iosDiagnostics(
+        _ios(
+          os: '16.1.0',
+          enabled: null,
+          widgets: const [
+            {'marked': true, 'minimum': '16.2', 'runs': false},
+          ],
+        ),
+      );
       expect(_statuses(d), containsPair(_C.osVersion, _S.problem));
+      // Only the OS version is the problem, not the widget's target.
+      expect(d.problems, hasLength(1));
+      expect(_statuses(d), containsPair(_C.widgetExtension, _S.notApplicable));
       expect(
         _statuses(d),
         containsPair(_C.liveActivitiesEnabled, _S.notApplicable),

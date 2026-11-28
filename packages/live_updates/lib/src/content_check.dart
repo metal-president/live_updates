@@ -33,15 +33,17 @@ enum LiveUpdateIssueCode {
   /// name.
   emptyStepLabel,
 
-  /// Android 16+: more stages than progress segments can show, so a plain
-  /// progress bar is shown.
+  /// Android 16+: more than 21 stages, for which this package draws a plain
+  /// progress bar instead of progress segments.
   tooManySteps,
 
   /// Android: an empty title, so the notification is not promoted to a Live
   /// Update.
   untitledLiveUpdate,
 
-  /// An icon name that the platform cannot find; the default icon is shown.
+  /// An icon name in a form the platform cannot use (not an Android resource
+  /// name, or an iOS asset catalog name with a path); the default icon is
+  /// shown.
   invalidIconName,
 
   /// Android: a symbol as the small icon, which Android cannot show; the
@@ -165,7 +167,8 @@ const _android = {TargetPlatform.android};
 /// ActivityKit's limit for the attributes and content together, in bytes.
 const iosPayloadLimit = 4096;
 
-/// Android 16+ draws one progress segment between each pair of stages, up
+/// On Android 16+ this package draws one progress segment between each pair
+/// of stages, up
 /// to this many stages.
 const _maxStepSegments = 21;
 
@@ -310,8 +313,9 @@ List<LiveUpdateIssue> checkContent(
         LiveUpdateIssueCode.tooManySteps,
         info,
         _android,
-        '$count stages; Android 16+ draws progress segments for up to '
-        '$_maxStepSegments stages and shows a plain progress bar for more.',
+        '$count stages; on Android 16+ live_updates draws progress segments '
+        'for up to $_maxStepSegments stages and a plain progress bar for '
+        'more.',
       );
     }
   }
@@ -344,7 +348,7 @@ List<LiveUpdateIssue> checkContent(
       LiveUpdateIssueCode.shortCriticalTextTooLong,
       info,
       _android,
-      'shortCriticalText "$text" has ${text.runes.length} characters; the '
+      'shortCriticalText has ${text.runes.length} characters; the '
       'status bar chip shows it in full only when it is shorter than 7 '
       'characters.',
     );
@@ -380,15 +384,44 @@ List<LiveUpdateIssue> checkContent(
         'AndroidLiveUpdateOptions.removeAtEnd removes the notification at '
         'endAt instead of showing endedContent.',
       );
+    } else if (content.timer?.end case final countdownEnd?
+        when (android?.removeAtCountdownEnd ?? true) &&
+            content.endAt!.isAfter(countdownEnd)) {
+      add(
+        LiveUpdateIssueCode.endedContentNeverShown,
+        warning,
+        _android,
+        'endAt is after the end of the countdown, where Android removes the '
+        'notification (AndroidLiveUpdateOptions.removeAtCountdownEnd), so '
+        'endedContent is not shown. Set endAt no later than the countdown '
+        'end.',
+      );
+    } else if ((android == null
+            ? const Duration(hours: 8)
+            : android.maxDuration)
+        case final max? when content.endAt!.isAfter(DateTime.now().add(max))) {
+      add(
+        LiveUpdateIssueCode.endedContentNeverShown,
+        warning,
+        _android,
+        'endAt is more than AndroidLiveUpdateOptions.maxDuration '
+        '(${max.inMinutes} minutes) away; a live update started now is '
+        'removed before endAt, so endedContent is likely not shown.',
+      );
     }
   }
 
   // Pictures.
   final pictures = <(String, LiveUpdateImage, Set<TargetPlatform>)>[
     if (content.image case final i?) ('image', i, _both),
-    for (final MapEntry(:key, :value) in content.mergedExtraImages.entries)
+    for (final MapEntry(:key, :value) in content.extraImages.entries)
       // Android stores extra pictures only for a custom layout.
       ('extraImages["$key"]', value, custom == null ? _ios : _both),
+    // ignore: deprecated_member_use_from_same_package
+    for (final MapEntry(:key, :value)
+        in content.ios?.extraImages.entries ??
+            const <MapEntry<String, LiveUpdateImage>>[])
+      ('IosLiveUpdateOptions.extraImages["$key"]', value, _ios),
     if (content.endedContent?.image case final i?)
       ('endedContent.image', i, _both),
   ];
@@ -423,7 +456,7 @@ List<LiveUpdateIssue> checkContent(
       add(
         LiveUpdateIssueCode.remoteImages,
         info,
-        _both,
+        pictures.any((p) => p.$3.length == 2) ? _both : _ios,
         'Pictures (${pictures.map((p) => p.$1).join(', ')}) are stored by '
         'the app; a push or remote payload replaces the whole content and '
         'cannot add them.',
@@ -437,7 +470,8 @@ List<LiveUpdateIssue> checkContent(
             warning,
             _android,
             'Remote payloads can only use layouts whose name starts with '
-            'live_update_, not "$name"; the system template is shown.',
+            'live_update_, not "$name"; '
+            '${name == custom.collapsed ? 'the system template is shown' : 'the collapsed layout is used when expanded'}.',
           );
         }
       }
@@ -487,7 +521,12 @@ int estimatedIosPayloadBytes(LiveUpdateContent content) {
     // Encoded even when empty.
     'actions': [
       for (final a in (json['actions'] as List<Object?>?) ?? const [])
-        {...a! as Map<String, Object?>}..remove('androidIcon'),
+        {
+          ...a! as Map<String, Object?>,
+          // Encoded even when false.
+          'opensApp': (a as Map<String, Object?>)['opensApp'] ?? false,
+          'requiresUnlock': a['requiresUnlock'] ?? false,
+        }..remove('androidIcon'),
     ],
     'extra': json['extra'] ?? const <String, String>{},
     'extraImages': {
@@ -501,5 +540,7 @@ int estimatedIosPayloadBytes(LiveUpdateContent content) {
         if (content.endedContent?.image != null) 'image': _storedName,
       },
   };
-  return utf8.encode(jsonEncode(state)).length;
+  final encoded = jsonEncode(state);
+  // JSONEncoder writes "/" as "\/".
+  return utf8.encode(encoded).length + '/'.allMatches(encoded).length;
 }

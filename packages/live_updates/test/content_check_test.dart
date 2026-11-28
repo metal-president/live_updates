@@ -10,6 +10,8 @@ List<LiveUpdateIssueCode> _codes(LiveUpdateContent c, {bool remote = false}) =>
 LiveUpdateIssue _only(LiveUpdateContent c, LiveUpdateIssueCode code) =>
     c.check().singleWhere((i) => i.code == code);
 
+final _soon = DateTime.now().add(const Duration(hours: 1));
+
 void main() {
   const ios = {TargetPlatform.iOS};
   const android = {TargetPlatform.android};
@@ -22,12 +24,12 @@ void main() {
         title: 'Order #1234',
         body: 'On the way',
         progress: .5,
-        timer: LiveUpdateTimer.countdown(DateTime(2030)),
+        timer: LiveUpdateTimer.countdown(_soon),
         metrics: const [LiveUpdateMetric.integer('Stops', 2)],
         criticalMetric: 0,
         steps: const LiveUpdateSteps(['A', 'B', 'C'], current: 2),
         journey: const LiveUpdateJourney(from: 'Shop', to: 'Home'),
-        endAt: DateTime(2030),
+        endAt: _soon,
         endedContent: const LiveUpdateEndedContent(title: 'Delivered'),
         ios: const IosLiveUpdateOptions(
           layout: IosLiveUpdateLayout.stepper,
@@ -332,6 +334,72 @@ void main() {
     );
   });
 
+  test('Android removes the update before endAt', () {
+    const ended = LiveUpdateEndedContent(title: 'Delivered');
+    final eta = DateTime.now().add(const Duration(minutes: 30));
+    // The countdown ends first, and Android removes the notification there.
+    final countdown = LiveUpdateContent(
+      title: 'T',
+      timer: LiveUpdateTimer.countdown(eta),
+      endAt: eta.add(const Duration(minutes: 5)),
+      endedContent: ended,
+    );
+    expect(countdown.check().map((i) => (i.code, i.platforms)), [
+      (LiveUpdateIssueCode.endedContentNeverShown, android),
+    ]);
+    expect(countdown.check().single.message, contains('countdown'));
+    // endAt at the countdown end, or a countdown that is kept, is fine.
+    expect(
+      LiveUpdateContent(
+        title: 'T',
+        timer: LiveUpdateTimer.countdown(eta),
+        endAt: eta,
+        endedContent: ended,
+      ).check(),
+      isEmpty,
+    );
+    expect(
+      countdown
+          .copyWith(
+            android: const AndroidLiveUpdateOptions(
+              removeAtCountdownEnd: false,
+            ),
+          )
+          .check(),
+      isEmpty,
+    );
+    // Beyond maxDuration (eight hours by default; null is no limit).
+    final late = LiveUpdateContent(
+      title: 'T',
+      endAt: DateTime.now().add(const Duration(hours: 9)),
+      endedContent: ended,
+    );
+    expect(late.check().single.message, contains('maxDuration'));
+    expect(
+      late
+          .copyWith(android: const AndroidLiveUpdateOptions(maxDuration: null))
+          .check(),
+      isEmpty,
+    );
+  });
+
+  test('deprecated iOS pictures are iOS only', () {
+    final issues = const LiveUpdateContent(
+      title: 'T',
+      ios: IosLiveUpdateOptions(
+        // ignore: deprecated_member_use
+        extraImages: {'map': LiveUpdateImage.asset('m.png')},
+      ),
+      android: AndroidLiveUpdateOptions(
+        mode: AndroidLiveUpdateMode.ongoing,
+        customLayout: AndroidCustomLayout('live_update_x'),
+      ),
+    ).check(remote: true);
+    expect(issues.map((i) => (i.code, i.platforms)), [
+      (LiveUpdateIssueCode.remoteImages, ios),
+    ]);
+  });
+
   group('iOS size', () {
     test('content over the ActivityKit limit is an error', () {
       final content = LiveUpdateContent(
@@ -376,6 +444,20 @@ void main() {
         ),
         base + '"image":"lu_${'0' * 32}.png",'.length,
       );
+      // Buttons encode both flags, and "/" is written as "\\/".
+      expect(
+        estimatedIosPayloadBytes(
+          const LiveUpdateContent(
+            title: 'T',
+            route: '/a',
+            actions: [LiveUpdateAction(id: 'x', title: 'X')],
+          ),
+        ),
+        base +
+            '"route":"\\/a",'.length +
+            '{"id":"x","title":"X","opensApp":false,"requiresUnlock":false}'
+                .length,
+      );
       // Multi-byte text counts in UTF-8 bytes.
       expect(
         estimatedIosPayloadBytes(const LiveUpdateContent(title: 'ü')),
@@ -405,6 +487,20 @@ void main() {
       (LiveUpdateIssueCode.remoteAssetIcon, ios),
     ]);
     expect(issues[1].message, contains('"courier"'));
+    expect(issues[1].message, contains('system template'));
+    expect(
+      const LiveUpdateContent(
+        title: 'T',
+        android: AndroidLiveUpdateOptions(
+          mode: AndroidLiveUpdateMode.ongoing,
+          customLayout: AndroidCustomLayout(
+            'live_update_courier',
+            expanded: 'courier_expanded',
+          ),
+        ),
+      ).check(remote: true).single.message,
+      contains('collapsed layout is used'),
+    );
     expect(issues[2].message, contains('preloadIcons'));
   });
 

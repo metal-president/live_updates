@@ -1,3 +1,4 @@
+import '../diagnostics.dart';
 import '../models.dart';
 // dart:ffi based backends are only imported where dart:ffi exists, so the
 // package still compiles (as a no-op) for the web.
@@ -118,6 +119,11 @@ abstract class LiveUpdatesPlatform {
 
   /// See [LiveUpdates.openSettings].
   Future<bool> openSettings() async => false;
+
+  /// See [LiveUpdates.diagnose].
+  Future<LiveUpdateDiagnostics> diagnose({
+    String androidChannelId = 'live_updates',
+  }) async => const LiveUpdateDiagnostics.unsupported();
 
   /// Schedules [content] to be shown with [key] at [at], replacing a
   /// schedule with that key. Shows it now when [at] is not in the future.

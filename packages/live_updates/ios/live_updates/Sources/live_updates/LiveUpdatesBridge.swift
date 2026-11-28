@@ -39,18 +39,27 @@ public final class LiveUpdatesBridge: NSObject {
   /// will do, as before. `true` when the app has no widget extension (as
   /// before; ActivityKit then reports the problem).
   static let widgetExtensionRuns: Bool = {
+    let widgets = widgetExtensions
+    let marked = widgets.filter(\.marked)
+    if !marked.isEmpty { return marked.allSatisfy(\.runs) }
+    return widgets.isEmpty || widgets.contains(where: \.runs)
+  }()
+
+  /// The WidgetKit extensions in the app bundle: whether each has the
+  /// `LiveUpdatesWidget` marker, its minimum iOS and whether it runs here.
+  static var widgetExtensions: [(marked: Bool, minimum: String, runs: Bool)] {
     guard let dir = Bundle.main.builtInPlugInsURL,
       let items = try? FileManager.default.contentsOfDirectory(
         at: dir, includingPropertiesForKeys: nil)
-    else { return true }
-    var widgets: [(marked: Bool, runs: Bool)] = []
+    else { return [] }
+    var widgets: [(marked: Bool, minimum: String, runs: Bool)] = []
     for url in items where url.pathExtension == "appex" {
       guard let info = Bundle(url: url)?.infoDictionary,
         let ext = info["NSExtension"] as? [String: Any],
         ext["NSExtensionPointIdentifier"] as? String == "com.apple.widgetkit-extension"
       else { continue }
-      let parts = ((info["MinimumOSVersion"] as? String) ?? "0").split(separator: ".")
-        .map { Int($0) ?? 0 }
+      let version = (info["MinimumOSVersion"] as? String) ?? "0"
+      let parts = version.split(separator: ".").map { Int($0) ?? 0 }
       let minimum = OperatingSystemVersion(
         majorVersion: parts.first ?? 0, minorVersion: parts.count > 1 ? parts[1] : 0,
         patchVersion: parts.count > 2 ? parts[2] : 0)
@@ -59,12 +68,55 @@ public final class LiveUpdatesBridge: NSObject {
         (flag as? Bool)
         ?? (flag as? String).map { ["yes", "true", "1"].contains($0.lowercased()) } ?? false
       widgets.append(
-        (marked: marked, runs: ProcessInfo.processInfo.isOperatingSystemAtLeast(minimum)))
+        (marked: marked, minimum: version,
+         runs: ProcessInfo.processInfo.isOperatingSystemAtLeast(minimum)))
     }
-    let marked = widgets.filter(\.marked)
-    if !marked.isEmpty { return marked.allSatisfy(\.runs) }
-    return widgets.isEmpty || widgets.contains(where: \.runs)
-  }()
+    return widgets
+  }
+
+  // MARK: - Diagnostics
+
+  /// Facts about the setup for `LiveUpdates.diagnose()`, as JSON: the iOS
+  /// version, the widget extensions, `NSSupportsLiveActivities`, whether
+  /// Live Activities are enabled for the app (iOS 16.2+), the App Group and
+  /// the tap URL scheme. Works on every iOS version the plugin builds for.
+  @objc public static func diagnosticsJson() -> String {
+    let info = Bundle.main.infoDictionary ?? [:]
+    let os = ProcessInfo.processInfo.operatingSystemVersion
+    var facts: [String: Any] = [
+      "os": "\(os.majorVersion).\(os.minorVersion).\(os.patchVersion)",
+      "widgets": widgetExtensions.map {
+        ["marked": $0.marked, "minimum": $0.minimum, "runs": $0.runs] as [String: Any]
+      },
+      "tapScheme": registersTapScheme(info),
+    ]
+    let supports = info["NSSupportsLiveActivities"]
+    facts["supportsLiveActivities"] =
+      (supports as? Bool)
+      ?? (supports as? String).map { ["yes", "true", "1"].contains($0.lowercased()) } ?? false
+    if #available(iOS 16.2, *) {
+      facts["activitiesEnabled"] = ActivityAuthorizationInfo().areActivitiesEnabled
+    }
+    if let group = info["LiveUpdatesAppGroup"] as? String {
+      facts["appGroup"] = group
+      facts["appGroupReachable"] =
+        FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: group) != nil
+    }
+    guard let data = try? JSONSerialization.data(withJSONObject: facts),
+      let json = String(data: data, encoding: .utf8)
+    else { return "{}" }
+    return json
+  }
+
+  /// Whether `info` (the app's Info.plist) registers `tapScheme`.
+  static func registersTapScheme(_ info: [String: Any]) -> Bool {
+    let types = info["CFBundleURLTypes"] as? [[String: Any]] ?? []
+    return types.contains { type in
+      (type["CFBundleURLSchemes"] as? [String] ?? []).contains {
+        $0.lowercased() == tapScheme.lowercased()
+      }
+    }
+  }
 
   // MARK: - Errors
 

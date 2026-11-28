@@ -31,6 +31,8 @@ jobs:
         run: |
           dart run tool/check_readme_snippets.dart
           flutter analyze build/readme_snippets
+      # For the tests of the create ios script (test/add_target_test.dart).
+      - run: gem install --user-install --no-document xcodeproj --version 1.27.0
       - run: flutter test
         working-directory: packages/live_updates
       - run: flutter test

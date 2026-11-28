@@ -4,6 +4,8 @@ import 'dart:ui' show Color;
 import 'package:flutter/foundation.dart' show listEquals, mapEquals;
 import 'package:meta/meta.dart';
 
+import 'content_check.dart';
+
 // All model classes are `final` so that new optional fields can be added in
 // minor releases without breaking code that would otherwise implement them.
 
@@ -195,6 +197,40 @@ final class LiveUpdateContent {
 
   /// Android-only options.
   final AndroidLiveUpdateOptions? android;
+
+  /// Checks this content without a device and returns what the platforms
+  /// would not show as written, such as a chosen iOS layout whose data is
+  /// missing (the widget falls back to the standard layout), more metrics
+  /// than are shown, or content that likely exceeds ActivityKit's size
+  /// limit. An empty list means no issue was found.
+  ///
+  /// Only behavior of this package and documented platform limits are
+  /// checked; the device stays the reference for how content looks. Use it
+  /// in unit tests:
+  ///
+  /// ```dart
+  /// expect(content.check(), isEmpty);
+  /// ```
+  ///
+  /// [remote] also checks for what a push or remote payload cannot carry,
+  /// for content your server sends or that it will replace (pictures, iOS
+  /// asset icons, Android layout names).
+  ///
+  /// [startedAt] is when the live update started, for an update of a
+  /// running one: Android's [AndroidLiveUpdateOptions.maxDuration] counts
+  /// from then. It defaults to now, as for content that starts a live update.
+  /// [key] is the key you pass to [LiveUpdates.startOrUpdate] or
+  /// [LiveUpdates.schedule]: it counts toward ActivityKit's size limit with
+  /// the content.
+  ///
+  /// Debug builds already assert some ranges (such as [progress]) when the
+  /// content is created; this reports them for content created in release
+  /// builds.
+  List<LiveUpdateIssue> check({
+    bool remote = false,
+    DateTime? startedAt,
+    String? key,
+  }) => checkContent(this, remote: remote, startedAt: startedAt, key: key);
 
   /// Returns a copy with the given fields replaced. A `null` argument keeps
   /// the current value, so a field such as [publicContent] cannot be removed

@@ -1,9 +1,11 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:ffi' show Void;
 import 'dart:ui' show PlatformDispatcher;
 
 import 'package:objective_c/objective_c.dart' as objc;
 
+import '../diagnostics.dart';
 import '../ios/bindings.g.dart';
 import '../models.dart';
 import 'buffered_broadcast.dart';
@@ -343,6 +345,11 @@ class IosLiveUpdatesPlatform extends LiveUpdatesPlatform with ContentEncoder {
       parseSchedules(LiveUpdatesBridge.scheduledJson().toDartString());
 
   @override
+  Future<LiveUpdateDiagnostics> diagnose({
+    String androidChannelId = 'live_updates',
+  }) async => diagnoseIos();
+
+  @override
   Future<void> cancelAllScheduled() async {
     final done = Completer<void>();
     LiveUpdatesBridge.cancelAllScheduled(
@@ -361,3 +368,11 @@ class IosLiveUpdatesPlatform extends LiveUpdatesPlatform with ContentEncoder {
     await done.future;
   }
 }
+
+/// [LiveUpdates.diagnose] on iOS, also below iOS 16.2.
+LiveUpdateDiagnostics diagnoseIos() => iosDiagnostics(switch (jsonDecode(
+  LiveUpdatesBridge.diagnosticsJson().toDartString(),
+)) {
+  final Map<String, Object?> facts => facts,
+  _ => const {},
+});

@@ -1136,6 +1136,64 @@ public final class LiveUpdatesBridge {
     emit("ended", id);
   }
 
+  /**
+   * Facts about the setup for {@code LiveUpdates.diagnose()}, as JSON: whether the plugin is
+   * attached, the SDK level, whether notifications are enabled (and the permission granted on
+   * Android 13+), the state of the notification channel {@code channelId} (Android 8.0+), whether
+   * {@code POST_PROMOTED_NOTIFICATIONS} is declared and usable, exact alarms and the default icon
+   * meta-data.
+   */
+  @NonNull
+  public static String diagnosticsJson(@NonNull String channelId) {
+    JSONObject facts = new JSONObject();
+    try {
+      Context c = context;
+      facts.put("attached", c != null);
+      facts.put("sdk", Build.VERSION.SDK_INT);
+      facts.put("release", Build.VERSION.RELEASE);
+      if (c == null) return facts.toString();
+      NotificationManager m = manager(c);
+      facts.put("notificationsEnabled", m.areNotificationsEnabled());
+      if (Build.VERSION.SDK_INT >= 33) {
+        facts.put(
+            "postNotificationsGranted",
+            c.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
+                == PackageManager.PERMISSION_GRANTED);
+      }
+      if (Build.VERSION.SDK_INT >= 26) {
+        JSONObject channel = new JSONObject();
+        NotificationChannel ch = m.getNotificationChannel(channelId);
+        channel.put("exists", ch != null);
+        if (ch != null) {
+          channel.put("importance", ch.getImportance());
+          boolean groupBlocked = false;
+          if (Build.VERSION.SDK_INT >= 28 && ch.getGroup() != null) {
+            android.app.NotificationChannelGroup group =
+                m.getNotificationChannelGroup(ch.getGroup());
+            groupBlocked = group != null && group.isBlocked();
+          }
+          channel.put("groupBlocked", groupBlocked);
+        }
+        facts.put("channel", channel);
+      }
+      facts.put(
+          "promotedDeclared",
+          LiveUpdatesScheduler.declares(c, "android.permission.POST_PROMOTED_NOTIFICATIONS"));
+      facts.put("canPostPromoted", canPostPromotedNotifications());
+      facts.put(
+          "exactAlarmDeclared",
+          LiveUpdatesScheduler.declares(c, Manifest.permission.SCHEDULE_EXACT_ALARM)
+              || LiveUpdatesScheduler.declares(c, "android.permission.USE_EXACT_ALARM"));
+      facts.put("canScheduleExactly", LiveUpdatesScheduler.canScheduleExactly(c));
+      facts.put("defaultIcon", defaultIconState(c));
+    } catch (JSONException | RuntimeException | LinkageError e) {
+      // JSONException only for non-finite numbers, which are not written here. A system call
+      // that fails leaves the remaining facts out; Dart reports them as not found.
+      Log.w(LOG_TAG, "Diagnostics incomplete", e);
+    }
+    return facts.toString();
+  }
+
   /** Whether live updates can be scheduled: as {@link #isSupported}. */
   public static boolean canSchedule() {
     return isSupported();
@@ -2188,6 +2246,22 @@ public final class LiveUpdatesBridge {
       defaultIconRes = res;
     }
     return Icon.createWithResource(c, res);
+  }
+
+  /**
+   * {@code "unset"} without the {@link #DEFAULT_ICON_META} meta-data, {@code "valid"} when it
+   * names a drawable or mipmap, else {@code "invalid"} (the app icon is used, see {@link
+   * #defaultIcon}).
+   */
+  static String defaultIconState(Context c) {
+    try {
+      ApplicationInfo info =
+          c.getPackageManager().getApplicationInfo(c.getPackageName(), PackageManager.GET_META_DATA);
+      if (info.metaData == null || !info.metaData.containsKey(DEFAULT_ICON_META)) return "unset";
+      return isDrawable(c, info.metaData.getInt(DEFAULT_ICON_META, 0)) ? "valid" : "invalid";
+    } catch (PackageManager.NameNotFoundException e) {
+      return "unset"; // Our own package: cannot happen.
+    }
   }
 
   /** Whether {@code res} is a drawable or mipmap resource. */

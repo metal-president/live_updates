@@ -10,6 +10,8 @@ import '../image_store.dart';
 import '../models.dart';
 import '../serialization.dart';
 
+export '../icon_checks.dart' show titleWarning;
+
 /// Encodes content for the native bridges, storing its image (and on iOS its
 /// asset icons) first.
 mixin ContentEncoder {
@@ -192,20 +194,6 @@ mixin ContentEncoder {
     }
     return result;
   }
-}
-
-/// Why Android will not promote [content] for lack of a title, or `null`.
-/// Only content that asks for promotion ([AndroidLiveUpdateMode.liveUpdate],
-/// the default) is checked, not content with a custom layout, which is never
-/// promoted.
-String? titleWarning(LiveUpdateContent content) {
-  final mode = content.android?.mode ?? AndroidLiveUpdateMode.liveUpdate;
-  if (mode != AndroidLiveUpdateMode.liveUpdate) return null;
-  if (content.android?.customLayout != null) return null;
-  // Android promotes a title of only spaces too, so only an empty one counts.
-  if (content.title.isNotEmpty) return null;
-  return 'title is empty; Android only promotes a notification to a Live '
-      'Update when it has a title.';
 }
 
 final _imageExtension = RegExp(

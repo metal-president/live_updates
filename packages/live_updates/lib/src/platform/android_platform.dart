@@ -6,6 +6,7 @@ import 'dart:ui' show PlatformDispatcher;
 import 'package:jni/jni.dart';
 
 import '../android/bindings.g.dart';
+import '../diagnostics.dart';
 import '../models.dart';
 import 'buffered_broadcast.dart';
 import 'observed_broadcast.dart';
@@ -285,6 +286,24 @@ class AndroidLiveUpdatesPlatform extends LiveUpdatesPlatform
 
   @override
   Future<bool> openSettings() async => LiveUpdatesBridge.openSettings();
+
+  @override
+  Future<LiveUpdateDiagnostics> diagnose({
+    String androidChannelId = 'live_updates',
+  }) async {
+    final channel = _j(androidChannelId);
+    final String json;
+    try {
+      json = LiveUpdatesBridge.diagnosticsJson(channel)
+          .toDartString(releaseOriginal: true);
+    } finally {
+      channel.release();
+    }
+    return androidDiagnostics(switch (jsonDecode(json)) {
+      final Map<String, Object?> facts => facts,
+      _ => const {},
+    }, channelId: androidChannelId);
+  }
 
   @override
   Future<void> schedule(

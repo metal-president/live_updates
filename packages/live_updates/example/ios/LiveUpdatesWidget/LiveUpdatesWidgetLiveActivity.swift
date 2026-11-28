@@ -71,6 +71,54 @@ struct LiveUpdatesWidgetLiveActivity: Widget {
   }
 }
 
+// Xcode previews of the Lock Screen and the Dynamic Island, drawn by this
+// file with sample content (in LiveUpdatesViews.swift). The Lock Screen and
+// expanded previews have a sample per built-in layout, the compact and
+// minimal ones the standard and timer samples: pick one at the bottom of the
+// canvas. Add a sample of your own content to check a layout you add above.
+#if DEBUG
+  @available(iOS 17.0, *)
+  #Preview("Lock Screen", as: .content, using: LiveUpdatesAttributes.preview) {
+    LiveUpdatesWidgetLiveActivity()
+  } contentStates: {
+    LiveUpdatesAttributes.ContentState.previewStandard
+    LiveUpdatesAttributes.ContentState.previewTimer
+    LiveUpdatesAttributes.ContentState.previewMetrics
+    LiveUpdatesAttributes.ContentState.previewStepper
+    LiveUpdatesAttributes.ContentState.previewJourney
+    // example-only:begin
+    LiveUpdatesAttributes.ContentState.previewDelivery
+    // example-only:end
+  }
+
+  @available(iOS 17.0, *)
+  #Preview("Expanded", as: .dynamicIsland(.expanded), using: LiveUpdatesAttributes.preview) {
+    LiveUpdatesWidgetLiveActivity()
+  } contentStates: {
+    LiveUpdatesAttributes.ContentState.previewStandard
+    LiveUpdatesAttributes.ContentState.previewTimer
+    LiveUpdatesAttributes.ContentState.previewMetrics
+    LiveUpdatesAttributes.ContentState.previewStepper
+    LiveUpdatesAttributes.ContentState.previewJourney
+  }
+
+  @available(iOS 17.0, *)
+  #Preview("Compact", as: .dynamicIsland(.compact), using: LiveUpdatesAttributes.preview) {
+    LiveUpdatesWidgetLiveActivity()
+  } contentStates: {
+    LiveUpdatesAttributes.ContentState.previewStandard
+    LiveUpdatesAttributes.ContentState.previewTimer
+  }
+
+  @available(iOS 17.0, *)
+  #Preview("Minimal", as: .dynamicIsland(.minimal), using: LiveUpdatesAttributes.preview) {
+    LiveUpdatesWidgetLiveActivity()
+  } contentStates: {
+    LiveUpdatesAttributes.ContentState.previewStandard
+    LiveUpdatesAttributes.ContentState.previewTimer
+  }
+#endif
+
 // example-only:begin
 /// The example app's custom layout ("Custom layout" switch): the same
 /// `LiveUpdateContent.extra` and `extraImages` as the Android layouts in
@@ -130,4 +178,19 @@ struct ExampleDeliveryLayout: View {
     }
   }
 }
+
+#if DEBUG
+  extension LiveUpdatesAttributes.ContentState {
+    /// The "delivery" layout above, with the extra values the app sends.
+    static var previewDelivery: Self {
+      Self(
+        title: "Order #1234", progress: 0.6,
+        extra: [
+          "status": "The courier is nearby", "distance": "1.6 km", "stops": "1",
+          "arrival": "18:30",
+        ],
+        timerEnd: previewTime(minutes: 15), layout: "delivery")
+    }
+  }
+#endif
 // example-only:end

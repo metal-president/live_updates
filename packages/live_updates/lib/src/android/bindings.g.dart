@@ -1668,6 +1668,47 @@ extension type LiveUpdatesBridge._(jni$_.JObject _$this)
     ).check();
   }
 
+  static final _id_diagnosticsJson = _class.staticMethodId(
+    r'diagnosticsJson',
+    r'(Ljava/lang/String;)Ljava/lang/String;',
+  );
+
+  static final _diagnosticsJson =
+      jni$_.ProtectedJniExtensions.lookup<
+            jni$_.NativeFunction<
+              jni$_.JniResult Function(
+                jni$_.Pointer<jni$_.Void>,
+                jni$_.JMethodIDPtr,
+                jni$_.VarArgs<(jni$_.Pointer<jni$_.Void>,)>,
+              )
+            >
+          >('globalEnv_CallStaticObjectMethod')
+          .asFunction<
+            jni$_.JniResult Function(
+              jni$_.Pointer<jni$_.Void>,
+              jni$_.JMethodIDPtr,
+              jni$_.Pointer<jni$_.Void>,
+            )
+          >();
+
+  /// from: `static public java.lang.String diagnosticsJson(java.lang.String channelId)`
+  /// The returned object must be released after use, by calling the [release] method.
+  ///
+  /// Facts about the setup for {@code LiveUpdates.diagnose()}, as JSON: whether the plugin is
+  /// attached, the SDK level, whether notifications are enabled (and the permission granted on
+  /// Android 13+), the state of the notification channel {@code channelId} (Android 8.0+), whether
+  /// {@code POST_PROMOTED_NOTIFICATIONS} is declared and usable, exact alarms and the default icon
+  /// meta-data.
+  static jni$_.JString diagnosticsJson(jni$_.JString channelId) {
+    final _$$classRef = _class.reference;
+    final _$channelId = channelId.reference;
+    return _diagnosticsJson(
+      _$$classRef.pointer,
+      _id_diagnosticsJson.pointer,
+      _$channelId.pointer,
+    ).object<jni$_.JString>();
+  }
+
   static final _id_canSchedule = _class.staticMethodId(r'canSchedule', r'()Z');
 
   static final _canSchedule =

@@ -2,8 +2,11 @@
 <!-- The example app's custom layout, expanded: courier picture
      (extraImages['courier']), title, status and countdown, three labeled
      values from extra, the parcel image and a progress bar. The labels are
-     fixed text here; a real app would use string resources. -->
+     fixed text here; a real app would use string resources. The tools:
+     attributes are sample content for Android Studio's layout preview
+     only. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical">
@@ -16,6 +19,8 @@
 
         <ImageView
             android:id="@+id/live_update_extra_image_courier"
+            tools:src="@tools:sample/avatars"
+            tools:visibility="visible"
             android:layout_width="48dp"
             android:layout_height="48dp"
             android:layout_marginEnd="12dp"
@@ -31,6 +36,7 @@
 
             <TextView
                 android:id="@+id/live_update_title"
+                tools:text="Order #1234"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:ellipsize="end"
@@ -39,6 +45,8 @@
 
             <TextView
                 android:id="@+id/live_update_extra_status"
+                tools:text="The courier is nearby"
+                tools:visibility="visible"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:ellipsize="end"
@@ -49,6 +57,8 @@
 
         <Chronometer
             android:id="@+id/live_update_timer"
+            tools:text="12:34"
+            tools:visibility="visible"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="8dp"
@@ -80,6 +90,7 @@
 
             <TextView
                 android:id="@+id/live_update_extra_distance"
+                tools:text="1.6 km"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:singleLine="true"
@@ -101,6 +112,7 @@
 
             <TextView
                 android:id="@+id/live_update_extra_stops"
+                tools:text="1"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:singleLine="true"
@@ -122,6 +134,7 @@
 
             <TextView
                 android:id="@+id/live_update_extra_arrival"
+                tools:text="18:30"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:singleLine="true"
@@ -131,6 +144,8 @@
 
         <ImageView
             android:id="@+id/live_update_image"
+            tools:src="@tools:sample/avatars"
+            tools:visibility="visible"
             android:layout_width="36dp"
             android:layout_height="36dp"
             android:importantForAccessibility="no"
@@ -140,6 +155,8 @@
 
     <ProgressBar
         android:id="@+id/live_update_progress"
+        tools:progress="60"
+        tools:visibility="visible"
         style="@android:style/Widget.Material.ProgressBar.Horizontal"
         android:layout_width="match_parent"
         android:layout_height="4dp"

@@ -62,6 +62,23 @@ List<LiveUpdateIssue> iconIssues(
     if (content.android?.smallIcon == null) {
       checkName('LiveUpdateContent.icon', content.icon);
     }
+    // The ended content's icon replaces the shared one from endAt on.
+    if (content.android?.smallIcon == null) {
+      final ended = content.endedContent?.icon;
+      if (ended?.symbolName != null) {
+        issues.add(
+          LiveUpdateIssue(
+            LiveUpdateIssueCode.symbolIconOnAndroid,
+            LiveUpdateIssueSeverity.warning,
+            _android,
+            'LiveUpdateEndedContent.icon is a symbol, which Android cannot '
+            'show; the default icon is used once the content has ended. Set '
+            'AndroidLiveUpdateOptions.smallIcon to a drawable or an asset.',
+          ),
+        );
+      }
+      checkName('LiveUpdateEndedContent.icon', ended);
+    }
     checkName(
       'AndroidLiveUpdateOptions.progressTrackerIcon',
       content.android?.progressTrackerIcon,
@@ -78,6 +95,9 @@ List<LiveUpdateIssue> iconIssues(
     checkName('IosLiveUpdateOptions.islandIcon', content.ios?.islandIcon);
     if (content.ios?.icon == null) {
       checkName('LiveUpdateContent.icon', content.icon);
+    }
+    if (content.ios?.icon == null) {
+      checkName('LiveUpdateEndedContent.icon', content.endedContent?.icon);
     }
     for (final a in content.actions) {
       checkName(

@@ -13,6 +13,10 @@ void main() {
   } on ProcessException {
     hasGem = false; // No Ruby.
   }
+  // CI installs the gem: there a missing gem fails the tests instead.
+  final skip = hasGem || Platform.environment['CI'] == 'true'
+      ? false
+      : 'needs Ruby with the xcodeproj gem';
 
   late Directory root;
   late String project;
@@ -77,7 +81,7 @@ puts JSON.generate(t.build_configurations.to_h { |c| [c.name, c.build_settings] 
       expect(result.exitCode, 0, reason: '${result.stderr}');
       expectPreviewSettings(settings('OtherWidget'));
     },
-    skip: hasGem ? false : 'needs Ruby with the xcodeproj gem',
+    skip: skip,
   );
 
   test('running again adds missing preview settings and keeps set ones', () {
@@ -114,12 +118,12 @@ p.save
       addTarget('LiveUpdatesWidget', 'example/ios/LiveUpdatesWidget').stdout,
       isNot(contains('Xcode previews')),
     );
-  }, skip: hasGem ? false : 'needs Ruby with the xcodeproj gem');
+  }, skip: skip);
 
   test(
     'the example widget has the preview settings',
     () => expectPreviewSettings(settings('LiveUpdatesWidget')),
-    skip: hasGem ? false : 'needs Ruby with the xcodeproj gem',
+    skip: skip,
   );
 
   test('settings that keep previews from working are kept with a hint', () {
@@ -148,5 +152,5 @@ p.save
       settings('LiveUpdatesWidget')['Debug'],
       containsPair('SWIFT_ACTIVE_COMPILATION_CONDITIONS', 'MINE'),
     );
-  }, skip: hasGem ? false : 'needs Ruby with the xcodeproj gem');
+  }, skip: skip);
 }

@@ -10,7 +10,8 @@ enum LiveUpdateDiagnosticStatus {
   /// expect, such as no buttons before iOS 17.0.
   warning,
 
-  /// Live updates, or a part of them, do not appear until this is fixed.
+  /// Live updates, or a part of them, do not appear until this is fixed (or
+  /// at all on this platform).
   problem,
 
   /// The check does not apply here, such as the App Group of an app that
@@ -290,6 +291,13 @@ LiveUpdateDiagnostics iosDiagnostics(Map<String, Object?> facts) {
       for (final w in marked)
         if (w['runs'] != true) w['minimum'],
     ];
+    final versions = [
+      for (final v in old)
+        if (v is String) v,
+    ];
+    final needs = versions.isEmpty
+        ? 'a newer iOS'
+        : 'iOS ${versions.join(', ')}';
     old.isEmpty
         ? add(
             LiveUpdateDiagnosticCheck.widgetExtension,
@@ -299,7 +307,7 @@ LiveUpdateDiagnostics iosDiagnostics(Map<String, Object?> facts) {
         : add(
             LiveUpdateDiagnosticCheck.widgetExtension,
             _problem,
-            'The widget extension needs iOS ${old.join(', ')}, newer than '
+            'The widget extension needs $needs, newer than '
                 '$os, so no Live Activity appears.',
             'Lower the deployment target of the widget extension to 16.2.',
           );
@@ -335,7 +343,16 @@ LiveUpdateDiagnostics iosDiagnostics(Map<String, Object?> facts) {
           'Run `dart run live_updates:create ios`, which sets it.',
         );
 
-  switch (facts['activitiesEnabled']) {
+  switch (facts['supportsLiveActivities'] == true
+      ? facts['activitiesEnabled']
+      : 'noKey') {
+    case 'noKey' when live:
+      // ActivityKit reports false without the key; there is no setting yet.
+      add(
+        LiveUpdateDiagnosticCheck.liveActivitiesEnabled,
+        _na,
+        'Depends on NSSupportsLiveActivities (see above).',
+      );
     case true:
       add(
         LiveUpdateDiagnosticCheck.liveActivitiesEnabled,
@@ -416,6 +433,23 @@ LiveUpdateDiagnostics iosDiagnostics(Map<String, Object?> facts) {
       });
     }
   }
+  if (!live) {
+    // Nothing runs below 16.2: the setup rows are no verdict there.
+    const setup = {
+      LiveUpdateDiagnosticCheck.supportsLiveActivities,
+      LiveUpdateDiagnosticCheck.appGroup,
+      LiveUpdateDiagnosticCheck.tapUrlScheme,
+    };
+    for (var i = 0; i < items.length; i++) {
+      if (setup.contains(items[i].check)) {
+        items[i] = LiveUpdateDiagnosticItem(
+          items[i].check,
+          _na,
+          'Not used before iOS 16.2.',
+        );
+      }
+    }
+  }
   return LiveUpdateDiagnostics(
     platform: TargetPlatform.iOS,
     osVersion: os,
@@ -453,9 +487,9 @@ LiveUpdateDiagnostics androidDiagnostics(
     add(
       LiveUpdateDiagnosticCheck.pluginAttached,
       _problem,
-      'live_updates is not attached to a Flutter engine yet.',
-      'Call diagnose() after runApp, or after '
-          'WidgetsFlutterBinding.ensureInitialized().',
+      'live_updates is not attached to a Flutter engine.',
+      'Register plugins for this engine (GeneratedPluginRegistrant), as '
+          'Flutter does by default.',
     );
     return LiveUpdateDiagnostics(
       platform: TargetPlatform.android,
@@ -479,7 +513,13 @@ LiveUpdateDiagnostics androidDiagnostics(
           'notifications; Live Updates need Android 16 QPR1 or later.',
         );
 
-  if (facts['notificationsEnabled'] == true) {
+  // A fact the device could not report is not a verdict.
+  void unread(LiveUpdateDiagnosticCheck check) =>
+      add(check, _na, 'Could not be read on this device.');
+
+  if (!facts.containsKey('notificationsEnabled')) {
+    unread(LiveUpdateDiagnosticCheck.notifications);
+  } else if (facts['notificationsEnabled'] == true) {
     add(
       LiveUpdateDiagnosticCheck.notifications,
       _ok,
@@ -503,7 +543,11 @@ LiveUpdateDiagnostics androidDiagnostics(
     );
   }
 
-  switch (facts['channel']) {
+  switch (sdk >= 26 && !facts.containsKey('channel')
+      ? 'unread'
+      : facts['channel']) {
+    case 'unread':
+      unread(LiveUpdateDiagnosticCheck.notificationChannel);
     case {'exists': false}:
       add(
         LiveUpdateDiagnosticCheck.notificationChannel,
@@ -553,6 +597,9 @@ LiveUpdateDiagnostics androidDiagnostics(
       _na,
       'Promoted notifications (Live Updates) need Android 16 QPR1 or later.',
     );
+  } else if (!facts.containsKey('promotedDeclared') ||
+      !facts.containsKey('canPostPromoted')) {
+    unread(LiveUpdateDiagnosticCheck.promotedNotifications);
   } else if (facts['promotedDeclared'] != true) {
     add(
       LiveUpdateDiagnosticCheck.promotedNotifications,
@@ -584,6 +631,9 @@ LiveUpdateDiagnostics androidDiagnostics(
       _ok,
       'Every app may set exact alarms before Android 12.',
     );
+  } else if (!facts.containsKey('exactAlarmDeclared') ||
+      !facts.containsKey('canScheduleExactly')) {
+    unread(LiveUpdateDiagnosticCheck.exactAlarms);
   } else if (facts['exactAlarmDeclared'] != true) {
     add(
       LiveUpdateDiagnosticCheck.exactAlarms,
@@ -609,7 +659,9 @@ LiveUpdateDiagnostics androidDiagnostics(
     );
   }
 
-  switch (facts['defaultIcon']) {
+  switch (facts.containsKey('defaultIcon') ? facts['defaultIcon'] : 'unread') {
+    case 'unread':
+      unread(LiveUpdateDiagnosticCheck.defaultIcon);
     case 'valid':
       add(
         LiveUpdateDiagnosticCheck.defaultIcon,
@@ -621,7 +673,7 @@ LiveUpdateDiagnostics androidDiagnostics(
         LiveUpdateDiagnosticCheck.defaultIcon,
         _warning,
         'The com.ttechapp.live_updates.default_icon meta-data is not a '
-            'drawable, so the app icon is used for content without an icon.',
+            'drawable or mipmap, so the app icon is used for content without an icon.',
         'Set it to android:resource="@drawable/...".',
       );
     default:

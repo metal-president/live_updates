@@ -383,6 +383,48 @@ void main() {
     );
   });
 
+  test('a countdown already over does not remove the update', () {
+    expect(
+      LiveUpdateContent(
+        title: 'T',
+        timer: LiveUpdateTimer.countdown(
+          DateTime.now().subtract(const Duration(minutes: 1)),
+        ),
+        endAt: DateTime.now().add(const Duration(minutes: 5)),
+        endedContent: const LiveUpdateEndedContent(title: 'Delivered'),
+      ).check(),
+      isEmpty,
+    );
+  });
+
+  test('the ended icon is checked like the shared one', () {
+    final issues = LiveUpdateContent(
+      title: 'T',
+      endAt: DateTime.now().add(const Duration(minutes: 5)),
+      endedContent: const LiveUpdateEndedContent(
+        title: 'Delivered',
+        icon: LiveUpdateIcon.symbol('checkmark.circle.fill'),
+      ),
+    ).check();
+    expect(issues.map((i) => (i.code, i.platforms)), [
+      (LiveUpdateIssueCode.symbolIconOnAndroid, android),
+    ]);
+    expect(
+      LiveUpdateContent(
+        title: 'T',
+        endAt: DateTime.now().add(const Duration(minutes: 5)),
+        endedContent: const LiveUpdateEndedContent(
+          title: 'Delivered',
+          icon: LiveUpdateIcon.native('a/b'),
+        ),
+        android: const AndroidLiveUpdateOptions(
+          smallIcon: LiveUpdateIcon.native('ic_stat'),
+        ),
+      ).check().map((i) => (i.code, i.platforms)),
+      [(LiveUpdateIssueCode.invalidIconName, ios)],
+    );
+  });
+
   test('deprecated iOS pictures are iOS only', () {
     final issues = const LiveUpdateContent(
       title: 'T',

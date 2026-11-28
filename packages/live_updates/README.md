@@ -1356,16 +1356,17 @@ The samples, one per built-in layout, are in `LiveUpdatesViews.swift`
 (`LiveUpdatesAttributes.ContentState.previewStandard`, `previewTimer`,
 `previewMetrics`, `previewStepper` and `previewJourney`), in debug builds
 only. They use SF Symbols instead of images, since images come from the App
-Group of the running app. The previews need iOS 17 in the canvas; they are
+Group of the running app. The previews need iOS 17 in the canvas ([source][apple-widget-preview]); they are
 marked `@available(iOS 17.0, *)`, so the widget still supports iOS 16.2.
 Previews show the full content: check `publicContent` (a locked device)
 and `endedContent` (`endAt`) on a device.
 
-Previews need a Debug build of the widget extension that is not optimized
-and defines `DEBUG`. `create ios` sets this up for the Debug configurations
-of the extension (`SWIFT_OPTIMIZATION_LEVEL` `-Onone`,
-`SWIFT_ACTIVE_COMPILATION_CONDITIONS` with `DEBUG` and `ENABLE_PREVIEWS`),
-and adds settings that are missing when you run it again. If the canvas
+Xcode previews need an unoptimized build, and the samples and previews are
+compiled only when `DEBUG` is defined. `create ios` sets this up for the
+configurations of the extension whose name contains "Debug"
+(`SWIFT_OPTIMIZATION_LEVEL = -Onone`, `DEBUG` in
+`SWIFT_ACTIVE_COMPILATION_CONDITIONS` and `ENABLE_PREVIEWS = YES`), and adds
+settings that are missing when you run it again. If the canvas
 says the extension needs an unoptimized build, set them by hand: select the
 widget extension target in Xcode, then in Build Settings, for Debug (and
 each `Debug-<flavor>`), set Swift Compiler - Code Generation > Optimization
@@ -1375,8 +1376,8 @@ Flags > Active Compilation Conditions.
 A layout file made by an earlier version is kept when you run `create ios`
 again, while `LiveUpdatesViews.swift` (with the samples) is refreshed. Add
 the previews you want to the end of your layout file by hand (or run
-`create ios --force`, which replaces the layout file and discards your
-edits):
+`create ios --force`, which replaces the layout file, `<Name>Bundle.swift`
+and the widget `Info.plist`, discarding your edits):
 
 ```swift
 #if DEBUG
@@ -1398,7 +1399,7 @@ edits):
 ```
 
 Use `.dynamicIsland(.expanded)` and `.dynamicIsland(.minimal)` for the other
-presentations, and the name of your widget if you passed `--name`. For a
+presentations, and `<Name>LiveActivity()` if you passed `--name <Name>`. For a
 layout of your own, add a sample with its data and list it in
 `contentStates`:
 
@@ -1474,8 +1475,9 @@ limits, for example:
 
 - an iOS layout whose data is missing (it falls back to `standard`), and a
   Dynamic Island choice whose data is missing;
-- more than three metrics or buttons, a `criticalMetric` that is not one of
-  the shown metrics, a `steps.current` outside the labels, empty stage
+- more than three metrics, more than three buttons (Android), a
+  `criticalMetric` that is not one of the shown metrics (Android), a
+  `steps.current` outside the labels, empty stage
   names, and more than 21 stages (live_updates then draws a plain progress
   bar instead of segments on Android 16+);
 - Android: an empty title (no promotion), a custom layout with
@@ -1484,9 +1486,9 @@ limits, for example:
   (see [Platform limits](#platform-limits));
 - icon names that are not valid Android resource names or iOS asset
   catalog names (the default icon is shown);
-- `endedContent` that is never shown (no `endAt`, `removeAtEnd`, or on
-  Android an `endAt` after the end of the countdown or beyond
-  `maxDuration`);
+- `endedContent` that is never shown (no `endAt`, or on iOS no `staleDate`
+  either; on Android `removeAtEnd`, an `endAt` after the end of the
+  countdown, or beyond `maxDuration`);
 - content that likely exceeds ActivityKit's 4 KB limit (an estimate; see
   [Platform limits](#platform-limits)).
 
@@ -1515,10 +1517,11 @@ for (final problem in diagnostics.problems) {
   `create ios` and whether it supports the running iOS,
   `NSSupportsLiveActivities`, whether the user allows Live Activities for
   the app, the App Group and the tap URL scheme.
-- **Android:** whether the plugin is attached (before `runApp` it reports
-  only that), the Android version (`ProgressStyle` from Android 16,
+- **Android:** whether the plugin is attached to a Flutter engine (if it is
+  not, for example in an engine created without plugin registration, it
+  reports only that), the Android version (`ProgressStyle` from Android 16,
   promotion to a Live Update from Android 16 QPR1, an ongoing notification
-  before), whether notifications are enabled, the
+  before; see [Platform support](#platform-support)), whether notifications are enabled, the
   notification channel (pass `androidChannelId` if you use your own),
   `POST_PROMOTED_NOTIFICATIONS` and whether the app may post promoted
   notifications, exact alarms and the default icon meta-data.
@@ -1673,7 +1676,8 @@ differently.
 [android-promotion-settings]: https://developer.android.com/reference/android/provider/Settings#ACTION_APP_NOTIFICATION_PROMOTION_SETTINGS
 [android-12-custom]: https://developer.android.com/about/versions/12/behavior-changes-12#custom-notifications
 [android-custom-notification]: https://developer.android.com/develop/ui/views/notifications/custom-notification
-[android-tools-attributes]: https://developer.android.com/studio/write/tool-attributes
+[android-tools-attributes]: https://developer.android.com/studio/views/tool-attributes-views
+[apple-widget-preview]: https://developer.apple.com/documentation/widgetkit/preview(_:as:using:widget:contentstates:)
 
 ## Remote updates
 

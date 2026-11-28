@@ -127,6 +127,12 @@ void main() {
       expect(_statuses(d), containsPair(_C.osVersion, _S.problem));
       // Only the OS version is the problem, not the widget's target.
       expect(d.problems, hasLength(1));
+      // Setup rows are no verdict where nothing runs.
+      final old = iosDiagnostics(
+        _ios(os: '15.8', enabled: null, supports: false, tapScheme: false),
+      );
+      expect(old.problems.map((i) => i.check), [_C.osVersion]);
+      expect(old.warnings, isEmpty);
       expect(_statuses(d), containsPair(_C.widgetExtension, _S.notApplicable));
       expect(
         _statuses(d),
@@ -204,11 +210,19 @@ void main() {
         ),
       );
       expect(_statuses(d), containsPair(_C.supportsLiveActivities, _S.problem));
-      expect(_statuses(d), containsPair(_C.liveActivitiesEnabled, _S.problem));
-      expect(d[_C.liveActivitiesEnabled]!.hint, contains('openSettings'));
+      // ActivityKit says "off" without the key: no Settings toggle to offer.
+      expect(
+        _statuses(d),
+        containsPair(_C.liveActivitiesEnabled, _S.notApplicable),
+      );
       expect(_statuses(d), containsPair(_C.appGroup, _S.problem));
       expect(_statuses(d), containsPair(_C.tapUrlScheme, _S.warning));
-      expect(d.problems, hasLength(3));
+      expect(d.problems, hasLength(2));
+      final off = iosDiagnostics(
+        _ios(enabled: false),
+      )[_C.liveActivitiesEnabled]!;
+      expect(off.status, _S.problem);
+      expect(off.hint, contains('openSettings'));
       expect(
         iosDiagnostics(_ios(group: null))[_C.appGroup]!.status,
         _S.notApplicable,
@@ -236,6 +250,26 @@ void main() {
         _C.defaultIcon,
       ]);
       expect(_statuses(d).values.toSet(), {_S.ok});
+    });
+
+    test('facts the device could not report are no verdict', () {
+      final facts = _android()
+        ..remove('notificationsEnabled')
+        ..remove('channel')
+        ..remove('promotedDeclared')
+        ..remove('exactAlarmDeclared')
+        ..remove('defaultIcon');
+      final d = androidDiagnostics(facts, channelId: 'live_updates');
+      for (final c in [
+        _C.notifications,
+        _C.notificationChannel,
+        _C.promotedNotifications,
+        _C.exactAlarms,
+        _C.defaultIcon,
+      ]) {
+        expect(d[c]!.status, _S.notApplicable, reason: c.name);
+        expect(d[c]!.message, contains('Could not be read'));
+      }
     });
 
     test('not attached', () {

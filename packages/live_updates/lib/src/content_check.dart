@@ -88,7 +88,9 @@ enum LiveUpdateIssueCode {
   /// [LiveUpdateContent.endedContent] that is never shown: there is no
   /// [LiveUpdateContent.endAt] (nor, on iOS, a
   /// [IosLiveUpdateOptions.staleDate]), or Android removes the notification
-  /// at that time ([AndroidLiveUpdateOptions.removeAtEnd]).
+  /// at or before that time ([AndroidLiveUpdateOptions.removeAtEnd], the end
+  /// of a countdown with [AndroidLiveUpdateOptions.removeAtCountdownEnd], or
+  /// [AndroidLiveUpdateOptions.maxDuration]).
   endedContentNeverShown,
 
   /// Remote content (`check(remote: true)`): pictures, which a push or remote
@@ -168,8 +170,7 @@ const _android = {TargetPlatform.android};
 const iosPayloadLimit = 4096;
 
 /// On Android 16+ this package draws one progress segment between each pair
-/// of stages, up
-/// to this many stages.
+/// of stages, up to this many stages.
 const _maxStepSegments = 21;
 
 /// See [LiveUpdateContent.check].
@@ -386,6 +387,7 @@ List<LiveUpdateIssue> checkContent(
       );
     } else if (content.timer?.end case final countdownEnd?
         when (android?.removeAtCountdownEnd ?? true) &&
+            countdownEnd.isAfter(DateTime.now()) &&
             content.endAt!.isAfter(countdownEnd)) {
       add(
         LiveUpdateIssueCode.endedContentNeverShown,

@@ -137,17 +137,16 @@ end
 # Xcode previews (the #Preview blocks in the layout file) need an
 # unoptimized build, and the preview samples are compiled only with DEBUG.
 # Flutter's xcconfig files set neither, so debug configurations of the widget
-# get them: those named Debug (or Debug-<flavor>) and those whose Runner
-# configuration is unoptimized. Settings that are already set are kept (with
+# get them: those whose name contains "debug" (Debug, Debug-<flavor>,
+# <flavor>-Debug). Settings that are already set are kept (with
 # a hint when they keep previews from working). Returns the names of the
 # settings it added.
-def ensure_preview_settings(target, runner)
+def ensure_preview_settings(target)
   added = []
   target.build_configurations.each do |config|
-    runner_config = runner.build_configurations.find { |c| c.name == config.name }
-    debug = config.name.match?(/\Adebug/i) ||
-            runner_config&.build_settings&.[]('SWIFT_OPTIMIZATION_LEVEL') == '-Onone'
-    next unless debug
+    # By name only: a configuration that is unoptimized but distributed (such
+    # as Staging) must not get DEBUG.
+    next unless config.name.match?(/debug/i)
     s = config.build_settings
     { 'SWIFT_OPTIMIZATION_LEVEL' => '-Onone',
       'SWIFT_ACTIVE_COMPILATION_CONDITIONS' => '$(inherited) DEBUG',
@@ -171,7 +170,7 @@ if (existing = project.targets.find { |t| t.name == name })
   ensure_assets(project, existing, name, ext_dir)
   ensure_shared_intent(project, [runner, existing], name)
   report_deployment_target(project, existing, name)
-  added = ensure_preview_settings(existing, runner)
+  added = ensure_preview_settings(existing)
   unless added.empty?
     puts "Set the Debug build settings Xcode previews need for #{name}: #{added.join(', ')}."
   end
@@ -221,7 +220,7 @@ target.build_configurations.each do |config|
   s['DEVELOPMENT_TEAM'] = team if team
   s['LD_RUNPATH_SEARCH_PATHS'] = ['$(inherited)', '@executable_path/Frameworks', '@executable_path/../../Frameworks']
 end
-ensure_preview_settings(target, runner)
+ensure_preview_settings(target)
 
 %w[WidgetKit SwiftUI].each do |fw|
   target.frameworks_build_phase.add_file_reference(

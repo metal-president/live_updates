@@ -134,11 +134,40 @@ def report_deployment_target(project, target, name)
   end
 end
 
+# Xcode previews (the #Preview blocks in the layout file) need an
+# unoptimized build, and the preview samples are compiled only with DEBUG.
+# Flutter's xcconfig files set neither, so debug configurations of the widget
+# get them: those named Debug (or Debug-<flavor>) and those whose Runner
+# configuration is unoptimized. Settings that are already set are kept.
+# Returns whether anything changed.
+def ensure_preview_settings(target, runner)
+  changed = false
+  target.build_configurations.each do |config|
+    runner_config = runner.build_configurations.find { |c| c.name == config.name }
+    debug = config.name.match?(/\Adebug/i) ||
+            runner_config&.build_settings&.[]('SWIFT_OPTIMIZATION_LEVEL') == '-Onone'
+    next unless debug
+    s = config.build_settings
+    { 'SWIFT_OPTIMIZATION_LEVEL' => '-Onone',
+      'SWIFT_ACTIVE_COMPILATION_CONDITIONS' => '$(inherited) DEBUG',
+      'ENABLE_PREVIEWS' => 'YES' }.each do |key, value|
+      next if s.key?(key)
+      s[key] = value
+      changed = true
+    end
+  end
+  changed
+end
+
 if (existing = project.targets.find { |t| t.name == name })
   ensure_widget_files(project, existing, name, ext_dir)
   ensure_assets(project, existing, name, ext_dir)
   ensure_shared_intent(project, [runner, existing], name)
   report_deployment_target(project, existing, name)
+  if ensure_preview_settings(existing, runner)
+    puts "Set the Debug build settings Xcode previews need for #{name} " \
+         '(SWIFT_OPTIMIZATION_LEVEL -Onone, DEBUG, ENABLE_PREVIEWS).'
+  end
   project.save
   if use_group
     configure_app_group(project, runner, ios_dir, 'Runner/Runner.entitlements', groups)
@@ -185,6 +214,7 @@ target.build_configurations.each do |config|
   s['DEVELOPMENT_TEAM'] = team if team
   s['LD_RUNPATH_SEARCH_PATHS'] = ['$(inherited)', '@executable_path/Frameworks', '@executable_path/../../Frameworks']
 end
+ensure_preview_settings(target, runner)
 
 %w[WidgetKit SwiftUI].each do |fw|
   target.frameworks_build_phase.add_file_reference(

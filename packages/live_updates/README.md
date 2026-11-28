@@ -1361,6 +1361,16 @@ marked `@available(iOS 17.0, *)`, so the widget still supports iOS 16.2.
 Previews show the full content: check `publicContent` (a locked device)
 and `endedContent` (`endAt`) on a device.
 
+Previews need a Debug build of the widget extension that is not optimized
+and defines `DEBUG`. `create ios` sets this up for the Debug configurations
+of the extension (`SWIFT_OPTIMIZATION_LEVEL` `-Onone`,
+`SWIFT_ACTIVE_COMPILATION_CONDITIONS` with `DEBUG` and `ENABLE_PREVIEWS`),
+and adds settings that are missing when you run it again. If the canvas
+says the extension needs an unoptimized build, set them by hand: select the
+widget extension target in Xcode, then in Build Settings set Optimization
+Level to No Optimization and add `DEBUG` to Active Compilation Conditions,
+both for Debug.
+
 A layout file made by an earlier version is kept when you run `create ios`
 again, while `LiveUpdatesViews.swift` (with the samples) is refreshed. Add
 the previews you want to the end of your layout file by hand (or run

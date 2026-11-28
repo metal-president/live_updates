@@ -20,7 +20,11 @@
   and the Dynamic Island (iOS 17 canvas; the widget still supports iOS
   16.2), and `LiveUpdatesViews.swift` has sample content for each built-in
   layout (debug builds only). A layout file you already have is kept: see
-  "Xcode previews" in the README to add the previews by hand.
+  "Xcode previews" in the README to add the previews by hand. The Debug
+  configurations of the widget extension are built unoptimized with `DEBUG`
+  (`SWIFT_OPTIMIZATION_LEVEL`, `SWIFT_ACTIVE_COMPILATION_CONDITIONS`,
+  `ENABLE_PREVIEWS`), as previews need; running `create ios` again adds
+  these settings to an existing extension when they are missing.
 - `create android`: the generated layouts have sample content in `tools:`
   attributes for Android Studio's layout preview (removed from the app by
   the build).

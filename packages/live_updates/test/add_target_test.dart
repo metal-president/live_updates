@@ -6,8 +6,13 @@ import 'package:flutter_test/flutter_test.dart';
 /// Runs the `create ios` Ruby script (lib/src/cli/ios_widget/add_target.rb.tmpl)
 /// on a copy of the example's Xcode project.
 void main() {
-  final hasGem =
-      Process.runSync('ruby', ['-e', "require 'xcodeproj'"]).exitCode == 0;
+  bool hasGem;
+  try {
+    hasGem =
+        Process.runSync('ruby', ['-e', "require 'xcodeproj'"]).exitCode == 0;
+  } on ProcessException {
+    hasGem = false; // No Ruby.
+  }
 
   late Directory root;
   late String project;
@@ -111,15 +116,37 @@ p.save
     );
   }, skip: hasGem ? false : 'needs Ruby with the xcodeproj gem');
 
-  test('the example widget has the preview settings', () {
-    final text = File('example/ios/Runner.xcodeproj/project.pbxproj')
-        .readAsStringSync();
-    expect('ENABLE_PREVIEWS = YES;'.allMatches(text), hasLength(1));
-    expect(
-      'SWIFT_ACTIVE_COMPILATION_CONDITIONS = "\$(inherited) DEBUG";'.allMatches(
-        text,
-      ),
-      hasLength(1),
+  test(
+    'the example widget has the preview settings',
+    () => expectPreviewSettings(settings('LiveUpdatesWidget')),
+    skip: hasGem ? false : 'needs Ruby with the xcodeproj gem',
+  );
+
+  test('settings that keep previews from working are kept with a hint', () {
+    final set = ruby(
+      '''
+require 'xcodeproj'
+p = Xcodeproj::Project.open(ARGV[0])
+t = p.targets.find { |t| t.name == 'LiveUpdatesWidget' }
+t.build_configurations.find { |c| c.name == 'Debug' }
+  .build_settings['SWIFT_ACTIVE_COMPILATION_CONDITIONS'] = 'MINE'
+p.save
+''',
+      [project],
     );
-  });
+    expect(set.exitCode, 0, reason: '${set.stderr}');
+    final result = addTarget(
+      'LiveUpdatesWidget',
+      'example/ios/LiveUpdatesWidget',
+    );
+    expect(result.exitCode, 0, reason: '${result.stderr}');
+    expect(
+      result.stdout,
+      contains('LiveUpdatesWidget (Debug): Xcode previews need'),
+    );
+    expect(
+      settings('LiveUpdatesWidget')['Debug'],
+      containsPair('SWIFT_ACTIVE_COMPILATION_CONDITIONS', 'MINE'),
+    );
+  }, skip: hasGem ? false : 'needs Ruby with the xcodeproj gem');
 }

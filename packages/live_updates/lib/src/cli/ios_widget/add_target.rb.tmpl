@@ -138,10 +138,11 @@ end
 # unoptimized build, and the preview samples are compiled only with DEBUG.
 # Flutter's xcconfig files set neither, so debug configurations of the widget
 # get them: those named Debug (or Debug-<flavor>) and those whose Runner
-# configuration is unoptimized. Settings that are already set are kept.
-# Returns whether anything changed.
+# configuration is unoptimized. Settings that are already set are kept (with
+# a hint when they keep previews from working). Returns the names of the
+# settings it added.
 def ensure_preview_settings(target, runner)
-  changed = false
+  added = []
   target.build_configurations.each do |config|
     runner_config = runner.build_configurations.find { |c| c.name == config.name }
     debug = config.name.match?(/\Adebug/i) ||
@@ -153,10 +154,16 @@ def ensure_preview_settings(target, runner)
       'ENABLE_PREVIEWS' => 'YES' }.each do |key, value|
       next if s.key?(key)
       s[key] = value
-      changed = true
+      added << key
+    end
+    conditions = Array(s['SWIFT_ACTIVE_COMPILATION_CONDITIONS']).join(' ').split
+    unless s['SWIFT_OPTIMIZATION_LEVEL'] == '-Onone' && conditions.include?('DEBUG')
+      puts "#{target.name} (#{config.name}): Xcode previews need SWIFT_OPTIMIZATION_LEVEL " \
+           '-Onone and DEBUG in SWIFT_ACTIVE_COMPILATION_CONDITIONS; kept your settings ' \
+           '(see "Xcode previews" in the live_updates README).'
     end
   end
-  changed
+  added.uniq
 end
 
 if (existing = project.targets.find { |t| t.name == name })
@@ -164,9 +171,9 @@ if (existing = project.targets.find { |t| t.name == name })
   ensure_assets(project, existing, name, ext_dir)
   ensure_shared_intent(project, [runner, existing], name)
   report_deployment_target(project, existing, name)
-  if ensure_preview_settings(existing, runner)
-    puts "Set the Debug build settings Xcode previews need for #{name} " \
-         '(SWIFT_OPTIMIZATION_LEVEL -Onone, DEBUG, ENABLE_PREVIEWS).'
+  added = ensure_preview_settings(existing, runner)
+  unless added.empty?
+    puts "Set the Debug build settings Xcode previews need for #{name}: #{added.join(', ')}."
   end
   project.save
   if use_group

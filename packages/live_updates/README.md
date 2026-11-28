@@ -1367,9 +1367,10 @@ of the extension (`SWIFT_OPTIMIZATION_LEVEL` `-Onone`,
 `SWIFT_ACTIVE_COMPILATION_CONDITIONS` with `DEBUG` and `ENABLE_PREVIEWS`),
 and adds settings that are missing when you run it again. If the canvas
 says the extension needs an unoptimized build, set them by hand: select the
-widget extension target in Xcode, then in Build Settings set Optimization
-Level to No Optimization and add `DEBUG` to Active Compilation Conditions,
-both for Debug.
+widget extension target in Xcode, then in Build Settings, for Debug (and
+each `Debug-<flavor>`), set Swift Compiler - Code Generation > Optimization
+Level to No Optimization [-Onone] and add `DEBUG` to Swift Compiler - Custom
+Flags > Active Compilation Conditions.
 
 A layout file made by an earlier version is kept when you run `create ios`
 again, while `LiveUpdatesViews.swift` (with the samples) is refreshed. Add

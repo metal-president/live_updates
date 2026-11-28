@@ -1322,11 +1322,12 @@ example `tools:keep="@layout/live_update_*,@layout/courier"`
 
 ## Previewing and troubleshooting
 
-The device shows what the user sees. Android has no layout setting: it
-draws the content with system templates, so the look depends on the
+The device shows what the user sees. Without a
+[custom layout](#customizing-the-android-notification), Android draws the
+content with system templates, so the look depends on the
 [display mode](#android-display-modes), the Android version and the device.
-Check your content on an iOS simulator and an Android emulator (or devices)
-for each platform, and use the tools below to get there faster.
+Check your content on an iOS simulator and an Android emulator (or
+devices), and use the tools below to get there faster.
 
 ### Check on a simulator or emulator
 

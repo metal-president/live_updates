@@ -1,4 +1,4 @@
-## Unreleased
+## 0.5.4
 
 - `LiveUpdateContent.check()`: checks content without a device and returns
   `LiveUpdateIssue`s (a stable `LiveUpdateIssueCode`, the platforms, a

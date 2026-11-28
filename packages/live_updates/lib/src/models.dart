@@ -216,11 +216,20 @@ final class LiveUpdateContent {
   /// for content your server sends or that it will replace (pictures, iOS
   /// asset icons, Android layout names).
   ///
+  /// [startedAt] is when the live update started, for an update of a
+  /// running one: Android's [AndroidLiveUpdateOptions.maxDuration] counts
+  /// from then. It defaults to now, as for content that starts a live update.
+  /// [key] is the key you pass to [LiveUpdates.startOrUpdate]: it counts
+  /// toward ActivityKit's size limit with the content.
+  ///
   /// Debug builds already assert some ranges (such as [progress]) when the
   /// content is created; this reports them for content created in release
   /// builds.
-  List<LiveUpdateIssue> check({bool remote = false}) =>
-      checkContent(this, remote: remote);
+  List<LiveUpdateIssue> check({
+    bool remote = false,
+    DateTime? startedAt,
+    String? key,
+  }) => checkContent(this, remote: remote, startedAt: startedAt, key: key);
 
   /// Returns a copy with the given fields replaced. A `null` argument keeps
   /// the current value, so a field such as [publicContent] cannot be removed

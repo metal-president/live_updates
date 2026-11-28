@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart' show TargetPlatform;
 import 'package:meta/meta.dart';
@@ -177,7 +176,10 @@ const _maxStepSegments = 21;
 List<LiveUpdateIssue> checkContent(
   LiveUpdateContent content, {
   bool remote = false,
+  DateTime? startedAt,
+  String? key,
 }) {
+  final now = DateTime.now();
   final issues = <LiveUpdateIssue>[];
   void add(
     LiveUpdateIssueCode code,
@@ -268,15 +270,17 @@ List<LiveUpdateIssue> checkContent(
       '${content.metrics.length} metrics; only the first three are shown.',
     );
   }
+  // Android 17 MetricStyle shows the first three metrics it can show
+  // (LiveUpdatesApi37.setMetricStyle skips a decimal that is not finite).
+  final metricStyle = androidMetricStyleIndexes(content.metrics);
   if (content.criticalMetric case final i?
-      when content.metrics.isNotEmpty &&
-          (i < 0 || i >= math.min(content.metrics.length, 3))) {
+      when metricStyle.isNotEmpty && !metricStyle.contains(i)) {
     add(
       LiveUpdateIssueCode.criticalMetricOutOfRange,
       warning,
       _android,
-      'criticalMetric is $i, which is not the index of one of the '
-      '${math.min(content.metrics.length, 3)} shown metrics; it is ignored.',
+      'criticalMetric is $i, which is not one of the metrics Android 17 shows '
+      '(index ${metricStyle.join(', ')}); it is ignored.',
     );
   }
 
@@ -316,7 +320,7 @@ List<LiveUpdateIssue> checkContent(
         _android,
         '$count stages; on Android 16+ live_updates draws progress segments '
         'for up to $_maxStepSegments stages and a plain progress bar for '
-        'more.',
+        'more${metricStyle.isEmpty ? '' : ' (on Android 17 the metrics replace the progress bar)'}.',
       );
     }
   }
@@ -387,7 +391,7 @@ List<LiveUpdateIssue> checkContent(
       );
     } else if (content.timer?.end case final countdownEnd?
         when (android?.removeAtCountdownEnd ?? true) &&
-            countdownEnd.isAfter(DateTime.now()) &&
+            countdownEnd.isAfter(now) &&
             content.endAt!.isAfter(countdownEnd)) {
       add(
         LiveUpdateIssueCode.endedContentNeverShown,
@@ -401,14 +405,16 @@ List<LiveUpdateIssue> checkContent(
     } else if ((android == null
             ? const Duration(hours: 8)
             : android.maxDuration)
-        case final max? when content.endAt!.isAfter(DateTime.now().add(max))) {
+        case final max?
+        when content.endAt!.isAfter((startedAt ?? now).add(max))) {
       add(
         LiveUpdateIssueCode.endedContentNeverShown,
         warning,
         _android,
         'endAt is more than AndroidLiveUpdateOptions.maxDuration '
-        '(${max.inMinutes} minutes) away; a live update started now is '
-        'removed before endAt, so endedContent is likely not shown.',
+        '(${max.inMinutes} minutes) after '
+        '${startedAt == null ? 'now; a live update started now' : 'startedAt; the live update'} '
+        'is removed before endAt, so endedContent is not shown.',
       );
     }
   }
@@ -440,7 +446,7 @@ List<LiveUpdateIssue> checkContent(
   }
 
   // Size.
-  final size = estimatedIosPayloadBytes(content);
+  final size = estimatedIosPayloadBytes(content, key: key);
   if (size > iosPayloadLimit) {
     add(
       LiveUpdateIssueCode.payloadTooLarge,
@@ -512,10 +518,11 @@ final _storedName = 'lu_${'0' * 32}.png';
 
 /// About how many bytes ActivityKit stores for [content]: the JSON of the
 /// fields of `LiveUpdatesAttributes.ContentState`, with stored file names
-/// for pictures. The attributes (the key of [LiveUpdates.startOrUpdate])
-/// come on top.
+/// for pictures, plus the attributes (`{"key": key}` for
+/// [LiveUpdates.startOrUpdate], else `{}`). ActivityKit's own encoding may
+/// differ slightly, so this is an estimate.
 @visibleForTesting
-int estimatedIosPayloadBytes(LiveUpdateContent content) {
+int estimatedIosPayloadBytes(LiveUpdateContent content, {String? key}) {
   final json = content.toJson();
   final state = <String, Object?>{
     for (final k in _contentStateKeys)
@@ -542,7 +549,21 @@ int estimatedIosPayloadBytes(LiveUpdateContent content) {
         if (content.endedContent?.image != null) 'image': _storedName,
       },
   };
-  final encoded = jsonEncode(state);
+  final encoded = jsonEncode(state) + jsonEncode({'key': ?key});
   // JSONEncoder writes "/" as "\/".
   return utf8.encode(encoded).length + '/'.allMatches(encoded).length;
 }
+
+/// Indexes in [metrics] of the metrics Android 17 shows with `MetricStyle`:
+/// the first three that it can show, as `LiveUpdatesApi37.setMetricStyle`
+/// does (it skips a decimal that is not a finite number, which the content
+/// sends as `null`).
+@visibleForTesting
+List<int> androidMetricStyleIndexes(List<LiveUpdateMetric> metrics) => [
+  for (var i = 0; i < metrics.length; i++)
+    if (metrics[i] case LiveUpdateMetric(value: final double v)
+        when !v.isFinite)
+      ...const <int>[]
+    else
+      i,
+].take(3).toList();

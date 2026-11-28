@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart' show TargetPlatform;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:live_updates/live_updates.dart';
 import 'package:live_updates/src/content_check.dart'
-    show estimatedIosPayloadBytes, iosPayloadLimit;
+    show androidMetricStyleIndexes, estimatedIosPayloadBytes, iosPayloadLimit;
 
 List<LiveUpdateIssueCode> _codes(LiveUpdateContent c, {bool remote = false}) =>
     [for (final i in c.check(remote: remote)) i.code];
@@ -381,6 +381,63 @@ void main() {
           .check(),
       isEmpty,
     );
+    // An update of a live update that started earlier counts from then.
+    final update = LiveUpdateContent(
+      title: 'T',
+      endAt: DateTime.now().add(const Duration(hours: 3)),
+      endedContent: ended,
+    );
+    expect(update.check(), isEmpty);
+    expect(
+      update
+          .check(startedAt: DateTime.now().subtract(const Duration(hours: 6)))
+          .single
+          .message,
+      contains('after startedAt'),
+    );
+  });
+
+  test('Android 17 shows the first three metrics it can show', () {
+    const bad = LiveUpdateMetric.decimal('Bad', double.nan);
+    const a = LiveUpdateMetric.integer('A', 1);
+    expect(androidMetricStyleIndexes([a, bad, a, a, a]), [0, 2, 3]);
+    expect(androidMetricStyleIndexes([bad]), isEmpty);
+    expect(
+      androidMetricStyleIndexes(const [
+        LiveUpdateMetric.decimal('D', 1.5),
+        LiveUpdateMetric.text('T', 'x'),
+      ]),
+      [0, 1],
+    );
+    // Index 3 is shown when one of the first three cannot be.
+    expect(
+      const LiveUpdateContent(
+        title: 'T',
+        metrics: [a, bad, a, a],
+        criticalMetric: 3,
+      ).check().map((i) => i.code),
+      [LiveUpdateIssueCode.tooManyMetrics],
+    );
+    expect(
+      const LiveUpdateContent(
+        title: 'T',
+        metrics: [a, bad, a, a],
+        criticalMetric: 1,
+      ).check().map((i) => i.code),
+      [
+        LiveUpdateIssueCode.tooManyMetrics,
+        LiveUpdateIssueCode.criticalMetricOutOfRange,
+      ],
+    );
+  });
+
+  test('with metrics, Android 17 shows them instead of the progress bar', () {
+    final message = LiveUpdateContent(
+      title: 'T',
+      steps: LiveUpdateSteps([for (var i = 0; i < 22; i++) 'S$i'], current: 0),
+      metrics: const [LiveUpdateMetric.integer('A', 1)],
+    ).check().single.message;
+    expect(message, contains('metrics replace the progress bar'));
   });
 
   test('a countdown already over does not remove the update', () {
@@ -461,8 +518,15 @@ void main() {
       expect(
         base,
         '{"title":"T","actions":[],"extra":{},"extraImages":{},'
-                '"metrics":[]}'
-            .length,
+                    '"metrics":[]}'
+                .length +
+            // The attributes, without a key.
+            '{}'.length,
+      );
+      // The key of startOrUpdate is part of the attributes.
+      expect(
+        estimatedIosPayloadBytes(plain, key: 'order-1234'),
+        base + '"key":"order-1234"'.length,
       );
       // Android options are not part of the content state.
       expect(

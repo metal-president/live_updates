@@ -120,6 +120,69 @@ p.save
     );
   }, skip: skip);
 
+  void stripPreviewSettings() {
+    final strip = ruby(
+      '''
+require 'xcodeproj'
+p = Xcodeproj::Project.open(ARGV[0])
+t = p.targets.find { |t| t.name == 'LiveUpdatesWidget' }
+t.build_configurations.each do |c|
+  %w[SWIFT_OPTIMIZATION_LEVEL SWIFT_ACTIVE_COMPILATION_CONDITIONS ENABLE_PREVIEWS]
+    .each { |k| c.build_settings.delete(k) }
+end
+p.save
+''',
+      [project],
+    );
+    expect(strip.exitCode, 0, reason: '${strip.stderr}');
+  }
+
+  test('settings an .xcconfig already provides are not added', () {
+    stripPreviewSettings();
+    // The widget's Debug configuration is based on Flutter/Debug.xcconfig.
+    Directory('${root.path}/ios/Flutter').createSync();
+    File('${root.path}/ios/Flutter/Debug.xcconfig').writeAsStringSync(
+      '#include? "Pods/missing.xcconfig"\n#include "Previews.xcconfig"\n',
+    );
+    File('${root.path}/ios/Flutter/Previews.xcconfig').writeAsStringSync(
+      '// Previews\nSWIFT_OPTIMIZATION_LEVEL = -Onone\n'
+      'SWIFT_ACTIVE_COMPILATION_CONDITIONS = \$(inherited) DEBUG\n',
+    );
+    final result = addTarget(
+      'LiveUpdatesWidget',
+      'example/ios/LiveUpdatesWidget',
+    );
+    expect(result.exitCode, 0, reason: '${result.stderr}');
+    final debug = settings('LiveUpdatesWidget')['Debug']!;
+    expect(debug, isNot(contains('SWIFT_OPTIMIZATION_LEVEL')));
+    expect(debug, isNot(contains('SWIFT_ACTIVE_COMPILATION_CONDITIONS')));
+    expect(debug, containsPair('ENABLE_PREVIEWS', 'YES'));
+    expect(result.stdout, isNot(contains('kept your settings')));
+  }, skip: skip);
+
+  test('an optimized .xcconfig value gets a target-level -Onone and why', () {
+    stripPreviewSettings();
+    Directory('${root.path}/ios/Flutter').createSync();
+    File('${root.path}/ios/Flutter/Debug.xcconfig')
+        .writeAsStringSync('SWIFT_OPTIMIZATION_LEVEL = -O\n');
+    final result = addTarget(
+      'LiveUpdatesWidget',
+      'example/ios/LiveUpdatesWidget',
+    );
+    expect(result.exitCode, 0, reason: '${result.stderr}');
+    expect(
+      result.stdout,
+      contains(
+        'LiveUpdatesWidget (Debug): SWIFT_OPTIMIZATION_LEVEL = -Onone '
+        '(inherited: -O)',
+      ),
+    );
+    expect(
+      settings('LiveUpdatesWidget')['Debug'],
+      containsPair('SWIFT_OPTIMIZATION_LEVEL', '-Onone'),
+    );
+  }, skip: skip);
+
   test(
     'the example widget has the preview settings',
     () => expectPreviewSettings(settings('LiveUpdatesWidget')),

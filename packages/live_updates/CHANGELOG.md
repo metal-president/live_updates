@@ -6,7 +6,8 @@
   is missing, more metrics or buttons than are shown, an empty title that
   Android does not promote, `endedContent` that is never shown or content
   that likely exceeds ActivityKit's 4 KB limit. `check(remote: true)` also
-  reports what a push or remote payload cannot carry. For unit tests.
+  reports what a push or remote payload cannot carry; `startedAt` and `key`
+  refine the Android duration and iOS size checks. For unit tests.
 - `LiveUpdates.diagnose()`: checks in one call why live updates may not
   appear and returns `LiveUpdateDiagnostics`, one `LiveUpdateDiagnosticItem`
   per check with a status (`ok`, `warning`, `problem`, `notApplicable`) and a
@@ -24,7 +25,9 @@
   configurations of the widget extension are built unoptimized with `DEBUG`
   (`SWIFT_OPTIMIZATION_LEVEL`, `SWIFT_ACTIVE_COMPILATION_CONDITIONS`,
   `ENABLE_PREVIEWS`), as previews need; running `create ios` again adds
-  these settings to an existing extension when they are missing.
+  them to an existing extension where a configuration does not set or
+  inherit them (from its `.xcconfig` file or the project), and prints what it
+  added and why.
 - `create android`: the generated layouts have sample content in `tools:`
   attributes for Android Studio's layout preview (removed from the app by
   the build).

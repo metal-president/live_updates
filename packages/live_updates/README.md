@@ -1365,8 +1365,10 @@ Xcode previews need an unoptimized build, and the samples and previews are
 compiled only when `DEBUG` is defined. `create ios` sets this up for the
 configurations of the extension whose name contains "Debug"
 (`SWIFT_OPTIMIZATION_LEVEL = -Onone`, `DEBUG` in
-`SWIFT_ACTIVE_COMPILATION_CONDITIONS` and `ENABLE_PREVIEWS = YES`), and adds
-settings that are missing when you run it again. If the canvas
+`SWIFT_ACTIVE_COMPILATION_CONDITIONS` and `ENABLE_PREVIEWS = YES`). Run
+again, it adds to an existing extension what a configuration neither sets
+itself nor gets from its `.xcconfig` file (following `#include`) or the
+project, and prints each setting it added and why. If the canvas
 says the extension needs an unoptimized build, set them by hand: select the
 widget extension target in Xcode, then in Build Settings, for Debug (and
 each `Debug-<flavor>`), set Swift Compiler - Code Generation > Optimization
@@ -1495,6 +1497,9 @@ limits, for example:
 Pass `remote: true` for content your server sends or replaces: it also
 reports pictures (a push cannot add them), asset icons that need
 `preloadIcons` and Android layout names that remote payloads cannot use.
+For an update of a running live update, pass `startedAt` (Android's
+`maxDuration` counts from the start), and pass the `key` of
+`startOrUpdate` so the size estimate includes it.
 
 ### Diagnose the setup
 

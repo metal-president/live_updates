@@ -134,35 +134,87 @@ def report_deployment_target(project, target, name)
   end
 end
 
+# Settings an .xcconfig file sets, following #include and #include? (the
+# last assignment wins). Settings with a condition (KEY[sdk=...]) are left
+# out; "$(inherited)" in a value is kept as it is.
+def xcconfig_settings(path, seen = {})
+  settings = {}
+  return settings if path.nil? || seen[path] || !File.file?(path)
+  seen[path] = true
+  File.foreach(path) do |line|
+    line = line.strip
+    if (m = line.match(/\A#include\??\s*"([^"]+)"/))
+      settings.merge!(xcconfig_settings(File.expand_path(m[1], File.dirname(path)), seen))
+    elsif !line.start_with?('//') && (m = line.match(/\A([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*;?\s*\z/))
+      settings[m[1]] = m[2].sub(%r{\s+//.*\z}, '')
+    end
+  end
+  settings
+end
+
+# What `key` is for `config` of the widget without its own target-level
+# value: its base .xcconfig file, else the project's configuration of the
+# same name, else nil.
+def inherited_setting(project, config, key)
+  ref = config.base_configuration_reference
+  path = ref && (ref.real_path.to_s rescue nil)
+  value = xcconfig_settings(path)[key]
+  project_config = project.build_configurations.find { |c| c.name == config.name }
+  base = project_config&.build_settings&.[](key)
+  base = Array(base).join(' ') unless base.nil?
+  return base if value.nil?
+  value.gsub('$(inherited)', base || '')
+end
+
 # Xcode previews (the #Preview blocks in the layout file) need an
 # unoptimized build, and the preview samples are compiled only with DEBUG.
 # Flutter's xcconfig files set neither, so debug configurations of the widget
 # get them: those whose name contains "debug" (Debug, Debug-<flavor>,
-# <flavor>-Debug). Settings that are already set are kept (with
-# a hint when they keep previews from working). Returns the names of the
-# settings it added.
-def ensure_preview_settings(target)
+# <flavor>-Debug). A setting is added at target level only when the value
+# the configuration inherits (its .xcconfig, following #include, or the
+# project) does not already provide it. Target-level values are kept (with
+# a hint when they keep previews from working). Returns what was added and
+# why, one line each.
+def ensure_preview_settings(project, target)
   added = []
   target.build_configurations.each do |config|
     # By name only: a configuration that is unoptimized but distributed (such
     # as Staging) must not get DEBUG.
     next unless config.name.match?(/debug/i)
     s = config.build_settings
-    { 'SWIFT_OPTIMIZATION_LEVEL' => '-Onone',
-      'SWIFT_ACTIVE_COMPILATION_CONDITIONS' => '$(inherited) DEBUG',
-      'ENABLE_PREVIEWS' => 'YES' }.each do |key, value|
-      next if s.key?(key)
-      s[key] = value
-      added << key
+    where = "#{target.name} (#{config.name})"
+    unless s.key?('SWIFT_OPTIMIZATION_LEVEL')
+      inherited = inherited_setting(project, config, 'SWIFT_OPTIMIZATION_LEVEL')
+      unless inherited == '-Onone'
+        s['SWIFT_OPTIMIZATION_LEVEL'] = '-Onone'
+        added << "#{where}: SWIFT_OPTIMIZATION_LEVEL = -Onone " \
+                 "(inherited: #{inherited || 'not set, so -O'})"
+      end
     end
-    conditions = Array(s['SWIFT_ACTIVE_COMPILATION_CONDITIONS']).join(' ').split
-    unless s['SWIFT_OPTIMIZATION_LEVEL'] == '-Onone' && conditions.include?('DEBUG')
-      puts "#{target.name} (#{config.name}): Xcode previews need SWIFT_OPTIMIZATION_LEVEL " \
-           '-Onone and DEBUG in SWIFT_ACTIVE_COMPILATION_CONDITIONS; kept your settings ' \
-           '(see "Xcode previews" in the live_updates README).'
+    unless s.key?('SWIFT_ACTIVE_COMPILATION_CONDITIONS')
+      inherited = inherited_setting(project, config, 'SWIFT_ACTIVE_COMPILATION_CONDITIONS')
+      unless inherited.to_s.split.include?('DEBUG')
+        s['SWIFT_ACTIVE_COMPILATION_CONDITIONS'] = '$(inherited) DEBUG'
+        added << "#{where}: DEBUG added to SWIFT_ACTIVE_COMPILATION_CONDITIONS " \
+                 "(inherited: #{inherited.to_s.strip.empty? ? 'none' : inherited})"
+      end
+    end
+    unless s.key?('ENABLE_PREVIEWS') || inherited_setting(project, config, 'ENABLE_PREVIEWS') == 'YES'
+      s['ENABLE_PREVIEWS'] = 'YES'
+      added << "#{where}: ENABLE_PREVIEWS = YES"
+    end
+    optimization = s['SWIFT_OPTIMIZATION_LEVEL'] ||
+                   inherited_setting(project, config, 'SWIFT_OPTIMIZATION_LEVEL')
+    inherited = inherited_setting(project, config, 'SWIFT_ACTIVE_COMPILATION_CONDITIONS').to_s
+    own = s['SWIFT_ACTIVE_COMPILATION_CONDITIONS']
+    conditions = (own.nil? ? inherited : Array(own).join(' ').gsub('$(inherited)', inherited)).split
+    unless optimization == '-Onone' && conditions.include?('DEBUG')
+      puts "#{where}: Xcode previews need SWIFT_OPTIMIZATION_LEVEL -Onone and DEBUG in " \
+           'SWIFT_ACTIVE_COMPILATION_CONDITIONS; kept your settings (see "Xcode previews" ' \
+           'in the live_updates README).'
     end
   end
-  added.uniq
+  added
 end
 
 if (existing = project.targets.find { |t| t.name == name })
@@ -170,9 +222,9 @@ if (existing = project.targets.find { |t| t.name == name })
   ensure_assets(project, existing, name, ext_dir)
   ensure_shared_intent(project, [runner, existing], name)
   report_deployment_target(project, existing, name)
-  added = ensure_preview_settings(existing)
+  added = ensure_preview_settings(project, existing)
   unless added.empty?
-    puts "Set the Debug build settings Xcode previews need for #{name}: #{added.join(', ')}."
+    puts "Set the build settings Xcode previews need:\n  #{added.join("\n  ")}"
   end
   project.save
   if use_group
@@ -220,7 +272,8 @@ target.build_configurations.each do |config|
   s['DEVELOPMENT_TEAM'] = team if team
   s['LD_RUNPATH_SEARCH_PATHS'] = ['$(inherited)', '@executable_path/Frameworks', '@executable_path/../../Frameworks']
 end
-ensure_preview_settings(target)
+added = ensure_preview_settings(project, target)
+puts "Set the build settings Xcode previews need:\n  #{added.join("\n  ")}" unless added.empty?
 
 %w[WidgetKit SwiftUI].each do |fw|
   target.frameworks_build_phase.add_file_reference(

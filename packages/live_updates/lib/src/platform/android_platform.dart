@@ -290,13 +290,20 @@ class AndroidLiveUpdatesPlatform extends LiveUpdatesPlatform
   @override
   Future<LiveUpdateDiagnostics> diagnose({
     String androidChannelId = 'live_updates',
-  }) async => androidDiagnostics(switch (jsonDecode(
-    LiveUpdatesBridge.diagnosticsJson(_j(androidChannelId))
-        .toDartString(releaseOriginal: true),
-  )) {
-    final Map<String, Object?> facts => facts,
-    _ => const {},
-  }, channelId: androidChannelId);
+  }) async {
+    final channel = _j(androidChannelId);
+    final String json;
+    try {
+      json = LiveUpdatesBridge.diagnosticsJson(channel)
+          .toDartString(releaseOriginal: true);
+    } finally {
+      channel.release();
+    }
+    return androidDiagnostics(switch (jsonDecode(json)) {
+      final Map<String, Object?> facts => facts,
+      _ => const {},
+    }, channelId: androidChannelId);
+  }
 
   @override
   Future<void> schedule(

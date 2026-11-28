@@ -1,4 +1,5 @@
 import 'background.dart';
+import 'diagnostics.dart';
 import 'models.dart';
 import 'platform/live_updates_platform.dart';
 
@@ -513,6 +514,32 @@ abstract final class LiveUpdates {
   /// iOS 16.2, or when the widget extension does not support the running
   /// iOS).
   static Future<bool> openSettings() => _platform.openSettings();
+
+  /// Checks, in one call, why live updates may not appear on this device,
+  /// and returns one item per check with a status and a hint. Print it while
+  /// setting up (its `toString()` is a readable report), or show it in a
+  /// debug screen.
+  ///
+  /// iOS: the iOS version (16.2 for Live Activities; buttons need 17.0,
+  /// push-to-start 17.2 and scheduling 26), the widget extension made by
+  /// `create ios`, `NSSupportsLiveActivities`, whether the user allows Live
+  /// Activities, the App Group and the tap URL scheme.
+  ///
+  /// Android: the Android version (Live Updates on 16 and later, else an
+  /// ongoing notification), notifications and the permission, the
+  /// notification channel [androidChannelId] (use the
+  /// [AndroidLiveUpdateOptions.channelId] you pass), promoted notifications
+  /// ([canPostPromotedNotifications]), exact alarms ([canScheduleExactly])
+  /// and the default icon meta-data.
+  ///
+  /// Elsewhere it reports that live updates do nothing on this platform.
+  ///
+  /// The device remains the reference: a check that passes does not mean
+  /// the system shows every update (for example, iOS limits how many Live
+  /// Activities run, and Android decides on promotion).
+  static Future<LiveUpdateDiagnostics> diagnose({
+    String androidChannelId = 'live_updates',
+  }) => _platform.diagnose(androidChannelId: androidChannelId);
 
   /// Copies Flutter assets used as [LiveUpdateIcon.asset] icons into the
   /// App Group shared with the iOS widget extension, so that content sent by

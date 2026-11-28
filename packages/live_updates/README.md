@@ -67,6 +67,12 @@ Screenshots of the example app in this repository. See also the
 - [Custom layouts](#custom-layouts)
   - [Customizing the iOS widget](#customizing-the-ios-widget)
   - [Customizing the Android notification](#customizing-the-android-notification)
+- [Previewing and troubleshooting](#previewing-and-troubleshooting)
+  - [Check on a simulator or emulator](#check-on-a-simulator-or-emulator)
+  - [Xcode previews](#xcode-previews)
+  - [Android Studio layout preview](#android-studio-layout-preview)
+  - [Check content in tests](#check-content-in-tests)
+  - [Diagnose the setup](#diagnose-the-setup)
 - [Platform limits](#platform-limits)
 - [Remote updates](#remote-updates)
 - [Upgrading](#upgrading)
@@ -1314,6 +1320,192 @@ names, add them to its `tools:keep` attribute (comma separated), for
 example `tools:keep="@layout/live_update_*,@layout/courier"`
 ([source][android-keep-resources]).
 
+## Previewing and troubleshooting
+
+The device shows what the user sees. Android has no layout setting: it
+draws the content with system templates, so the look depends on the
+[display mode](#android-display-modes), the Android version and the device.
+Check your content on an iOS simulator and an Android emulator (or devices)
+for each platform, and use the tools below to get there faster.
+
+### Check on a simulator or emulator
+
+Run the app with `flutter run` and show the content with `startOrUpdate`
+and a fixed key. Edit the content in your code, press Hot Reload and call
+`startOrUpdate` again: the live update changes in place, without a
+rebuild. On iOS, lock the simulator to see the Lock Screen; on Android, pull
+down the notification shade.
+
+The example app does this on its **Samples** screen: a list of named
+samples (each built-in layout, the custom layout, content hidden on the
+Lock Screen and content that switches to its ended version) with Show and
+End buttons, the `check()` result of each sample and the `diagnose()`
+report. Its samples are in
+[`samples_page.dart`](https://github.com/metal-president/live_updates/blob/main/packages/live_updates/example/lib/samples_page.dart).
+
+### Xcode previews
+
+The layout file that `create ios` writes (`LiveUpdatesWidgetLiveActivity.swift`)
+ends with Xcode previews of the Lock Screen and of the expanded, compact and
+minimal Dynamic Island. They draw your layout file with SwiftUI, as the
+device does, so a change to the layout shows in the canvas right away.
+Open the file in Xcode and show the canvas; pick a sample at the bottom of
+the canvas.
+
+The samples, one per built-in layout, are in `LiveUpdatesViews.swift`
+(`LiveUpdatesAttributes.ContentState.previewStandard`, `previewTimer`,
+`previewMetrics`, `previewStepper` and `previewJourney`), in debug builds
+only. They use SF Symbols instead of images, since images come from the App
+Group of the running app. The previews need iOS 17 in the canvas; they are
+marked `@available(iOS 17.0, *)`, so the widget still supports iOS 16.2.
+Previews show the full content: check `publicContent` (a locked device)
+and `endedContent` (`endAt`) on a device.
+
+A layout file made by an earlier version is kept when you run `create ios`
+again, while `LiveUpdatesViews.swift` (with the samples) is refreshed. Add
+the previews you want to the end of your layout file by hand:
+
+```swift
+#if DEBUG
+  @available(iOS 17.0, *)
+  #Preview("Lock Screen", as: .content, using: LiveUpdatesAttributes.preview) {
+    LiveUpdatesWidgetLiveActivity()
+  } contentStates: {
+    LiveUpdatesAttributes.ContentState.previewStandard
+    LiveUpdatesAttributes.ContentState.previewMetrics
+  }
+
+  @available(iOS 17.0, *)
+  #Preview("Compact", as: .dynamicIsland(.compact), using: LiveUpdatesAttributes.preview) {
+    LiveUpdatesWidgetLiveActivity()
+  } contentStates: {
+    LiveUpdatesAttributes.ContentState.previewStandard
+  }
+#endif
+```
+
+Use `.dynamicIsland(.expanded)` and `.dynamicIsland(.minimal)` for the other
+presentations, and the name of your widget if you passed `--name`. For a
+layout of your own, add a sample with its data and list it in
+`contentStates`:
+
+```swift
+#if DEBUG
+  extension LiveUpdatesAttributes.ContentState {
+    static var previewDelivery: Self {
+      Self(title: "Order #1234", extra: ["status": "On the way"], layout: "delivery")
+    }
+  }
+#endif
+```
+
+The example app has one for its `delivery` layout.
+
+### Android Studio layout preview
+
+The layouts that `create android` writes hold sample content in `tools:`
+attributes (`tools:text`, `tools:progress`, `tools:src` and
+`tools:visibility`), so Android Studio's layout preview shows a filled
+notification instead of empty, hidden views. The build removes `tools:`
+attributes from the app ([source][android-tools-attributes]), so they
+change nothing at runtime. For layouts made by an earlier version, add them
+by hand, for example:
+
+```xml
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools" ...>
+
+    <TextView
+        android:id="@+id/live_update_body"
+        tools:text="On the way"
+        tools:visibility="visible"
+        android:visibility="gone" ... />
+```
+
+The preview shows the layout alone: on the device Android draws it inside
+its notification frame (see
+[Customizing the Android notification](#customizing-the-android-notification)).
+Content without a custom layout uses the system templates, which have no
+layout file to preview.
+
+### Check content in tests
+
+`LiveUpdateContent.check()` checks content without a device and returns a
+list of `LiveUpdateIssue`s: what the platforms would not show as written.
+Each issue has a stable `code`, the `platforms` it applies to, a
+`severity` (`info`, `warning` or `error`) and an English `message`. Use it
+in unit tests:
+
+```dart
+import 'package:flutter_test/flutter_test.dart';
+import 'package:live_updates/live_updates.dart';
+
+void main() {
+  test('order content shows as written', () {
+    const content = LiveUpdateContent(
+      title: 'Order #1234',
+      ios: IosLiveUpdateOptions(layout: IosLiveUpdateLayout.metrics),
+    );
+    // layoutDataMissing: the metrics layout has no metrics and falls back
+    // to the standard layout.
+    expect(content.check().map((i) => i.code), [
+      LiveUpdateIssueCode.layoutDataMissing,
+    ]);
+  });
+}
+```
+
+It reports what this package does with the content and the documented
+limits, for example:
+
+- an iOS layout whose data is missing (it falls back to `standard`), and a
+  Dynamic Island choice whose data is missing;
+- more than three metrics or buttons, a `criticalMetric` that is not one of
+  the shown metrics, a `steps.current` outside the labels, empty stage
+  names, and more stages than Android 16 draws as segments;
+- Android: an empty title (no promotion), a custom layout with
+  `AndroidLiveUpdateMode.liveUpdate` (never promoted), `extra` keys a custom
+  layout cannot show, icon names the platform cannot find and a
+  `shortCriticalText` the status bar chip may cut;
+- `endedContent` that is never shown (no `endAt`, or `removeAtEnd`);
+- content that likely exceeds ActivityKit's 4 KB limit (an estimate; see
+  [Platform limits](#platform-limits)).
+
+Pass `remote: true` for content your server sends or replaces: it also
+reports pictures (a push cannot add them), asset icons that need
+`preloadIcons` and Android layout names that remote payloads cannot use.
+
+### Diagnose the setup
+
+When a live update does not appear, `LiveUpdates.diagnose()` checks the
+setup in one call and returns one item per check, each with a status (`ok`,
+`warning`, `problem` or `notApplicable`) and, where it helps, a hint:
+
+```dart
+final diagnostics = await LiveUpdates.diagnose();
+debugPrint('$diagnostics'); // one line per check
+if (diagnostics.problems.isNotEmpty) {
+  // For example offer LiveUpdates.openSettings().
+}
+```
+
+- **iOS:** the iOS version (Live Activities need 16.2; buttons 17.0,
+  push-to-start 17.2, scheduling 26), the widget extension made by
+  `create ios` and whether it supports the running iOS,
+  `NSSupportsLiveActivities`, whether the user allows Live Activities for
+  the app, the App Group and the tap URL scheme.
+- **Android:** the Android version (Live Updates from Android 16, an ongoing
+  notification before), whether notifications are enabled, the
+  notification channel (pass `androidChannelId` if you use your own),
+  `POST_PROMOTED_NOTIFICATIONS` and whether the app may post promoted
+  notifications, exact alarms and the default icon meta-data.
+- **Other platforms:** a single item saying that live updates do nothing
+  there.
+
+Settings change at any time, so diagnose again when something changes. A
+passing check does not promise that the system shows every update (the
+[platform limits](#platform-limits) still apply).
+
 ## Platform limits
 
 Each limit links to the platform documentation it comes from. The systems
@@ -1458,6 +1650,7 @@ differently.
 [android-promotion-settings]: https://developer.android.com/reference/android/provider/Settings#ACTION_APP_NOTIFICATION_PROMOTION_SETTINGS
 [android-12-custom]: https://developer.android.com/about/versions/12/behavior-changes-12#custom-notifications
 [android-custom-notification]: https://developer.android.com/develop/ui/views/notifications/custom-notification
+[android-tools-attributes]: https://developer.android.com/studio/write/tool-attributes
 
 ## Remote updates
 

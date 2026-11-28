@@ -22,8 +22,13 @@
   most 48 dp high. Keep the text colors of
   the notification text appearances (no background color), so the layout
   reads well in light and dark themes.
+
+  The tools: attributes only fill Android Studio's layout preview with sample
+  content; they are not part of the app. Check the result on a device: the
+  system's frame and colors differ between Android versions.
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:gravity="center_vertical"
@@ -37,6 +42,7 @@
 
         <TextView
             android:id="@+id/live_update_title"
+            tools:text="Order #1234"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
@@ -46,6 +52,8 @@
 
         <Chronometer
             android:id="@+id/live_update_timer"
+            tools:text="12:34"
+            tools:visibility="visible"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="8dp"
@@ -56,6 +64,8 @@
 
     <TextView
         android:id="@+id/live_update_body"
+        tools:text="On the way"
+        tools:visibility="visible"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:ellipsize="end"
@@ -65,6 +75,8 @@
 
     <ProgressBar
         android:id="@+id/live_update_progress"
+        tools:progress="60"
+        tools:visibility="visible"
         style="@android:style/Widget.Material.ProgressBar.Horizontal"
         android:layout_width="match_parent"
         android:layout_height="4dp"

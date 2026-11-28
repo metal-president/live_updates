@@ -242,6 +242,18 @@ extension type LiveUpdatesBridge._(objc.ObjCObject object$)
     );
   }
 
+  /// Facts about the setup for <code>LiveUpdates.diagnose()</code>, as JSON: the iOS
+  /// version, the widget extensions, <code>NSSupportsLiveActivities</code>, whether
+  /// Live Activities are enabled for the app (iOS 16.2+), the App Group and
+  /// the tap URL scheme. Works on every iOS version the plugin builds for.
+  static objc.NSString diagnosticsJson() {
+    final $ret = _objc_msgSend_151sglz(
+      _class_LiveUpdatesBridge,
+      _sel_diagnosticsJson,
+    );
+    return objc.NSString.fromPointer($ret, retain: true, release: true);
+  }
+
   /// Ends the activity with <code>id</code>. <code>dismissAfter</code> < 0 uses the system default
   /// policy, 0 dismisses immediately, otherwise seconds from now.
   static void end(
@@ -2099,6 +2111,7 @@ late final _sel_cancelAllScheduled_ = objc.registerName("cancelAllScheduled:");
 late final _sel_cancelScheduled_completion_ = objc.registerName(
   "cancelScheduled:completion:",
 );
+late final _sel_diagnosticsJson = objc.registerName("diagnosticsJson");
 late final _sel_endAll_ = objc.registerName("endAll:");
 late final _sel_end_json_dismissAfter_completion_ = objc.registerName(
   "end:json:dismissAfter:completion:",

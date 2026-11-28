@@ -869,3 +869,68 @@ private func liveUpdatesAppURL(host: String, _ items: [URLQueryItem]) -> URL? {
   components.queryItems = items
   return components.url
 }
+
+#if DEBUG
+  /// Sample content for Xcode previews of the layout file (the `#Preview`
+  /// blocks in {{name}}LiveActivity.swift): one per built-in layout. They
+  /// use SF Symbols instead of images (images need the App Group of the
+  /// running app), and timers count from when the preview is drawn. Debug
+  /// builds only.
+  extension LiveUpdatesAttributes {
+    /// Attributes for previews.
+    static var preview: Self { Self(key: "preview") }
+  }
+
+  extension LiveUpdatesAttributes.ContentState {
+    /// The standard layout: icon, title, body, timer and progress.
+    static var previewStandard: Self {
+      Self(
+        title: "Order #1234", body: "On the way", progress: 0.6,
+        icon: LiveUpdatesIcon(symbol: "shippingbox.fill"),
+        timerEnd: previewTime(minutes: 15))
+    }
+
+    /// The timer layout: a large countdown.
+    static var previewTimer: Self {
+      Self(
+        title: "Order #1234", body: "Arriving soon",
+        icon: LiveUpdatesIcon(symbol: "shippingbox.fill"),
+        timerEnd: previewTime(minutes: 15), compactTrailing: "timer", layout: "timer")
+    }
+
+    /// The metrics layout: three labeled values.
+    static var previewMetrics: Self {
+      Self(
+        title: "Order #1234", body: "On the way",
+        icon: LiveUpdatesIcon(symbol: "shippingbox.fill"), layout: "metrics",
+        metrics: [
+          LiveUpdatesMetric(
+            label: "Arrives in", type: "timer", number: previewTime(minutes: 15) * 1000),
+          LiveUpdatesMetric(
+            label: "Distance", type: "decimal", number: 2.4, unit: "km", fractionDigits: 1),
+          LiveUpdatesMetric(label: "Stops", type: "integer", number: 2),
+        ])
+    }
+
+    /// The stepper layout: stages with the current one highlighted.
+    static var previewStepper: Self {
+      Self(
+        title: "Order #1234", body: "On the way", progress: 0.66,
+        icon: LiveUpdatesIcon(symbol: "shippingbox.fill"), layout: "stepper",
+        steps: LiveUpdatesSteps(labels: ["Ordered", "Preparing", "On the way", "Delivered"], current: 2))
+    }
+
+    /// The journey layout: from and to with the progress between them.
+    static var previewJourney: Self {
+      Self(
+        title: "Order #1234", body: "On the way", progress: 0.6,
+        icon: LiveUpdatesIcon(symbol: "shippingbox.fill"), layout: "journey",
+        journey: LiveUpdatesJourney(from: "Shop", to: "Home", fromDetail: "18:10", toDetail: "18:30"))
+    }
+
+    /// Seconds since 1970, `minutes` from now.
+    static func previewTime(minutes: Double) -> Double {
+      Date().addingTimeInterval(minutes * 60).timeIntervalSince1970
+    }
+  }
+#endif

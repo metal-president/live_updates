@@ -77,7 +77,8 @@ final class LiveUpdatesScheduler {
     }
   }
 
-  private static boolean declares(Context c, String permission) {
+  /** Whether the app's merged manifest requests {@code permission}. */
+  static boolean declares(Context c, String permission) {
     try {
       PackageInfo info =
           c.getPackageManager().getPackageInfo(c.getPackageName(), PackageManager.GET_PERMISSIONS);

@@ -67,3 +67,47 @@ struct {{name}}LiveActivity: Widget {
     }
   }
 }
+
+// Xcode previews of the Lock Screen and the Dynamic Island, drawn by this
+// file with sample content (in LiveUpdatesViews.swift). Each preview has a
+// sample per built-in layout: pick one at the bottom of the canvas. Add a
+// sample of your own content to check a layout you add above.
+#if DEBUG
+  @available(iOS 17.0, *)
+  #Preview("Lock Screen", as: .content, using: LiveUpdatesAttributes.preview) {
+    {{name}}LiveActivity()
+  } contentStates: {
+    LiveUpdatesAttributes.ContentState.previewStandard
+    LiveUpdatesAttributes.ContentState.previewTimer
+    LiveUpdatesAttributes.ContentState.previewMetrics
+    LiveUpdatesAttributes.ContentState.previewStepper
+    LiveUpdatesAttributes.ContentState.previewJourney
+  }
+
+  @available(iOS 17.0, *)
+  #Preview("Expanded", as: .dynamicIsland(.expanded), using: LiveUpdatesAttributes.preview) {
+    {{name}}LiveActivity()
+  } contentStates: {
+    LiveUpdatesAttributes.ContentState.previewStandard
+    LiveUpdatesAttributes.ContentState.previewTimer
+    LiveUpdatesAttributes.ContentState.previewMetrics
+    LiveUpdatesAttributes.ContentState.previewStepper
+    LiveUpdatesAttributes.ContentState.previewJourney
+  }
+
+  @available(iOS 17.0, *)
+  #Preview("Compact", as: .dynamicIsland(.compact), using: LiveUpdatesAttributes.preview) {
+    {{name}}LiveActivity()
+  } contentStates: {
+    LiveUpdatesAttributes.ContentState.previewStandard
+    LiveUpdatesAttributes.ContentState.previewTimer
+  }
+
+  @available(iOS 17.0, *)
+  #Preview("Minimal", as: .dynamicIsland(.minimal), using: LiveUpdatesAttributes.preview) {
+    {{name}}LiveActivity()
+  } contentStates: {
+    LiveUpdatesAttributes.ContentState.previewStandard
+    LiveUpdatesAttributes.ContentState.previewTimer
+  }
+#endif

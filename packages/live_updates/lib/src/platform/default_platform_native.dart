@@ -1,6 +1,7 @@
 import 'dart:io' show Platform;
 
 import '../ios/bindings.g.dart' show LiveUpdatesBridge;
+import '../diagnostics.dart';
 import '../models.dart';
 import 'android_platform.dart';
 import 'ios_platform.dart';
@@ -24,6 +25,11 @@ LiveUpdatesPlatform createDefaultPlatform() {
 /// handle one case.
 class OldIosLiveUpdatesPlatform extends NoopLiveUpdatesPlatform {
   static const _message = 'Scheduling live updates requires iOS 26 or later.';
+
+  @override
+  Future<LiveUpdateDiagnostics> diagnose({
+    String androidChannelId = 'live_updates',
+  }) async => diagnoseIos();
 
   @override
   Future<void> schedule(

@@ -4,6 +4,8 @@ import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:live_updates/live_updates.dart';
 import 'package:material_ui/material_ui.dart';
 
+import 'samples_page.dart';
+
 /// Runs in a headless engine when a button is pressed while the app is not
 /// running.
 @pragma('vm:entry-point')
@@ -76,6 +78,8 @@ class _ExamplePageState extends State<ExamplePage> {
     LiveUpdates.canPostPromotedNotifications().then(
       (s) => _add('can post promoted: $s'),
     );
+    // Why live updates may not appear: one line per check.
+    LiveUpdates.diagnose().then((d) => _add('$d'));
   }
 
   @override
@@ -317,7 +321,18 @@ class _ExamplePageState extends State<ExamplePage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('live_updates example')),
+    appBar: AppBar(
+      title: const Text('live_updates example'),
+      actions: [
+        // Named samples of every layout to check on the device.
+        TextButton(
+          onPressed: () => Navigator.of(
+            context,
+          ).push(MaterialPageRoute<void>(builder: (_) => const SamplesPage())),
+          child: const Text('Samples'),
+        ),
+      ],
+    ),
     body: Column(
       children: [
         Wrap(

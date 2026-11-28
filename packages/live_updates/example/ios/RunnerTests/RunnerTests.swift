@@ -495,3 +495,42 @@ struct ScheduleLimitTests {
     #expect(result == 1)
   }
 }
+
+/// Facts for `LiveUpdates.diagnose()`, read from the example app (Runner),
+/// which `create ios` set up.
+struct DiagnosticsTests {
+  private func facts() throws -> [String: Any] {
+    let json = LiveUpdatesBridge.diagnosticsJson()
+    return try #require(
+      JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any])
+  }
+
+  @Test func reportsTheExampleSetup() throws {
+    let facts = try facts()
+    let os = ProcessInfo.processInfo.operatingSystemVersion
+    #expect(facts["os"] as? String == "\(os.majorVersion).\(os.minorVersion).\(os.patchVersion)")
+    #expect(facts["supportsLiveActivities"] as? Bool == true)
+    #expect(facts["tapScheme"] as? Bool == true)
+    #expect(facts["activitiesEnabled"] is Bool)
+    #expect(facts["appGroup"] as? String != nil)
+    #expect(facts["appGroupReachable"] is Bool)
+    let widgets = try #require(facts["widgets"] as? [[String: Any]])
+    #expect(widgets.count == 1)
+    #expect(widgets.first?["marked"] as? Bool == true)
+    #expect(widgets.first?["runs"] as? Bool == true)
+    #expect(widgets.first?["minimum"] as? String == "16.2")
+  }
+
+  @Test func theTapSchemeIsFoundInURLTypes() {
+    let scheme = LiveUpdatesBridge.tapScheme
+    #expect(
+      LiveUpdatesBridge.registersTapScheme([
+        "CFBundleURLTypes": [["CFBundleURLSchemes": ["other", scheme.uppercased()]]]
+      ]))
+    #expect(!LiveUpdatesBridge.registersTapScheme([:]))
+    #expect(
+      !LiveUpdatesBridge.registersTapScheme([
+        "CFBundleURLTypes": [["CFBundleURLSchemes": ["other"]]]
+      ]))
+  }
+}

@@ -1,3 +1,33 @@
+## Unreleased
+
+- `LiveUpdateContent.check()`: checks content without a device and returns
+  `LiveUpdateIssue`s (a stable `LiveUpdateIssueCode`, the platforms, a
+  `LiveUpdateIssueSeverity` and a message), such as an iOS layout whose data
+  is missing, more metrics or buttons than are shown, an empty title that
+  Android does not promote, `endedContent` that is never shown or content
+  that likely exceeds ActivityKit's 4 KB limit. `check(remote: true)` also
+  reports what a push or remote payload cannot carry. For unit tests.
+- `LiveUpdates.diagnose()`: checks in one call why live updates may not
+  appear and returns `LiveUpdateDiagnostics`, one `LiveUpdateDiagnosticItem`
+  per check with a status (`ok`, `warning`, `problem`, `notApplicable`) and a
+  hint; its `toString()` is a readable report. iOS: the iOS version and
+  feature minimums, the widget extension, `NSSupportsLiveActivities`,
+  whether Live Activities are allowed, the App Group and the tap URL scheme.
+  Android: the Android version, notifications, the channel, promoted
+  notifications, exact alarms and the default icon meta-data. Other
+  platforms report that live updates do nothing there.
+- `create ios`: the layout file ends with Xcode previews of the Lock Screen
+  and the Dynamic Island (iOS 17 canvas; the widget still supports iOS
+  16.2), and `LiveUpdatesViews.swift` has sample content for each built-in
+  layout (debug builds only). A layout file you already have is kept: see
+  "Xcode previews" in the README to add the previews by hand.
+- `create android`: the generated layouts have sample content in `tools:`
+  attributes for Android Studio's layout preview (removed from the app by
+  the build).
+- Docs: "Previewing and troubleshooting". The example app has a Samples
+  screen to show, update and end a sample of each layout on a simulator or
+  emulator, with the `check()` and `diagnose()` results.
+
 ## 0.5.3
 
 - Docs: "Scheduling" explains how to schedule several live updates (one

@@ -1356,8 +1356,9 @@ The samples, one per built-in layout, are in `LiveUpdatesViews.swift`
 (`LiveUpdatesAttributes.ContentState.previewStandard`, `previewTimer`,
 `previewMetrics`, `previewStepper` and `previewJourney`), in debug builds
 only. They use SF Symbols instead of images, since images come from the App
-Group of the running app. The previews need iOS 17 in the canvas ([source][apple-widget-preview]); they are
-marked `@available(iOS 17.0, *)`, so the widget still supports iOS 16.2.
+Group of the running app. The previews need iOS 17 in the canvas
+([source][apple-widget-preview]); they are marked `@available(iOS 17.0, *)`,
+so the widget still supports iOS 16.2.
 Previews show the full content: check `publicContent` (a locked device)
 and `endedContent` (`endAt`) on a device.
 
@@ -1365,15 +1366,17 @@ Xcode previews need an unoptimized build, and the samples and previews are
 compiled only when `DEBUG` is defined. `create ios` sets this up for the
 configurations of the extension whose name contains "Debug"
 (`SWIFT_OPTIMIZATION_LEVEL = -Onone`, `DEBUG` in
-`SWIFT_ACTIVE_COMPILATION_CONDITIONS` and `ENABLE_PREVIEWS = YES`). Run
-again, it adds to an existing extension what a configuration neither sets
-itself nor gets from its `.xcconfig` file (following `#include`) or the
-project, and prints each setting it added and why. If the canvas
-says the extension needs an unoptimized build, set them by hand: select the
-widget extension target in Xcode, then in Build Settings, for Debug (and
-each `Debug-<flavor>`), set Swift Compiler - Code Generation > Optimization
-Level to No Optimization [-Onone] and add `DEBUG` to Swift Compiler - Custom
-Flags > Active Compilation Conditions.
+`SWIFT_ACTIVE_COMPILATION_CONDITIONS` and `ENABLE_PREVIEWS = YES`). When you
+run it again on an existing extension, it adds what a configuration neither
+sets itself nor gets from its `.xcconfig` file (following `#include`) or the
+project, and prints each setting it added and why. It keeps settings the
+target already has, and prints a note when they keep previews from working.
+If the canvas says the extension needs an unoptimized build, set them by
+hand: select the widget extension target in Xcode, then in Build Settings,
+for Debug (and each `Debug-<flavor>`), set Swift Compiler - Code Generation >
+Optimization Level to No Optimization [-Onone], add `DEBUG` to Swift
+Compiler - Custom Flags > Active Compilation Conditions, and set Build
+Options > Enable Previews to Yes.
 
 A layout file made by an earlier version is kept when you run `create ios`
 again, while `LiveUpdatesViews.swift` (with the samples) is refreshed. Add
@@ -1499,7 +1502,7 @@ reports pictures (a push cannot add them), asset icons that need
 `preloadIcons` and Android layout names that remote payloads cannot use.
 For an update of a running live update, pass `startedAt` (Android's
 `maxDuration` counts from the start), and pass the `key` of
-`startOrUpdate` so the size estimate includes it.
+`startOrUpdate` or `schedule` so the size estimate includes it.
 
 ### Diagnose the setup
 

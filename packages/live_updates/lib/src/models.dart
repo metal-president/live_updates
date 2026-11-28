@@ -219,8 +219,9 @@ final class LiveUpdateContent {
   /// [startedAt] is when the live update started, for an update of a
   /// running one: Android's [AndroidLiveUpdateOptions.maxDuration] counts
   /// from then. It defaults to now, as for content that starts a live update.
-  /// [key] is the key you pass to [LiveUpdates.startOrUpdate]: it counts
-  /// toward ActivityKit's size limit with the content.
+  /// [key] is the key you pass to [LiveUpdates.startOrUpdate] or
+  /// [LiveUpdates.schedule]: it counts toward ActivityKit's size limit with
+  /// the content.
   ///
   /// Debug builds already assert some ranges (such as [progress]) when the
   /// content is created; this reports them for content created in release

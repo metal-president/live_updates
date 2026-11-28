@@ -137,16 +137,32 @@ end
 # Settings an .xcconfig file sets, following #include and #include? (the
 # last assignment wins). Settings with a condition (KEY[sdk=...]) are left
 # out; "$(inherited)" in a value is kept as it is.
-def xcconfig_settings(path, seen = {})
+def xcconfig_settings(path, project_dir = nil, seen = {}, depth = 0)
   settings = {}
-  return settings if path.nil? || seen[path] || !File.file?(path)
-  seen[path] = true
+  return settings if path.nil? || depth > 32 || !File.file?(path)
+  real = (File.realpath(path) rescue path)
+  return settings if seen[real]
+  seen[real] = true
   File.foreach(path) do |line|
     line = line.strip
     if (m = line.match(/\A#include\??\s*"([^"]+)"/))
-      settings.merge!(xcconfig_settings(File.expand_path(m[1], File.dirname(path)), seen))
-    elsif !line.start_with?('//') && (m = line.match(/\A([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*;?\s*\z/))
-      settings[m[1]] = m[2].sub(%r{\s+//.*\z}, '')
+      # Relative to the including file, else to the project folder (as
+      # Flutter's "Pods/Target Support Files/..." includes are).
+      inc = File.expand_path(m[1], File.dirname(path))
+      inc = File.expand_path(m[1], project_dir) if project_dir && !File.file?(inc)
+      xcconfig_settings(inc, project_dir, seen, depth + 1).each do |k, v|
+        settings[k] = settings.key?(k) ? v.gsub('$(inherited)', settings[k]) : v
+      end
+    elsif !line.start_with?('//') && (m = line.match(/\A([A-Za-z_]\w*)\s*=(.*)\z/))
+      # String operations, not a regex, for the value (no backtracking).
+      value = m[2]
+      comment = value.index('//')
+      value = value[0...comment] if comment
+      value = value.strip
+      value = value.chomp(';').rstrip
+      # $(inherited) here is what earlier lines and includes set.
+      value = value.gsub('$(inherited)', settings[m[1]]) if settings.key?(m[1])
+      settings[m[1]] = value
     end
   end
   settings
@@ -158,12 +174,12 @@ end
 def inherited_setting(project, config, key)
   ref = config.base_configuration_reference
   path = ref && (ref.real_path.to_s rescue nil)
-  value = xcconfig_settings(path)[key]
+  value = xcconfig_settings(path, project.project_dir.to_s)[key]
   project_config = project.build_configurations.find { |c| c.name == config.name }
   base = project_config&.build_settings&.[](key)
   base = Array(base).join(' ') unless base.nil?
-  return base if value.nil?
-  value.gsub('$(inherited)', base || '')
+  resolved = value.nil? ? base : value.gsub('$(inherited)', base || '').strip
+  resolved.nil? || resolved.strip.empty? ? nil : resolved
 end
 
 # Xcode previews (the #Preview blocks in the layout file) need an
@@ -203,8 +219,9 @@ def ensure_preview_settings(project, target)
       s['ENABLE_PREVIEWS'] = 'YES'
       added << "#{where}: ENABLE_PREVIEWS = YES"
     end
-    optimization = s['SWIFT_OPTIMIZATION_LEVEL'] ||
-                   inherited_setting(project, config, 'SWIFT_OPTIMIZATION_LEVEL')
+    optimization = (s['SWIFT_OPTIMIZATION_LEVEL'] || '$(inherited)')
+                   .gsub('$(inherited)', inherited_setting(project, config, 'SWIFT_OPTIMIZATION_LEVEL') || '')
+                   .strip
     inherited = inherited_setting(project, config, 'SWIFT_ACTIVE_COMPILATION_CONDITIONS').to_s
     own = s['SWIFT_ACTIVE_COMPILATION_CONDITIONS']
     conditions = (own.nil? ? inherited : Array(own).join(' ').gsub('$(inherited)', inherited)).split
@@ -271,6 +288,14 @@ target.build_configurations.each do |config|
   team = runner_config&.build_settings&.dig('DEVELOPMENT_TEAM')
   s['DEVELOPMENT_TEAM'] = team if team
   s['LD_RUNPATH_SEARCH_PATHS'] = ['$(inherited)', '@executable_path/Frameworks', '@executable_path/../../Frameworks']
+end
+# new_target gave configurations it took for release ones (no DEBUG=1 in
+# the project) optimized Swift settings: for debug-named ones, let the
+# inherited values decide instead.
+target.build_configurations.each do |config|
+  next unless config.name.match?(/debug/i)
+  %w[SWIFT_OPTIMIZATION_LEVEL SWIFT_COMPILATION_MODE SWIFT_ACTIVE_COMPILATION_CONDITIONS]
+    .each { |k| config.build_settings.delete(k) }
 end
 added = ensure_preview_settings(project, target)
 puts "Set the build settings Xcode previews need:\n  #{added.join("\n  ")}" unless added.empty?

@@ -402,6 +402,14 @@ void main() {
     const a = LiveUpdateMetric.integer('A', 1);
     expect(androidMetricStyleIndexes([a, bad, a, a, a]), [0, 2, 3]);
     expect(androidMetricStyleIndexes([bad]), isEmpty);
+    // Android converts decimals to 32-bit floats.
+    expect(
+      androidMetricStyleIndexes(const [
+        LiveUpdateMetric.decimal('Huge', 1e300),
+        a,
+      ]),
+      [1],
+    );
     expect(
       androidMetricStyleIndexes(const [
         LiveUpdateMetric.decimal('D', 1.5),
@@ -429,6 +437,25 @@ void main() {
         LiveUpdateIssueCode.criticalMetricOutOfRange,
       ],
     );
+  });
+
+  test('criticalMetric is only checked where MetricStyle is used', () {
+    for (final options in const [
+      AndroidLiveUpdateOptions(mode: AndroidLiveUpdateMode.classic),
+      AndroidLiveUpdateOptions(
+        mode: AndroidLiveUpdateMode.ongoing,
+        customLayout: AndroidCustomLayout('live_update_x'),
+      ),
+    ]) {
+      expect(
+        const LiveUpdateContent(
+          title: 'T',
+          metrics: [LiveUpdateMetric.integer('A', 1)],
+          criticalMetric: 2,
+        ).copyWith(android: options).check(),
+        isEmpty,
+      );
+    }
   });
 
   test('with metrics, Android 17 shows them instead of the progress bar', () {

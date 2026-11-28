@@ -183,6 +183,30 @@ p.save
     );
   }, skip: skip);
 
+  test('xcconfig comments, project-relative includes and inherited values', () {
+    stripPreviewSettings();
+    // Flutter's Debug.xcconfig includes the Pods file relative to ios/.
+    final pods = Directory('${root.path}/ios/Pods/Target Support Files')
+      ..createSync(recursive: true);
+    File('${pods.path}/Pods-Runner.debug.xcconfig')
+        .writeAsStringSync('SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG\n');
+    Directory('${root.path}/ios/Flutter').createSync();
+    File('${root.path}/ios/Flutter/Debug.xcconfig').writeAsStringSync(
+      '#include? "Pods/Target Support Files/Pods-Runner.debug.xcconfig"\n'
+      'SWIFT_ACTIVE_COMPILATION_CONDITIONS = \$(inherited) FOO\n'
+      'SWIFT_OPTIMIZATION_LEVEL = -Onone;// fast\n',
+    );
+    final result = addTarget(
+      'LiveUpdatesWidget',
+      'example/ios/LiveUpdatesWidget',
+    );
+    expect(result.exitCode, 0, reason: '${result.stderr}');
+    final debug = settings('LiveUpdatesWidget')['Debug']!;
+    expect(debug, isNot(contains('SWIFT_OPTIMIZATION_LEVEL')));
+    expect(debug, isNot(contains('SWIFT_ACTIVE_COMPILATION_CONDITIONS')));
+    expect(result.stdout, isNot(contains('kept your settings')));
+  }, skip: skip);
+
   test(
     'the example widget has the preview settings',
     () => expectPreviewSettings(settings('LiveUpdatesWidget')),

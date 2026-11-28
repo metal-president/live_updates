@@ -188,7 +188,7 @@ final class LiveUpdateDiagnostics {
   @override
   int get hashCode => Object.hash(platform, osVersion, Object.hashAll(items));
 
-  /// A readable report, one line per check, for logs.
+  /// A readable report for logs: a summary line, then one line per check.
   @override
   String toString() {
     final where = switch (platform) {

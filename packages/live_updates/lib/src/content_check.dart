@@ -16,12 +16,12 @@ enum LiveUpdateIssueCode {
   /// the widget shows the standard layout.
   layoutDataMissing,
 
-  /// More than three [LiveUpdateContent.metrics]: only the first three are
-  /// shown.
+  /// More than three [LiveUpdateContent.metrics]: only three are shown (the
+  /// first three; on Android 17 the first three it can show).
   tooManyMetrics,
 
-  /// Android: [LiveUpdateContent.criticalMetric] is not the index of one of
-  /// the shown metrics, so it is ignored.
+  /// Android 17: [LiveUpdateContent.criticalMetric] is not the index of one
+  /// of the metrics `MetricStyle` shows, so it is ignored.
   criticalMetricOutOfRange,
 
   /// [LiveUpdateSteps.current] is not the index of a label; the nearest
@@ -267,14 +267,18 @@ List<LiveUpdateIssue> checkContent(
       LiveUpdateIssueCode.tooManyMetrics,
       info,
       _both,
-      '${content.metrics.length} metrics; only the first three are shown.',
+      '${content.metrics.length} metrics; only three are shown (the first '
+      'three; on Android 17 the first three it can show).',
     );
   }
   // Android 17 MetricStyle shows the first three metrics it can show
-  // (LiveUpdatesApi37.setMetricStyle skips a decimal that is not finite).
+  // (LiveUpdatesApi37.setMetricStyle skips a decimal it cannot show).
   final metricStyle = androidMetricStyleIndexes(content.metrics);
   if (content.criticalMetric case final i?
-      when metricStyle.isNotEmpty && !metricStyle.contains(i)) {
+      when custom == null &&
+          mode != AndroidLiveUpdateMode.classic &&
+          metricStyle.isNotEmpty &&
+          !metricStyle.contains(i)) {
     add(
       LiveUpdateIssueCode.criticalMetricOutOfRange,
       warning,
@@ -556,14 +560,22 @@ int estimatedIosPayloadBytes(LiveUpdateContent content, {String? key}) {
 
 /// Indexes in [metrics] of the metrics Android 17 shows with `MetricStyle`:
 /// the first three that it can show, as `LiveUpdatesApi37.setMetricStyle`
-/// does (it skips a decimal that is not a finite number, which the content
-/// sends as `null`).
+/// does: it skips a decimal that is not a finite number (sent as `null`) or
+/// that is not finite as a 32-bit float, which Android uses.
 @visibleForTesting
 List<int> androidMetricStyleIndexes(List<LiveUpdateMetric> metrics) => [
   for (var i = 0; i < metrics.length; i++)
-    if (metrics[i] case LiveUpdateMetric(value: final double v)
-        when !v.isFinite)
+    if (metrics[i]
+        case LiveUpdateMetric(
+          kind: LiveUpdateMetricKind.decimal,
+          value: final double v,
+        )
+        when !v.isFinite || v.abs() > _maxFloat)
       ...const <int>[]
     else
       i,
 ].take(3).toList();
+
+/// The largest finite 32-bit float: larger decimals become infinite on
+/// Android.
+const _maxFloat = 3.4028234663852886e38;

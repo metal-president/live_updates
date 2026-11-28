@@ -37,7 +37,7 @@ Screenshots of the example app in this repository. See also the
   Dart and Flutter team packages (`ffi`, `objective_c`, `jni`, `crypto`,
   `meta`). Other platforms are a safe no-op.
 
-> **Status:** 0.5.x. Breaking changes come with a new minor version (0.6.0); pin the version you test with.
+> **Status:** 0.5.x. Breaking changes come with a new minor version (0.6.0).
 
 ## Contents
 
